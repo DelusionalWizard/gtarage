@@ -45,12 +45,8 @@ test('Ultimate ASI Loader is not offered where ScriptHookV already provides one'
   // The ScriptHookV download bundles its own dinput8.dll. Offering UAL as
   // well is redundant and makes both mods claim the same file.
   const ual = def('ultimate-asi-loader');
-  // Legacy and Enhanced each carry their own ScriptHookV build, and both
-  // bundle the loader — so neither should be offered UAL.
-  const hookFor: Record<string, string> = {
-    gta5: 'scripthookv',
-    gta5e: 'scripthookv-enhanced',
-  };
+  // The one ScriptHookV download bundles the loader, and it covers both
+  // games — so neither should be offered UAL.
   for (const gameId of ['gta5', 'gta5e'] as GameId[]) {
     assert.ok(!ual.games.includes(gameId), `UAL must not be listed for ${gameId}`);
     assert.ok(
@@ -58,8 +54,8 @@ test('Ultimate ASI Loader is not offered where ScriptHookV already provides one'
       `${gameId} must not see UAL in its catalogue`,
     );
     assert.ok(
-      essentialsFor(gameId).some((e) => e.id === hookFor[gameId]),
-      `${gameId} still needs ${hookFor[gameId]}, which carries the loader`,
+      essentialsFor(gameId).some((e) => e.id === 'scripthookv'),
+      `${gameId} still needs ScriptHookV, which carries the loader`,
     );
   }
 });
@@ -72,30 +68,29 @@ test('the Definitive Editions use UE4SS rather than an ASI loader', () => {
   }
 });
 
-test('Enhanced gets its own tooling, not Legacy tooling', () => {
-  // Enhanced is a separate executable with BattlEye; the Legacy script hook
-  // does not load in it, so offering Legacy's entries there is wrong.
-  const legacy = essentialsFor('gta5' as GameId).map((e) => e.id);
-  const enhanced = essentialsFor('gta5e' as GameId).map((e) => e.id);
+test('one ScriptHookV entry serves both Legacy and Enhanced', () => {
+  // An earlier version split this in two on the assumption that Enhanced
+  // needed its own build. It does not: one download covers both, and the
+  // split meant the setup prompt asked people to fetch the same file twice.
+  const hook = def('scripthookv');
+  assert.deepEqual([...hook.games].sort(), ['gta5', 'gta5e']);
 
-  assert.ok(legacy.includes('scripthookv'), 'Legacy keeps the Legacy hook');
-  assert.ok(legacy.includes('scripthookvdotnet'), 'Legacy keeps stable SHVDN');
-
-  assert.ok(!enhanced.includes('scripthookv'), 'Enhanced must not offer the Legacy hook');
-  assert.ok(
-    !enhanced.includes('scripthookvdotnet'),
-    'Enhanced must not offer the stable SHVDN build, which predates it',
-  );
-  assert.ok(enhanced.includes('scripthookv-enhanced'));
-  assert.ok(enhanced.includes('scripthookvdotnet-nightly'));
+  for (const gameId of ['gta5', 'gta5e'] as GameId[]) {
+    const ids = essentialsFor(gameId).map((e) => e.id);
+    assert.ok(ids.includes('scripthookv'), `${gameId} should be offered ScriptHookV`);
+    assert.ok(
+      !ids.includes('scripthookv-enhanced'),
+      'the separate Enhanced entry must not come back',
+    );
+  }
 });
 
-test('Enhanced dependency fixes resolve to Enhanced builds', () => {
-  const fixes = dependencyFixesFor('gta5e' as GameId);
-  assert.ok(fixes.includes('scripthookv-enhanced'));
-  assert.ok(fixes.includes('scripthookvdotnet-nightly'));
-  assert.ok(!fixes.includes('scripthookv'), 'must not send Enhanced to the Legacy hook');
-  assert.ok(!fixes.includes('scripthookvdotnet'));
+test('the script-hook fix resolves to the same entry for both games', () => {
+  for (const gameId of ['gta5', 'gta5e'] as GameId[]) {
+    const fixes = dependencyFixesFor(gameId);
+    assert.ok(fixes.includes('scripthookv'), `${gameId} should be pointed at ScriptHookV`);
+    assert.ok(!fixes.includes('scripthookv-enhanced'));
+  }
 });
 
 test('the classic games still get an ASI loader', () => {

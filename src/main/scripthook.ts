@@ -49,18 +49,14 @@ export interface HookCandidate {
 }
 
 /**
- * Decide which game an archive is for.
+ * Confirm an archive actually looks like ScriptHookV.
  *
- * The Enhanced build names its payload differently, so the entry list is the
- * signal rather than the filename, which people rename constantly. Returns
- * null when it genuinely cannot tell, and the caller asks.
+ * There is no per-game variant to distinguish: one download covers both
+ * Legacy and Enhanced, so a copy found anywhere can be offered for every game
+ * that needs it.
  */
-function gameFromNames(names: string[]): GameId | null {
-  const joined = names.join(' ').toLowerCase();
-  if (/enhanced/.test(joined)) return 'gta5e';
-  // The Legacy distribution ships the Native Trainer and a bin/ folder.
-  if (/scripthookv\.dll/.test(joined)) return 'gta5';
-  return null;
+function looksLikeHook(names: string[]): boolean {
+  return /scripthookv\.dll/i.test(names.join(' '));
 }
 
 async function namesInside(file: string): Promise<string[]> {
@@ -105,10 +101,16 @@ export async function findDownloadedHook(): Promise<HookCandidate[]> {
 
     const abs = path.join(downloads, entry.name);
     try {
+      const names = await namesInside(abs);
+      // An archive we cannot read (a .rar, say) still counts if it is named
+      // like ScriptHookV; the importer will deal with the format.
+      if (names.length > 0 && !looksLikeHook(names)) continue;
+
       const stat = await fs.stat(abs);
       const candidate: HookCandidate = {
         path: abs,
-        gameId: gameFromNames(await namesInside(abs)) ?? gameFromNames([entry.name]),
+        // One build serves every game, so this is never narrowed.
+        gameId: null,
         source: 'downloads',
         modifiedAt: stat.mtime.toISOString(),
       };
@@ -121,7 +123,30 @@ export async function findDownloadedHook(): Promise<HookCandidate[]> {
   }
 
   // Newest first: people re-download it when a game update breaks the old one.
-  return out.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+  out.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+
+  /*
+   * Collapse browser duplicates.
+   *
+   * Downloading the same file repeatedly leaves `name.zip`, `name (1).zip`,
+   * `name (2).zip` and so on. They are the same archive, and listing five of
+   * them turns a one-click prompt into a guessing game. Keyed on the name with
+   * the counter stripped, keeping the newest of each.
+   */
+  const seen = new Set<string>();
+  return out.filter((candidate) => {
+    // Extension dropped as well as the counter, so the extracted folder and
+    // the archive it came from collapse together — either one imports fine.
+    const key = path
+      .basename(candidate.path)
+      .replace(/\.(zip|rar|7z)$/i, '')
+      .replace(/\s*\(\d+\)\s*$/, '')
+      .trim()
+      .toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
@@ -143,9 +168,9 @@ export async function findInstalledHook(config: AppConfig): Promise<HookCandidat
       const stat = await fs.stat(dll);
       out.push({
         path: install.path,
-        // A copy in a game folder is for that game, by definition: it is the
-        // build that game is currently running.
-        gameId: install.gameId,
+        // Left open: the same build works in every game that needs it, so a
+        // copy sitting in one game folder can set up the other too.
+        gameId: null,
         source: 'game-folder',
         modifiedAt: stat.mtime.toISOString(),
       });
@@ -157,9 +182,20 @@ export async function findInstalledHook(config: AppConfig): Promise<HookCandidat
   return out;
 }
 
-/** Games that need ScriptHookV, are installed, and do not have it yet. */
-export function gamesMissingHook(config: AppConfig): GameId[] {
+/**
+ * Split the games that need ScriptHookV into those that have it and those
+ * that do not.
+ *
+ * Both halves matter to the prompt: Legacy and Enhanced take different,
+ * non-interchangeable builds, so "Enhanced needs it" is only half the story
+ * if Legacy is sitting there already set up.
+ */
+export function hookCoverage(config: AppConfig): {
+  missing: GameId[];
+  present: GameId[];
+} {
   const missing: GameId[] = [];
+  const present: GameId[] = [];
 
   for (const install of config.installs) {
     if (!NEEDS_HOOK.includes(install.gameId)) continue;
@@ -171,10 +207,15 @@ export function gamesMissingHook(config: AppConfig): GameId[] {
         (/script\s*hook\s*v/i.test(m.name) ||
           m.files.some((f) => /^scripthookv\.dll$/i.test(path.basename(f)))),
     );
-    if (!inLibrary) missing.push(install.gameId);
+    (inLibrary ? present : missing).push(install.gameId);
   }
 
-  return missing;
+  return { missing, present };
+}
+
+/** Games that need ScriptHookV, are installed, and do not have it yet. */
+export function gamesMissingHook(config: AppConfig): GameId[] {
+  return hookCoverage(config).missing;
 }
 
 /**

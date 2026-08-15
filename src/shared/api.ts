@@ -165,6 +165,15 @@ export interface HookCandidateView {
 export interface HookStatus {
   /** Installed games that need ScriptHookV and do not have it. */
   missingFor: GameId[];
+  /**
+   * Installed games that need ScriptHookV and already have it.
+   *
+   * Reported so the prompt can say what is already covered. Without it, a
+   * user with Legacy set up and Enhanced not just sees "Enhanced needs
+   * ScriptHookV" with no indication that the two take different builds and
+   * that their Legacy copy is not transferable.
+   */
+  presentFor: GameId[];
   /** Copies already on this machine. */
   candidates: HookCandidateView[];
   /** The official download page. */

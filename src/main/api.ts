@@ -51,6 +51,7 @@ import {
   findDownloadedHook,
   findInstalledHook,
   gamesMissingHook,
+  hookCoverage,
 } from './scripthook';
 import { missingDependencies, scanDependencies } from './depscan';
 import {
@@ -752,8 +753,10 @@ export const handlers: SwapmeetApi = {
       candidates.push(view);
     }
 
+    const coverage = hookCoverage(config);
     return {
-      missingFor: gamesMissingHook(config),
+      missingFor: coverage.missing,
+      presentFor: coverage.present,
       candidates,
       url: SCRIPTHOOKV_URL,
     };

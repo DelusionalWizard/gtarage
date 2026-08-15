@@ -143,20 +143,17 @@ interface Rule {
 }
 
 const RULES: Record<string, Rule> = {
-  // Enhanced is a different executable with its own builds of both hooks, so
-  // the fix offered there must point at the Enhanced entries, not Legacy's.
+  // One ScriptHookV download serves both Legacy and Enhanced.
   scripthookv: {
     capability: 'scripthookv',
     label: 'ScriptHookV',
     essentialId: 'scripthookv',
-    essentialByGame: { gta5e: 'scripthookv-enhanced' },
     games: ['gta5', 'gta5e'],
   },
   shvdn: {
     capability: 'shvdn',
     label: 'ScriptHookV .NET',
     essentialId: 'scripthookvdotnet',
-    essentialByGame: { gta5e: 'scripthookvdotnet-nightly' },
     games: ['gta5', 'gta5e'],
   },
   asiloader: {
@@ -165,7 +162,7 @@ const RULES: Record<string, Rule> = {
     essentialId: 'ultimate-asi-loader',
     // ScriptHookV bundles its own dinput8.dll, so on GTA V it *is* the loader
     // and Ultimate ASI Loader is not offered there at all.
-    essentialByGame: { gta5: 'scripthookv', gta5e: 'scripthookv-enhanced' },
+    essentialByGame: { gta5: 'scripthookv', gta5e: 'scripthookv' },
     // The Definitive Editions are Unreal Engine 4 and have no ASI ecosystem.
     games: ['gta3', 'gtavc', 'gtasa', 'gta4', 'gta5', 'gta5e'],
   },

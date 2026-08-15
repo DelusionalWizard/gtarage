@@ -1697,16 +1697,15 @@ async function maybePromptForHook(): Promise<void> {
 function showHookPrompt(status: HookStatus): void {
   const missing = status.missingFor;
   const names = missing.map((g) => GAME_LABEL[g] ?? g).join(' and ');
+  const verb = missing.length > 1 ? 'need' : 'needs';
 
-  // Only offer a copy whose build matches a game that actually needs it.
-  const usable = status.candidates.filter(
-    (c) => c.gameId === null || missing.includes(c.gameId),
-  );
+  // One download covers every game, so every candidate is usable everywhere.
+  const usable = status.candidates;
 
   openModal({
-    title: `${names} needs ScriptHookV`,
+    title: `${names} ${verb} ScriptHookV`,
     subtitle:
-      'Almost every GTA V script mod depends on it. Its author publishes it from his own site rather than through an API, so Swapmeet cannot fetch it for you — but it can take it from here once you have it.',
+      'Almost every GTA V script mod depends on it, and the same download works for both Legacy and Enhanced. Its author publishes it from his own site rather than through an API, so Swapmeet cannot fetch it for you — but it can take it from here once you have it.',
     build: (body) => {
       if (usable.length > 0) {
         body.appendChild(el('div', 'field-label', 'Found on this machine'));
@@ -1717,7 +1716,7 @@ function showHookPrompt(status: HookStatus): void {
           el(
             'div',
             'alert-body',
-            'Check the version matches your game build — a ScriptHookV from before your last game update will not load.',
+            'Check the version is recent enough for your game build — a ScriptHookV from before your last game update will not load.',
           ),
         );
       } else {
@@ -1725,18 +1724,17 @@ function showHookPrompt(status: HookStatus): void {
           el(
             'div',
             'alert-body',
-            'Download the build that matches your game, then come back — Swapmeet watches your Downloads folder and will offer to install it the moment it appears.',
+            missing.length > 1
+              ? 'Download it once, then come back — Swapmeet watches your Downloads folder and will offer to set up both games from the same file.'
+              : 'Download it, then come back — Swapmeet watches your Downloads folder and will offer to install it the moment it appears.',
           ),
         );
       }
 
-      if (missing.includes('gta5') && missing.includes('gta5e')) {
+      if (status.presentFor.length > 0) {
+        const have = status.presentFor.map((g) => GAME_LABEL[g] ?? g).join(' and ');
         body.appendChild(
-          el(
-            'div',
-            'warning',
-            'GTA V and GTA V Enhanced need different builds of ScriptHookV. The Legacy one will not load in Enhanced, so download each separately.',
-          ),
+          el('div', 'alert-body', `${have} already has ScriptHookV in your library.`),
         );
       }
     },
@@ -1769,7 +1767,7 @@ function hookCandidateRow(candidate: HookCandidateView, missing: string[]): HTML
       '',
       candidate.source === 'downloads'
         ? `In Downloads${candidate.version ? ` · v${candidate.version}` : ''}`
-        : `Already installed in ${GAME_LABEL[candidate.gameId ?? ''] ?? 'a game folder'}`,
+        : 'Already installed in a game folder',
     ),
   );
   main.appendChild(el('div', 'stack-meta', candidate.path));
@@ -1778,12 +1776,12 @@ function hookCandidateRow(candidate: HookCandidateView, missing: string[]): HTML
   }
   row.appendChild(main);
 
-  // A copy is only ever offered for the build it actually is.
+  // The same build serves every game, so one copy sets up all of them.
   const targets = candidate.gameId ? [candidate.gameId] : missing;
   const label =
     targets.length > 1
-      ? 'Use for both'
-      : `Use for ${GAME_LABEL[targets[0] ?? ''] ?? 'this game'}`;
+      ? `Set up ${targets.length} games`
+      : `Set up ${GAME_LABEL[targets[0] ?? ''] ?? 'this game'}`;
 
   const use = el('button', 'small-btn is-primary', label);
   use.addEventListener('click', async () => {

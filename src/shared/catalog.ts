@@ -170,8 +170,7 @@ export const ESSENTIALS: EssentialDef[] = [
       'Runs .NET script mods in GTA V Legacy. Required by most modern script mods. Needs ScriptHookV itself alongside it.',
     author: 'crosire and contributors',
     category: 'core',
-    // Legacy only: the current stable release predates Enhanced entirely.
-    games: ['gta5'],
+    games: ['gta5', 'gta5e'],
     repo: 'scripthookvdotnet/scripthookvdotnet',
     homepage: 'https://github.com/scripthookvdotnet/scripthookvdotnet',
   },
@@ -183,42 +182,31 @@ export const ESSENTIALS: EssentialDef[] = [
    * and BattlEye. Legacy's tooling does not transfer, so it gets its own
    * entries rather than sharing Legacy's.
    *
-   * ScriptHookV itself was updated by its author to support Enhanced, so it
-   * is the same tool from the same page — just a different download. That is
-   * why the Enhanced entry says "take the Enhanced build" rather than
-   * claiming Legacy's will not load at all.
+   * ScriptHookV is a single download that covers both Legacy and Enhanced,
+   * so it is one catalogue entry listed for both games. An earlier version of
+   * this file split it in two on the assumption that Enhanced needed its own
+   * build; that was wrong and is not something to reintroduce.
    *
-   * ScriptHookVDotNet is the opposite case: its newest *stable* release is
-   * v3.6.0 from 2022, which predates Enhanced and never mentions it, while
-   * the official nightly mirror is still building (August 2026). So nightly
-   * is where Enhanced support appears first -- stated as "check the notes",
-   * not as a promise, because the API does not confirm it.
+   * ScriptHookVDotNet is listed twice for a different and verifiable reason:
+   * its newest *stable* release is v3.6.0 from 2022, while the official
+   * nightly mirror is still building (checked August 2026). Both are offered
+   * for both games, with the nightly described as the one to try when the
+   * stable will not load — a statement about release dates, not a claim about
+   * compatibility we have not tested.
    *
-   * The limit adjusters matter more on Enhanced than they read: the RPF cap
-   * is what turns "I added a few car mods" into a crash on load.
+   * The limit adjusters matter more than they read: the RPF cap is what turns
+   * "I added a few car mods" into a crash on load.
    */
   {
     id: 'scripthookvdotnet-nightly',
     name: 'ScriptHookV .NET (nightly)',
     summary:
-      'The rolling build of ScriptHookV .NET. Enhanced support lands here before it reaches a stable release, so this is the build to try — check the release notes match your game version.',
+      'The rolling build of ScriptHookV .NET. The stable release is from 2022, so the nightly is where support for newer game builds lands first — worth trying if the stable one will not load.',
     author: 'crosire and contributors',
     category: 'core',
-    games: ['gta5e'],
+    games: ['gta5', 'gta5e'],
     repo: 'scripthookvdotnet/scripthookvdotnet-nightly',
     homepage: 'https://github.com/scripthookvdotnet/scripthookvdotnet-nightly',
-  },
-  {
-    id: 'scripthookv-enhanced',
-    name: 'ScriptHookV (Enhanced build)',
-    summary:
-      'The native script hook, updated for GTA V Enhanced. Same tool and same page as the Legacy version, but a separate download — take the one labelled for Enhanced. Includes the Native Trainer, which is the quickest way to confirm your setup loads.',
-    author: 'Alexander Blade',
-    category: 'core',
-    games: ['gta5e'],
-    homepage: 'http://www.dev-c.com/gtav/scripthookv/',
-    manualReason:
-      'ScriptHookV is released only from the author’s own site, which has no download API. Grab the build for Enhanced, then drag the archive back here.',
   },
   {
     id: 'rageopenv',
@@ -271,8 +259,8 @@ export const ESSENTIALS: EssentialDef[] = [
       'The native script hook for GTA V — nearly every script mod needs it. The download also includes an ASI loader and the Native Trainer, so no separate loader is required. Note it disables itself in GTA Online.',
     author: 'Alexander Blade',
     category: 'core',
-    // Legacy only; Enhanced has its own build, listed separately.
-    games: ['gta5'],
+    // One build covers both Legacy and Enhanced.
+    games: ['gta5', 'gta5e'],
     homepage: 'http://www.dev-c.com/gtav/scripthookv/',
     manualReason:
       'ScriptHookV is released only from the author’s own site, which has no download API. Swapmeet will open the page so you can fetch it, then you can drag the archive straight in.',
