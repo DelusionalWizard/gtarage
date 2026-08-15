@@ -20,7 +20,7 @@
     <header class="titlebar">
       <div class="brand-mark" aria-hidden="true"></div>
       <div class="brand">SWAPMEET</div>
-      <div class="brand-version" id="app-version">v0.2.3</div>
+      <div class="brand-version" id="app-version"></div>
 
       <div class="titlebar-divider"></div>
 
@@ -30,6 +30,22 @@
       <div class="game-note" id="game-note"></div>
 
       <div class="titlebar-spacer"></div>
+
+      <!--
+        Settings gets its own place in the chrome rather than a tab.
+        It is app configuration, not one of the things you switch between
+        while working, which is what the tab row is for.
+      -->
+      <button
+        id="btn-settings"
+        class="chrome-btn"
+        title="Settings, folders and the game folder check"
+      >
+        <span class="chrome-btn-icon" aria-hidden="true">&#9881;</span>
+        Settings
+      </button>
+
+      <div class="titlebar-divider"></div>
 
       <div class="window-controls">
         <button id="win-min" class="win-btn" title="Minimise" aria-label="Minimise">&#8211;</button>
@@ -66,7 +82,6 @@
           <button class="tab" data-tab="order">Load order</button>
           <button class="tab" data-tab="browse">Browse</button>
           <button class="tab" data-tab="saves">Saves</button>
-          <button class="tab" data-tab="settings">Settings</button>
         </nav>
 
         <div class="toolbar" id="toolbar">
@@ -75,8 +90,24 @@
             <input id="search" type="search" placeholder="search your mods…" spellcheck="false" />
           </div>
           <div class="chips" id="chips"></div>
-          <button id="btn-add-mod" class="solid-btn" title="Add mod archives or loose files to your library">Add files</button>
-          <button id="btn-add-folder" class="outline-btn" title="Add an already-extracted mod folder to your library">Add folder</button>
+
+          <label class="mini-toggle" title="Hide mods that are switched off in this profile">
+            <input type="checkbox" id="hide-disabled" />
+            <span>Hide off</span>
+          </label>
+
+          <!--
+            One button. Windows cannot show a picker that takes files *and*
+            folders, so this opens the file picker (which is what almost every
+            mod is) and offers the folder picker from inside the same flow.
+          -->
+          <button
+            id="btn-install"
+            class="solid-btn"
+            title="Install a mod from a .zip, .rar, .oiv, a loose file, or a folder"
+          >
+            Install mod
+          </button>
         </div>
 
         <section class="view" id="view"></section>
@@ -84,9 +115,13 @@
         <footer class="actionbar">
           <div class="action-status" id="action-status"></div>
           <div class="actionbar-spacer"></div>
-          <button id="btn-backup" class="outline-btn" title="Take a snapshot of your save games right now">Back up saves</button>
-          <button id="btn-verify" class="outline-btn" title="Check your game folder for mod files Swapmeet did not install">Check game folder</button>
-          <button id="btn-apply" class="primary-btn" title="Show what will change, then install this profile and start the game">Apply &amp; launch</button>
+          <!--
+            Apply and Launch are separate: changing profile is far more common
+            than changing profile *and* starting the game, and pairing them
+            forced a game launch every time you wanted to switch.
+          -->
+          <button id="btn-apply" class="primary-btn" title="Show what will change, then install this profile into your game folder">Apply profile</button>
+          <button id="btn-launch" class="outline-btn" title="Start the game without changing anything">Launch game</button>
         </footer>
       </main>
 

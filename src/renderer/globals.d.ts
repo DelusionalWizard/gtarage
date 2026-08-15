@@ -20,6 +20,8 @@ type ImportReport = import('../shared/api').ImportReport;
 type NexusAccount = import('../shared/api').NexusAccount;
 type GraphicsView = import('../shared/api').GraphicsView;
 type AdoptGroupView = import('../shared/api').AdoptGroupView;
+type HookStatus = import('../shared/api').HookStatus;
+type HookCandidateView = import('../shared/api').HookCandidateView;
 type SiteEvent = import('../shared/api').SiteEvent;
 
 type BrowseResult = import('../shared/catalog').BrowseResult;

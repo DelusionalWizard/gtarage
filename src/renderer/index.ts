@@ -16,15 +16,26 @@ const api = window.swapmeet;
 
 // --- local view state -------------------------------------------------------
 
+/**
+ * Settings is not in this list: it lives in the header and opens as its own
+ * view, because it is app configuration rather than one of the things you
+ * switch between while managing mods.
+ */
 type TabId = 'mods' | 'order' | 'browse' | 'saves' | 'settings';
 
 let state: AppState | null = null;
 let tab: TabId = 'mods';
 let search = '';
 let filter = 'all';
+/** Hide mods switched off in the current profile, to keep the list readable. */
+let hideDisabled = false;
 let saves: SaveSnapshotView[] = [];
 /** Hand-installed files found in the game folder, offered for import. */
 let adoptable: AdoptGroupView[] = [];
+/** Set once the ScriptHookV prompt has been shown or dismissed this session. */
+let hookPromptSettled = false;
+/** Timer used while waiting for a ScriptHookV download to appear. */
+let hookWatchTimer: number | null = null;
 
 // Browser tab state
 let provider: ProviderId = 'essentials';
@@ -68,6 +79,28 @@ function formatBytes(bytes: number): string {
     unit += 1;
   }
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
+/**
+ * A precise, local, unambiguous timestamp.
+ *
+ * "3 days ago" is fine for a mod's import date, but useless when you are
+ * picking which of six snapshots to restore, so those show the real time.
+ */
+function formatExact(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const date = d.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  const time = d.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  return `${date}, ${time} (${formatDate(iso)})`;
 }
 
 function formatDate(iso: string): string {
@@ -225,11 +258,17 @@ function renderTitlebar(s: AppState): void {
   }
 
   const current = s.games.find((g) => g.id === s.currentGameId);
-  byId('game-note').textContent = current
+  const note = current
     ? current.installed
       ? `${current.name}${current.version ? ` · ${current.version}` : ''}`
       : `${current.name} — not detected`
     : 'No game selected';
+  byId('app-version').textContent = `v${s.appVersion}`;
+
+  const noteEl = byId('game-note');
+  noteEl.textContent = note;
+  // Capped at 40vw and ellipsised, so keep the full text on hover.
+  noteEl.title = current?.path ? `${note}\n${current.path}` : note;
 }
 
 // --- rendering: sidebar -----------------------------------------------------
@@ -252,7 +291,9 @@ function renderSidebar(s: AppState): void {
 
     const row = el('button', `profile${profile.id === s.activeProfileId ? ' is-active' : ''}`);
     const main = el('div', 'profile-main');
-    main.appendChild(el('div', 'profile-name', profile.name));
+    const nameEl = el('div', 'profile-name', profile.name);
+    nameEl.title = profile.name; // ellipsised when long
+    main.appendChild(nameEl);
     main.appendChild(
       el(
         'div',
@@ -463,11 +504,17 @@ function visibleMods(s: AppState): Mod[] {
   const conflicts = conflictMap(s.conflicts);
   const needle = search.trim().toLowerCase();
 
+  const enabled = new Set(profile?.enabled ?? []);
+
   return s.mods
     .filter((m) => {
       if (needle && !`${m.name} ${m.category} ${m.kind}`.toLowerCase().includes(needle)) {
         return false;
       }
+      // Switched-off mods stay in the library and stay listed by default, so
+      // you can find and re-enable them; this just collapses the noise when a
+      // library gets big.
+      if (hideDisabled && !enabled.has(m.id)) return false;
       if (filter === 'all') return true;
       if (filter === 'conflicts') return conflicts.has(m.id);
       if (filter === 'enabled') return profile?.enabled.includes(m.id) ?? false;
@@ -520,7 +567,7 @@ function renderModsTable(s: AppState, view: HTMLElement): void {
         'No mods yet',
         'Drag a mod in anywhere \u2014 a .zip, .rar or .oiv archive, a folder, or a loose file. Or open the Browse tab, where Swapmeet can fetch the essential tools straight from their official release pages. Mods are kept in Swapmeet\u2019s own folder, so your game is not touched until you apply a profile.',
         'Add mod files',
-        () => addMods('files'),
+        () => installMod('files'),
       ),
     );
     return;
@@ -554,9 +601,15 @@ function renderModsTable(s: AppState, view: HTMLElement): void {
 
     row.appendChild(el('div', 'row-index', String(index + 1).padStart(2, '0')));
 
+    // These two are ellipsised when the column is narrow, so the full value
+    // has to stay reachable on hover rather than being simply lost.
     const nameCell = el('div');
-    nameCell.appendChild(el('div', 'mod-name', mod.name));
-    nameCell.appendChild(el('div', 'mod-file', describeFiles(mod)));
+    const nameEl = el('div', 'mod-name', mod.name);
+    nameEl.title = mod.name;
+    nameCell.appendChild(nameEl);
+    const fileEl = el('div', 'mod-file', describeFiles(mod));
+    fileEl.title = mod.files.join('\n');
+    nameCell.appendChild(fileEl);
     row.appendChild(nameCell);
 
     row.appendChild(el('div', 'cell-mono', mod.version));
@@ -721,10 +774,8 @@ function renderOrder(s: AppState, view: HTMLElement): void {
   });
 
   view.appendChild(stack);
-
-  const drop = el('div', 'dropzone', 'Drop a mod archive or folder here to add it');
-  wireDropzone(drop);
-  view.appendChild(drop);
+  // No drop target here: installing belongs on the Mods tab, and having two
+  // places that accept mods made it unclear which one was "the" way in.
 }
 
 // --- rendering: browse ------------------------------------------------------
@@ -1108,6 +1159,18 @@ function renderSaves(s: AppState, view: HTMLElement): void {
   head.appendChild(el('div', 'card-title', 'Save snapshots'));
   head.appendChild(el('div', 'card-count', `${saves.length} kept`));
   head.appendChild(el('div', 'card-spacer'));
+
+  const openSaves = el('button', 'small-btn', 'Open saves folder');
+  openSaves.title = "Open the game's own save folder in Explorer";
+  openSaves.addEventListener('click', () => {
+    if (s.currentGameId) {
+      void api.openPath('saves', s.currentGameId).catch((err: Error) => toast(err.message, 'error'));
+    }
+  });
+  head.appendChild(openSaves);
+
+  // Backing up lives here, next to the snapshots it produces, rather than in
+  // the action bar where it sat between the two buttons people actually use.
   const backupBtn = el('button', 'small-btn is-primary', 'Snapshot now');
   backupBtn.addEventListener('click', () => backupSaves());
   head.appendChild(backupBtn);
@@ -1126,8 +1189,27 @@ function renderSaves(s: AppState, view: HTMLElement): void {
       const row = el('div', 'card-row');
       const main = el('div', 'setting-main');
       main.appendChild(el('div', 'setting-name', snap.label));
+      // Two different times, and the difference matters: the snapshot time is
+      // when you swapped profiles, the save time is how far along the save
+      // itself actually is.
       main.appendChild(
-        el('div', 'setting-desc', `${formatDate(snap.createdAt)} · ${formatBytes(snap.size)}`),
+        el('div', 'setting-desc', `Snapshot taken ${formatExact(snap.createdAt)}`),
+      );
+      main.appendChild(
+        el(
+          'div',
+          'setting-desc',
+          snap.savedAt
+            ? `Game last saved ${formatExact(snap.savedAt)}`
+            : 'Game save time unknown',
+        ),
+      );
+      main.appendChild(
+        el(
+          'div',
+          'setting-desc',
+          `${snap.fileCount} file${snap.fileCount === 1 ? '' : 's'} · ${formatBytes(snap.size)}`,
+        ),
       );
       row.appendChild(main);
 
@@ -1242,6 +1324,62 @@ function renderSettings(s: AppState, view: HTMLElement): void {
   limitRow.appendChild(limitInput);
   toggles.appendChild(limitRow);
   cards.appendChild(toggles);
+
+  // The folder check lives here now: it is a maintenance tool you reach for
+  // occasionally, not something that belongs in the action bar next to the
+  // buttons used on every visit.
+  const checks = el('div', 'card');
+  const chead = el('div', 'card-head');
+  chead.appendChild(el('div', 'card-title', 'Game folder'));
+  checks.appendChild(chead);
+
+  const checkRow = el('div', 'setting');
+  const checkMain = el('div', 'setting-main');
+  checkMain.appendChild(el('div', 'setting-name', 'Check the game folder'));
+  checkMain.appendChild(
+    el(
+      'div',
+      'setting-desc',
+      'Looks for mod files in your game folder that Swapmeet did not install — usually left behind by a manual install — and for anything it expected that has gone missing.',
+    ),
+  );
+  checkRow.appendChild(checkMain);
+  const checkBtn = el('button', 'small-btn is-primary', 'Check now');
+  checkBtn.disabled = !s.games.find((g) => g.id === s.currentGameId)?.installed;
+  checkBtn.addEventListener('click', () => verify());
+  checkRow.appendChild(checkBtn);
+  checks.appendChild(checkRow);
+
+  const undeployRow = el('div', 'setting');
+  const undeployMain = el('div', 'setting-main');
+  undeployMain.appendChild(el('div', 'setting-name', 'Remove all mods from the game folder'));
+  undeployMain.appendChild(
+    el(
+      'div',
+      'setting-desc',
+      'Takes every file Swapmeet installed back out and restores anything it displaced. Your library and profiles are untouched.',
+    ),
+  );
+  undeployRow.appendChild(undeployMain);
+  const undeployBtn = el('button', 'danger-btn', 'Remove all');
+  undeployBtn.disabled = !s.deployed;
+  undeployBtn.addEventListener('click', async () => {
+    if (!s.currentGameId) return;
+    const ok = await confirmModal(
+      'Remove every installed mod?',
+      'This puts your game folder back the way Swapmeet found it. Nothing is deleted from your library.',
+      'Remove all',
+    );
+    if (!ok) return;
+    const result = await guard('Removing…', () => api.undeployAll(s.currentGameId!));
+    if (!result) return;
+    apply(result.state);
+    for (const problem of result.problems) toast(problem, 'warn');
+    toast('Game folder returned to vanilla.', 'ok');
+  });
+  undeployRow.appendChild(undeployBtn);
+  checks.appendChild(undeployRow);
+  cards.appendChild(checks);
 
   const folders = el('div', 'card');
   const fhead = el('div', 'card-head');
@@ -1531,6 +1669,181 @@ function renderInspector(s: AppState): void {
   );
 }
 
+// --- ScriptHookV setup ------------------------------------------------------
+
+const GAME_LABEL: Record<string, string> = {
+  gta5: 'GTA V',
+  gta5e: 'GTA V Enhanced',
+};
+
+/**
+ * Offer to set up ScriptHookV when a game that needs it does not have it.
+ *
+ * Shown once per session. If a copy is already on the machine this is a
+ * single click; otherwise it opens the official page and then watches for the
+ * download to land, so the user never has to come back and find the file.
+ */
+async function maybePromptForHook(): Promise<void> {
+  if (hookPromptSettled) return;
+  const status = await api.hookStatus().catch(() => null);
+  if (!status || status.missingFor.length === 0) {
+    hookPromptSettled = true;
+    return;
+  }
+  hookPromptSettled = true;
+  showHookPrompt(status);
+}
+
+function showHookPrompt(status: HookStatus): void {
+  const missing = status.missingFor;
+  const names = missing.map((g) => GAME_LABEL[g] ?? g).join(' and ');
+
+  // Only offer a copy whose build matches a game that actually needs it.
+  const usable = status.candidates.filter(
+    (c) => c.gameId === null || missing.includes(c.gameId),
+  );
+
+  openModal({
+    title: `${names} needs ScriptHookV`,
+    subtitle:
+      'Almost every GTA V script mod depends on it. Its author publishes it from his own site rather than through an API, so Swapmeet cannot fetch it for you — but it can take it from here once you have it.',
+    build: (body) => {
+      if (usable.length > 0) {
+        body.appendChild(el('div', 'field-label', 'Found on this machine'));
+        for (const candidate of usable) {
+          body.appendChild(hookCandidateRow(candidate, missing));
+        }
+        body.appendChild(
+          el(
+            'div',
+            'alert-body',
+            'Check the version matches your game build — a ScriptHookV from before your last game update will not load.',
+          ),
+        );
+      } else {
+        body.appendChild(
+          el(
+            'div',
+            'alert-body',
+            'Download the build that matches your game, then come back — Swapmeet watches your Downloads folder and will offer to install it the moment it appears.',
+          ),
+        );
+      }
+
+      if (missing.includes('gta5') && missing.includes('gta5e')) {
+        body.appendChild(
+          el(
+            'div',
+            'warning',
+            'GTA V and GTA V Enhanced need different builds of ScriptHookV. The Legacy one will not load in Enhanced, so download each separately.',
+          ),
+        );
+      }
+    },
+    actions: [
+      { label: 'Not now', onClick: () => true },
+      {
+        label: 'Open the download page',
+        kind: 'primary',
+        onClick: () => {
+          void api.openExternal(status.url).catch((err: Error) => toast(err.message, 'error'));
+          watchForHookDownload();
+          toast('Watching your Downloads folder — I will offer to install it when it arrives.', 'ok');
+          return true;
+        },
+      },
+    ],
+  });
+}
+
+function hookCandidateRow(candidate: HookCandidateView, missing: string[]): HTMLElement {
+  const row = el('div', 'diff-row');
+  row.appendChild(
+    el('div', 'diff-sign', candidate.source === 'downloads' ? 'ZIP' : 'GAME'),
+  );
+
+  const main = el('div', 'diff-name');
+  main.appendChild(
+    el(
+      'div',
+      '',
+      candidate.source === 'downloads'
+        ? `In Downloads${candidate.version ? ` · v${candidate.version}` : ''}`
+        : `Already installed in ${GAME_LABEL[candidate.gameId ?? ''] ?? 'a game folder'}`,
+    ),
+  );
+  main.appendChild(el('div', 'stack-meta', candidate.path));
+  if (candidate.contents.length > 0) {
+    main.appendChild(el('div', 'stack-meta', candidate.contents.slice(0, 4).join(', ')));
+  }
+  row.appendChild(main);
+
+  // A copy is only ever offered for the build it actually is.
+  const targets = candidate.gameId ? [candidate.gameId] : missing;
+  const label =
+    targets.length > 1
+      ? 'Use for both'
+      : `Use for ${GAME_LABEL[targets[0] ?? ''] ?? 'this game'}`;
+
+  const use = el('button', 'small-btn is-primary', label);
+  use.addEventListener('click', async () => {
+    closeModal();
+    const result = await guard('Setting up ScriptHookV…', () =>
+      api.installHook(candidate.path, targets as GameId[]),
+    );
+    if (!result) return;
+    apply(result.state);
+    toast(result.message, 'ok');
+    await refresh();
+  });
+  row.appendChild(use);
+  return row;
+}
+
+/**
+ * Poll for a ScriptHookV archive appearing in Downloads.
+ *
+ * Polling rather than watching: the user is off in a browser, this only runs
+ * while they are mid-setup, and it stops itself after a few minutes so it
+ * never becomes a background cost.
+ */
+function watchForHookDownload(): void {
+  if (hookWatchTimer !== null) return;
+  const startedAt = Date.now();
+
+  hookWatchTimer = window.setInterval(async () => {
+    // Give up after five minutes; they can retry from Settings.
+    if (Date.now() - startedAt > 5 * 60 * 1000) {
+      stopHookWatch();
+      return;
+    }
+
+    const status = await api.hookStatus().catch(() => null);
+    if (!status || status.missingFor.length === 0) {
+      stopHookWatch();
+      return;
+    }
+
+    const fresh = status.candidates.filter(
+      (c) =>
+        c.source === 'downloads' &&
+        (c.gameId === null || status.missingFor.includes(c.gameId)) &&
+        Date.parse(c.modifiedAt) >= startedAt - 60_000,
+    );
+    if (fresh.length === 0) return;
+
+    stopHookWatch();
+    showHookPrompt({ ...status, candidates: fresh });
+  }, 4000);
+}
+
+function stopHookWatch(): void {
+  if (hookWatchTimer !== null) {
+    window.clearInterval(hookWatchTimer);
+    hookWatchTimer = null;
+  }
+}
+
 async function adoptGroup(
   group: AdoptGroupView,
   s: AppState,
@@ -1742,6 +2055,8 @@ async function refresh(): Promise<void> {
     // Best-effort: a scan failure must not stop the app from rendering.
     adoptable = await api.scanAdoptable(next.currentGameId).catch(() => []);
     render();
+    // Offered after the first render so the app is on screen behind it.
+    void maybePromptForHook();
   }
 }
 
@@ -1832,12 +2147,56 @@ function requireGame(action: string): boolean {
  * Windows cannot show one dialog that takes files *and* folders, so the two
  * are separate actions rather than a single misleading button.
  */
-async function addMods(mode: 'files' | 'folder'): Promise<void> {
-  if (!requireGame('add mods')) return;
-  const result = await guard('Importing…', () => api.importMods(state!.currentGameId!, mode));
+/**
+ * One install entry point.
+ *
+ * Windows genuinely cannot show a picker that accepts files *and* folders, so
+ * rather than two buttons that make the user guess which applies, this opens
+ * the file picker — which covers essentially every mod, since they arrive as
+ * archives — and offers the folder picker from inside the same flow for the
+ * already-extracted case.
+ */
+async function installMod(mode: 'files' | 'folder' = 'files'): Promise<void> {
+  if (!requireGame('install mods')) return;
+  const result = await guard('Installing…', () => api.importMods(state!.currentGameId!, mode));
   if (!result) return;
   apply(result.state);
+
+  // Nothing chosen and nothing failed means the picker was cancelled. Offer
+  // the folder picker rather than leaving the user wondering where folders go.
+  if (result.report.imported.length === 0 && result.report.failed.length === 0) {
+    if (mode === 'files') offerFolderPicker();
+    return;
+  }
   reportImport(result.report);
+}
+
+function offerFolderPicker(): void {
+  openModal({
+    title: 'Installing an already-extracted mod?',
+    subtitle:
+      'Windows cannot offer files and folders in one picker, so folders get their own step.',
+    build: (body) => {
+      body.appendChild(
+        el(
+          'div',
+          'alert-body',
+          'Most mods arrive as a .zip, .rar, .7z or .oiv, and those go through the file picker. Choose a folder here only if you have already unpacked the mod yourself.',
+        ),
+      );
+    },
+    actions: [
+      { label: 'Cancel', onClick: () => true },
+      {
+        label: 'Choose a folder',
+        kind: 'primary',
+        onClick: () => {
+          void installMod('folder');
+          return true;
+        },
+      },
+    ],
+  });
 }
 
 async function importPaths(paths: string[]): Promise<void> {
@@ -1931,6 +2290,36 @@ async function goVanilla(s: AppState): Promise<void> {
   const next = await api.setActiveProfile(s.currentGameId, vanilla.id);
   apply(next);
   await applyProfile();
+}
+
+/**
+ * Start the game without touching the deployment.
+ *
+ * Warns first when the profile on disk is not the one selected, since that is
+ * the one case where launching does something the user probably did not mean.
+ */
+async function launchOnly(): Promise<void> {
+  const s = state;
+  if (!s?.currentGameId) return;
+
+  const selected = s.profiles.find((p) => p.id === s.activeProfileId);
+  const deployedId = s.deployed?.profileId ?? null;
+  const mismatch = selected && deployedId !== selected.id;
+
+  if (mismatch) {
+    const ok = await confirmModal(
+      'Launch without applying?',
+      s.deployed
+        ? `Your game folder currently has "${s.deployed.profileName}" installed, but "${selected.name}" is selected. Launching now runs ${s.deployed.profileName}.`
+        : `No mods are installed in your game folder right now, but "${selected.name}" is selected. Launching now runs the game unmodded.`,
+      'Launch anyway',
+    );
+    if (!ok) return;
+  }
+
+  const launched = await api.launchGame(s.currentGameId);
+  if (launched.ok) toast('Starting the game…', 'ok');
+  else toast(launched.error ?? 'Could not start the game.', 'error');
 }
 
 /** The swap preview, then the deploy. */
@@ -2177,12 +2566,21 @@ function render(): void {
   }
 
   const profile = s.profiles.find((p) => p.id === s.activeProfileId);
-  byId('action-status').textContent = s.deployed
+  const statusEl = byId('action-status');
+  statusEl.title = s.deployed
+    ? `${s.deployed.profileName} was installed ${formatExact(s.deployed.deployedAt)}`
+    : 'No mods are installed in the game folder yet';
+  statusEl.textContent = s.deployed
     ? `${s.deployed.profileName} is installed \u00b7 ${s.deployed.fileCount} files \u00b7 ${s.conflicts.length} conflict(s)`
     : `Nothing installed yet \u00b7 ${profile?.enabled.length ?? 0} mod(s) switched on and ready`;
 
   byId<HTMLButtonElement>('btn-apply').disabled = !profile || !current?.installed;
-  byId<HTMLButtonElement>('btn-verify').disabled = !current?.installed;
+  byId<HTMLButtonElement>('btn-launch').disabled = !current?.installed;
+  byId<HTMLButtonElement>('btn-install').disabled = !current?.installed;
+
+  // The toolbar only makes sense on the mods list.
+  byId('toolbar').hidden = tab !== 'mods';
+  byId('btn-settings').classList.toggle('is-active', tab === 'settings');
 }
 
 // --- wiring -----------------------------------------------------------------
@@ -2211,22 +2609,44 @@ byId('tabs').addEventListener('click', (event) => {
   if (tab === 'browse' && !browseResult && !browseLoading) void loadBrowse();
 });
 
+/*
+ * Debounced: every keystroke rebuilds the whole mod table, which is fine for
+ * a dozen mods and visibly laggy for a few hundred. 90ms is below the
+ * threshold where typing feels delayed but coalesces a fast typist's input
+ * into one render.
+ */
+let searchTimer: number | null = null;
 byId('search').addEventListener('input', (event) => {
   search = (event.target as HTMLInputElement).value;
-  render();
+  if (searchTimer !== null) window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => {
+    searchTimer = null;
+    render();
+  }, 90);
 });
 
-byId('btn-add-mod').addEventListener('click', () => addMods('files'));
-byId('btn-add-folder').addEventListener('click', () => addMods('folder'));
+byId('btn-install').addEventListener('click', () => installMod('files'));
 byId('new-profile').addEventListener('click', () => newProfile());
 byId('btn-detect').addEventListener('click', () => detect_());
 byId('btn-browse').addEventListener('click', () => browseForGame());
 byId('btn-open-game').addEventListener('click', () => {
   if (state?.currentGameId) void api.openPath('game', state.currentGameId);
 });
-byId('btn-backup').addEventListener('click', () => backupSaves());
-byId('btn-verify').addEventListener('click', () => verify());
-byId('btn-apply').addEventListener('click', () => applyProfile(true));
+
+// Apply and Launch are independent: switching profile should not force the
+// game to start, and starting the game should not force a redeploy.
+byId('btn-apply').addEventListener('click', () => applyProfile(false));
+byId('btn-launch').addEventListener('click', () => launchOnly());
+
+byId('btn-settings').addEventListener('click', () => {
+  tab = tab === 'settings' ? 'mods' : 'settings';
+  render();
+});
+
+byId('hide-disabled').addEventListener('change', (event) => {
+  hideDisabled = (event.target as HTMLInputElement).checked;
+  render();
+});
 
 byId('modal-scrim').addEventListener('click', (event) => {
   if (event.target === byId('modal-scrim')) closeModal();

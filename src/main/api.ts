@@ -28,6 +28,7 @@ import type {
   ImportReport,
   NexusAccount,
   SwapmeetApi,
+  HookCandidateView,
   SaveSnapshotView,
   SiteEvent,
   VerifyView,
@@ -44,6 +45,13 @@ import {
 import { promises as fs } from 'node:fs';
 
 import { findAdoptable } from './adopt';
+import {
+  SCRIPTHOOKV_URL,
+  describeCandidate,
+  findDownloadedHook,
+  findInstalledHook,
+  gamesMissingHook,
+} from './scripthook';
 import { missingDependencies, scanDependencies } from './depscan';
 import {
   captureGraphics,
@@ -91,7 +99,13 @@ import {
   refreshMod,
   repairLayout,
 } from './library';
-import { listSnapshots, restoreSnapshot, snapshotSaves } from './saves';
+import {
+  listSnapshots,
+  restoreSnapshot,
+  saveFolders,
+  snapshotSaves,
+  type SaveSnapshot,
+} from './saves';
 
 let userDataDir = '';
 let mainWindow: BrowserWindow | null = null;
@@ -187,6 +201,7 @@ async function buildState(config: AppConfig): Promise<AppState> {
         deps: missingDependencies(mod, mods),
       }))
       .filter((entry) => entry.deps.length > 0),
+    appVersion: app.getVersion(),
     nexus: nexusAccount,
     hasNexusKey: Boolean(config.nexusApiKey),
     // Surfaced so the UI can warn rather than silently looking freshly
@@ -717,6 +732,90 @@ export const handlers: SwapmeetApi = {
     };
   },
 
+  async hookStatus() {
+    const config = await loadConfig(userDataDir);
+    const found = [
+      ...(await findInstalledHook(config)),
+      ...(await findDownloadedHook()),
+    ];
+
+    const candidates: HookCandidateView[] = [];
+    for (const candidate of found) {
+      const view: HookCandidateView = {
+        path: candidate.path,
+        gameId: candidate.gameId,
+        source: candidate.source,
+        modifiedAt: candidate.modifiedAt,
+        contents: await describeCandidate(candidate),
+      };
+      if (candidate.version) view.version = candidate.version;
+      candidates.push(view);
+    }
+
+    return {
+      missingFor: gamesMissingHook(config),
+      candidates,
+      url: SCRIPTHOOKV_URL,
+    };
+  },
+
+  async installHook(sourcePath, gameIds) {
+    if (gameIds.length === 0) throw new Error('No game chosen.');
+
+    const installedFor: GameId[] = [];
+    const failures: string[] = [];
+
+    /*
+     * Imported once per game rather than once overall.
+     *
+     * Legacy and Enhanced keep separate libraries, and their builds are not
+     * interchangeable, so a copy is only installed into a game whose build it
+     * actually is. The caller has already narrowed the list.
+     */
+    for (const gameId of gameIds) {
+      try {
+        const result = await handlers.importPaths(gameId, [sourcePath]);
+        const imported = result.report.imported[0];
+        if (!imported) {
+          failures.push(result.report.failed[0]?.error ?? 'import failed');
+          continue;
+        }
+
+        await mutate((cfg) => {
+          const mod = cfg.mods.find((m) => m.id === imported.id);
+          if (mod) {
+            mod.name = 'ScriptHookV';
+            mod.core = true;
+          }
+          // Switch it on: it is a prerequisite, so an installed-but-disabled
+          // ScriptHookV is never what anyone wanted.
+          const profile = activeProfileFor(cfg, gameId);
+          if (profile && !profile.vanillaLock && !profile.enabled.includes(imported.id)) {
+            profile.enabled.push(imported.id);
+            profile.order = normaliseOrder(profile.order, cfg.mods);
+            profile.enabled = profile.order.filter((id) => profile.enabled.includes(id));
+          }
+        });
+        installedFor.push(gameId);
+      } catch (err) {
+        failures.push((err as Error).message);
+      }
+    }
+
+    if (installedFor.length === 0) {
+      throw new Error(failures[0] ?? 'ScriptHookV could not be installed.');
+    }
+
+    const names = installedFor.map((id) => getGame(id).shortName).join(' and ');
+    return {
+      state: await state(),
+      installedFor,
+      message:
+        `ScriptHookV added to your library for ${names} and switched on. ` +
+        'Apply the profile to install it into the game folder.',
+    };
+  },
+
   async graphicsFor(profileId) {
     const config = await loadConfig(userDataDir);
     const profile = requireProfile(config, profileId);
@@ -813,6 +912,19 @@ export const handlers: SwapmeetApi = {
       case 'library':
         target = gameId ? libraryFor(config, gameId) : config.libraryPath;
         break;
+      case 'saves': {
+        if (!gameId) throw new Error('No game selected.');
+        // The game's own save folder, not Swapmeet's snapshots of it.
+        const folders = await saveFolders(gameId);
+        const first = folders[0];
+        if (!first) {
+          throw new Error(
+            `${getGame(gameId).shortName} has not created a save folder yet. Launch the game once first.`,
+          );
+        }
+        target = first;
+        break;
+      }
       case 'shelf':
         target = config.shelfPath;
         break;
@@ -991,8 +1103,16 @@ export const handlers: SwapmeetApi = {
   },
 };
 
-function toSaveView(s: { id: string; createdAt: string; label: string; size: number }): SaveSnapshotView {
-  return { id: s.id, createdAt: s.createdAt, label: s.label, size: s.size };
+function toSaveView(s: SaveSnapshot): SaveSnapshotView {
+  const view: SaveSnapshotView = {
+    id: s.id,
+    createdAt: s.createdAt,
+    label: s.label,
+    size: s.size,
+    fileCount: s.fileCount,
+  };
+  if (s.savedAt) view.savedAt = s.savedAt;
+  return view;
 }
 
 /** Mods for a game, exported for tests. */

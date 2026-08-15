@@ -105,6 +105,18 @@ const PROXY_DLL = /^(dinput8|dsound|winmm|version|vorbisfile|binkw32|xlive|winin
 const MOD_ONLY_DIR = /(^|\/)(scripts|cleo|modloader|~mods|ue4ss)(\/|$)/i;
 
 /**
+ * Engine and vendor libraries the games ship with. Never a mod, anywhere.
+ *
+ * The rules below are already meant to exclude these by requiring positive
+ * evidence, but this list is a hard floor underneath them: offering someone
+ * their own `steam_api64.dll` as a mod, and then letting them "disable" it,
+ * breaks the game. Every name here was observed in a real GTA V, GTA V
+ * Enhanced or Definitive Edition install.
+ */
+const ENGINE_DLL =
+  /^(bink2w64|binkawin64|d3dcompiler_\d+|d3dcsx_\d+|dstorage|dstoragecore|fvad|libcurl|libtox|opus|opusenc|steam_api64|steam_api|xcurl|zlib1|turbojpeg|mtlx|oo2core[\w.]*|amd_ags_x64|amd_fidelityfx[\w]*|nvngx[\w]*|gfsdk_[\w.]+|gpuperfapi[\w-]*|nvpmapi[\w.]*|sl\.[\w]+|api-ms-win[\w-]*|msvc[pr]\d+|vcruntime\d+|concrt\d+|ucrtbase|openvr_api|openal32|physx[\w]*|apex_[\w]*|cudart[\w]*|icu[\w]*)\.dll$/i;
+
+/**
  * Is this file evidence of a mod, on its own?
  *
  * The bar is deliberately high. The HD-era games ship dozens of loose vendor
@@ -120,6 +132,7 @@ const MOD_ONLY_DIR = /(^|\/)(scripts|cleo|modloader|~mods|ue4ss)(\/|$)/i;
  */
 function isModEvidence(rel: string): boolean {
   const base = path.basename(rel).toLowerCase();
+  if (ENGINE_DLL.test(base)) return false; // never, whatever else matches
   if (base.endsWith('.asi') || base.endsWith('.oiv')) return true;
   if (PROXY_DLL.test(base)) return true;
 
@@ -159,7 +172,15 @@ export async function findAdoptable(
 
     // Depth-limited: the game root itself is shallow, deploy roots get a full
     // walk because that is where a tool's own subfolder lives.
-    const files = await walk(dir);
+    /*
+     * Depth-limited on purpose.
+     *
+     * The game root is flat, and a mod's own folder is one or two levels at
+     * most. But `mods/` on GTA V can mirror the entire game archive tree, so
+     * an unbounded walk here would spend tens of seconds enumerating tens of
+     * thousands of files that could never be adoption candidates anyway.
+     */
+    const files = await walk(dir, root === '' ? 0 : 3);
     for (const file of files) {
       const rel = toPosix(root ? `${root}/${file.rel}` : file.rel);
       // Skip the base game's own protected files and anything we deployed.

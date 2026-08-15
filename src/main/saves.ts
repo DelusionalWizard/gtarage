@@ -13,16 +13,67 @@ import path from 'node:path';
 
 import { getGame } from '../shared/games';
 import type { AppConfig, GameId } from '../shared/types';
-import { dirSize, ensureDir, exists } from './fsutil';
+import { dirSize, ensureDir, exists, walk } from './fsutil';
 import { shelfFor } from './config';
 
 export interface SaveSnapshot {
   id: string;
   gameId: GameId;
+  /** When Swapmeet took the snapshot. */
   createdAt: string;
   label: string;
   path: string;
   size: number;
+  /**
+   * When the game itself last wrote the newest save inside this snapshot.
+   *
+   * Distinct from `createdAt`, and the more useful of the two when you are
+   * hunting for a particular point in your playthrough: the snapshot time
+   * only says when you swapped profiles, whereas this says how far along the
+   * save actually is.
+   */
+  savedAt?: string;
+  /** Number of save files captured. */
+  fileCount: number;
+}
+
+/**
+ * The newest modification time among a snapshot's files, and how many there
+ * are. That timestamp is the game's own, since Swapmeet copies files without
+ * rewriting their contents.
+ */
+async function newestSaveTime(
+  dir: string,
+): Promise<{ savedAt?: string; fileCount: number }> {
+  const files = await walk(dir);
+  let newest = 0;
+  for (const file of files) {
+    try {
+      const stat = await fs.stat(file.abs);
+      if (stat.mtimeMs > newest) newest = stat.mtimeMs;
+    } catch {
+      // skip unreadable entries
+    }
+  }
+  return newest > 0
+    ? { savedAt: new Date(newest).toISOString(), fileCount: files.length }
+    : { fileCount: files.length };
+}
+
+/**
+ * Recover the snapshot instant from its folder name.
+ *
+ * Snapshot ids are an ISO timestamp with `:` and `.` swapped for `-`, since
+ * those are illegal in Windows paths. Reading the id back is more reliable
+ * than the folder's mtime, which changes if the folder is ever copied or
+ * moved — as happens during a data migration.
+ */
+function parseSnapshotId(id: string): string | null {
+  const m = id.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/);
+  if (!m) return null;
+  const iso = `${m[1]}T${m[2]}:${m[3]}:${m[4]}.${m[5]}Z`;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function snapshotRoot(config: AppConfig, gameId: GameId): string {
@@ -72,6 +123,7 @@ export async function snapshotSaves(
     label,
     path: dest,
     size: await dirSize(dest),
+    ...(await newestSaveTime(dest)),
   };
 
   await pruneSnapshots(config, gameId);
@@ -100,10 +152,13 @@ export async function listSnapshots(
       out.push({
         id: name,
         gameId,
-        createdAt: stat.mtime.toISOString(),
+        // The folder name is the ISO instant the snapshot was taken, which
+        // survives a copy; mtime does not.
+        createdAt: parseSnapshotId(name) ?? stat.mtime.toISOString(),
         label: name,
         path: dir,
         size: await dirSize(dir),
+        ...(await newestSaveTime(dir)),
       });
     } catch {
       // Skip anything unreadable.

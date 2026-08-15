@@ -51,6 +51,55 @@ const VENDOR_DLLS = [
   'oo2core_5_win64.dll',
 ];
 
+/**
+ * The exact list a user reported seeing offered as "mods they added".
+ * This is GTA V Legacy's own vendor set, verbatim.
+ */
+const REPORTED_FALSE_POSITIVES = [
+  'bink2w64.dll',
+  'd3dcompiler_46.dll',
+  'd3dcsx_46.dll',
+  'fvad.dll',
+  'GFSDK_ShadowLib.win64.dll',
+  'GFSDK_TXAA.win64.dll',
+  'GFSDK_TXAA_AlphaResolve.win64.dll',
+  'GPUPerfAPIDX11-x64.dll',
+  'libcurl.dll',
+  'libtox.dll',
+  'NvPmApi.Core.win64.dll',
+  'opus.dll',
+  'opusenc.dll',
+  'steam_api64.dll',
+  'XCurl.dll',
+  'zlib1.dll',
+];
+
+test('the exact set of engine DLLs a user reported is never offered', async () => {
+  const dir = await gameFolder(REPORTED_FALSE_POSITIVES);
+  try {
+    const groups = await findAdoptable(config(), 'gta5' as GameId, dir);
+    assert.deepEqual(
+      groups.map((g) => g.name),
+      [],
+      `still offering: ${groups.map((g) => g.name).join(', ')}`,
+    );
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('an engine DLL is refused even sitting inside a mod folder', async () => {
+  // Defence in depth: scripts/ normally means "this is a mod", but a vendor
+  // library in there is still a vendor library.
+  const dir = await gameFolder(['scripts/steam_api64.dll', 'scripts/RealMod.dll']);
+  try {
+    const groups = await findAdoptable(config(), 'gta5' as GameId, dir);
+    assert.deepEqual(groups.map((g) => g.name), ['RealMod.dll']);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('the game\'s own vendor DLLs are never offered for adoption', async () => {
   const dir = await gameFolder(VENDOR_DLLS);
   try {

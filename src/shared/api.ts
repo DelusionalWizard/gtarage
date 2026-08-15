@@ -96,6 +96,14 @@ export interface AppState {
   activeBytes: number;
   /** Enabled mods whose detected prerequisites are not in the library. */
   missingDeps: MissingDeps[];
+  /**
+   * The running app version.
+   *
+   * Comes from the app rather than being written into the HTML, because a
+   * hardcoded one silently drifts every time the version is bumped — it had
+   * already fallen two releases behind.
+   */
+  appVersion: string;
   /** Nexus account, when a working API key is configured. */
   nexus: NexusAccount | null;
   /** Whether a Nexus key is stored at all (it is never sent to the UI). */
@@ -121,9 +129,14 @@ export interface VerifyView {
 
 export interface SaveSnapshotView {
   id: string;
+  /** When the snapshot was taken. */
   createdAt: string;
   label: string;
   size: number;
+  /** When the game itself last wrote a save inside it. */
+  savedAt?: string;
+  /** How many save files it holds. */
+  fileCount: number;
 }
 
 export interface ApplyReport {
@@ -135,6 +148,27 @@ export interface ApplyReport {
   graphicsCaptured: number;
   /** Settings files restored for the incoming profile. */
   graphicsRestored: number;
+}
+
+/** A ScriptHookV copy found on the machine, offered for one-click setup. */
+export interface HookCandidateView {
+  path: string;
+  gameId: GameId | null;
+  source: 'downloads' | 'game-folder';
+  modifiedAt: string;
+  version?: string;
+  /** A few representative filenames, so the user can sanity-check it. */
+  contents: string[];
+}
+
+/** Whether ScriptHookV setup is needed, and what is available to do it with. */
+export interface HookStatus {
+  /** Installed games that need ScriptHookV and do not have it. */
+  missingFor: GameId[];
+  /** Copies already on this machine. */
+  candidates: HookCandidateView[];
+  /** The official download page. */
+  url: string;
 }
 
 /** Hand-installed files found in the game folder, offered for import. */
@@ -220,6 +254,17 @@ export interface SwapmeetApi {
   /** Copy such files into the library so Swapmeet can manage them. */
   adopt(gameId: GameId, groupId: string): Promise<{ state: AppState; message: string }>;
 
+  /** Is ScriptHookV missing, and is there a copy already on this machine? */
+  hookStatus(): Promise<HookStatus>;
+  /**
+   * Install a found ScriptHookV copy into the given games. Used by the
+   * first-run prompt and by the watcher when a download appears.
+   */
+  installHook(
+    sourcePath: string,
+    gameIds: GameId[],
+  ): Promise<{ state: AppState; installedFor: GameId[]; message: string }>;
+
   /** Settings tracked for a profile. */
   graphicsFor(profileId: string): Promise<GraphicsView>;
   /** Save the game's current settings onto a profile. */
@@ -234,7 +279,10 @@ export interface SwapmeetApi {
   /** Apply the profile, then start the game. */
   launchGame(gameId: GameId): Promise<{ ok: boolean; error?: string }>;
   /** Reveal a folder in the OS file manager. */
-  openPath(which: 'game' | 'library' | 'shelf' | 'config', gameId?: GameId): Promise<void>;
+  openPath(
+    which: 'game' | 'library' | 'shelf' | 'config' | 'saves',
+    gameId?: GameId,
+  ): Promise<void>;
 
   updateSettings(patch: Partial<AppConfig['settings']>): Promise<AppState>;
 

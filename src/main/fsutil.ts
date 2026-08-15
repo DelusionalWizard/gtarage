@@ -78,11 +78,18 @@ export async function isDirectory(p: string): Promise<boolean> {
   }
 }
 
-/** Recursively list every file under `root`. Symlinks are not followed. */
-export async function walk(root: string): Promise<WalkedFile[]> {
+/**
+ * Recursively list every file under `root`. Symlinks are not followed.
+ *
+ * `maxDepth` bounds the descent. That matters where the walk starts inside a
+ * game folder: GTA V's `mods/` can hold an entire mirrored copy of the game's
+ * archives, and walking it unbounded turns a quick scan into tens of seconds.
+ */
+export async function walk(root: string, maxDepth = Infinity): Promise<WalkedFile[]> {
   const out: WalkedFile[] = [];
 
-  async function recurse(dir: string): Promise<void> {
+  async function recurse(dir: string, depth = 0): Promise<void> {
+    if (depth > maxDepth) return;
     let entries;
     try {
       entries = await fs.readdir(dir, { withFileTypes: true });
@@ -93,7 +100,7 @@ export async function walk(root: string): Promise<WalkedFile[]> {
       const abs = path.join(dir, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
-        await recurse(abs);
+        await recurse(abs, depth + 1);
       } else if (entry.isFile()) {
         const stat = await fs.stat(abs);
         out.push({ abs, rel: toPosix(path.relative(root, abs)), size: stat.size });

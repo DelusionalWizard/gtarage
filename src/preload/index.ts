@@ -43,6 +43,8 @@ const METHODS: ApiMethod[] = [
   'verify',
   'scanAdoptable',
   'adopt',
+  'hookStatus',
+  'installHook',
   'graphicsFor',
   'captureGraphics',
   'clearGraphics',

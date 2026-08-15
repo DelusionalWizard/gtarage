@@ -1506,3 +1506,74 @@ button:disabled {
   font: 500 10.5px var(--mono);
   flex: none;
 }
+
+/* --- header settings button --------------------------------------------- */
+
+.chrome-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--muted);
+  font: 500 11.5px var(--mono);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chrome-btn:hover {
+  color: var(--text);
+  border-color: var(--faint);
+}
+
+.chrome-btn.is-active {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.chrome-btn-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* --- hide-disabled toggle ------------------------------------------------ */
+
+.mini-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 5px;
+  font: 500 11px var(--mono);
+  color: var(--dim);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.mini-toggle:hover {
+  color: var(--text-2);
+}
+
+.mini-toggle input {
+  accent-color: var(--amber);
+  margin: 0;
+  cursor: pointer;
+}
+
+/*
+ * Long values (paths, timestamps) must wrap rather than be clipped: a
+ * truncated file path is worse than useless, because it looks like a
+ * complete one.
+ */
+.setting-desc,
+.gfx-path,
+.alert-body,
+.stack-meta {
+  overflow-wrap: anywhere;
+}
