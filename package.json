@@ -1,0 +1,74 @@
+{
+  "name": "swapmeet",
+  "version": "0.3.0-beta.1",
+  "description": "Swapmeet - an open-source universal mod manager for the Grand Theft Auto games.",
+  "license": "MIT",
+  "author": "Swapmeet contributors",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "watch": "tsc -p tsconfig.json --watch",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --dev",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test \"dist/test/**/*.test.js\"",
+    "dist": "npm run build && electron-builder"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "electron": "^33.3.1",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "app.swapmeet",
+    "productName": "Swapmeet",
+    "copyright": "Copyright (c) 2026 Swapmeet contributors",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "!dist/test/**",
+      "!dist/**/*.map",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Swapmeet",
+      "artifactName": "Swapmeet-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Swapmeet-${version}-portable.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Game",
+      "target": [
+        "AppImage"
+      ]
+    }
+  }
+}

@@ -1,0 +1,52 @@
+/**
+ * Ambient types for the renderer.
+ *
+ * The renderer is loaded as a classic <script>, not a module: Chromium
+ * refuses ES module scripts from `file://`, and bundling one file would be
+ * silly. A classic script means `src/renderer/index.ts` must contain no
+ * top-level `import` at all, or TypeScript would emit a CommonJS wrapper that
+ * fails the moment `exports` is touched in a browser.
+ *
+ * Inline `import(...)` type syntax gives us the shared types anyway, without
+ * turning either file into a module.
+ */
+
+type AppState = import('../shared/api').AppState;
+type GameView = import('../shared/api').GameView;
+type ProgressEvent_ = import('../shared/api').ProgressEvent;
+type SwapmeetApi = import('../shared/api').SwapmeetApi;
+type SaveSnapshotView = import('../shared/api').SaveSnapshotView;
+type ImportReport = import('../shared/api').ImportReport;
+type NexusAccount = import('../shared/api').NexusAccount;
+type GraphicsView = import('../shared/api').GraphicsView;
+type AdoptGroupView = import('../shared/api').AdoptGroupView;
+type SiteEvent = import('../shared/api').SiteEvent;
+
+type BrowseResult = import('../shared/catalog').BrowseResult;
+type BrowseSort = import('../shared/catalog').BrowseSort;
+type CatalogFile = import('../shared/catalog').CatalogFile;
+type CatalogMod = import('../shared/catalog').CatalogMod;
+type ProviderId = import('../shared/catalog').ProviderId;
+type ModSite = import('../shared/sites').ModSite;
+
+type Conflict = import('../shared/types').Conflict;
+type GameId = import('../shared/types').GameId;
+type Mod = import('../shared/types').Mod;
+type Profile = import('../shared/types').Profile;
+type SwapPlan = import('../shared/types').SwapPlan;
+
+type ModDependency = import('../shared/types').ModDependency;
+type MissingDeps = import('../shared/api').MissingDeps;
+
+interface Window {
+  swapmeet: SwapmeetApi;
+  /**
+   * Electron 32 removed `File.path`, so a dropped file's real location has to
+   * come back through the preload.
+   */
+  swapmeetFiles: { getPathForFile(file: File): string };
+  swapmeetEvents: {
+    onProgress(handler: (event: ProgressEvent_) => void): () => void;
+    onSiteEvent(handler: (event: SiteEvent) => void): () => void;
+  };
+}

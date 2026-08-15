@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Strict CSP: the renderer loads nothing from the network and evaluates no
+      inline or dynamic script. A mod manager reads a lot of untrusted text
+      (archive filenames, mod titles), so the UI is built with DOM calls and
+      textContent rather than innerHTML.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>Swapmeet</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- Custom chrome: the OS title bar is off, so this row is draggable. -->
+    <header class="titlebar">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand">SWAPMEET</div>
+      <div class="brand-version" id="app-version">v0.2.3</div>
+
+      <div class="titlebar-divider"></div>
+
+      <label class="visually-hidden" for="game-select">Game</label>
+      <select id="game-select" class="game-select"></select>
+
+      <div class="game-note" id="game-note"></div>
+
+      <div class="titlebar-spacer"></div>
+
+      <div class="window-controls">
+        <button id="win-min" class="win-btn" title="Minimise" aria-label="Minimise">&#8211;</button>
+        <button id="win-max" class="win-btn" title="Maximise" aria-label="Maximise">&#9633;</button>
+        <button id="win-close" class="win-btn win-close" title="Close" aria-label="Close">&#10005;</button>
+      </div>
+    </header>
+
+    <div class="shell">
+      <!-- 1a: profile rail -->
+      <aside class="sidebar">
+        <div class="rail-label" title="A profile is a named set of mods you switch on together">Profiles</div>
+        <div id="profile-list" class="profile-list"></div>
+        <button id="new-profile" class="ghost-btn" title="Create another set of mods you can switch between">+ new profile</button>
+
+        <div class="rail-spacer"></div>
+
+        <div class="rail-foot">
+          <div class="rail-label">Game folder</div>
+          <div id="game-path" class="game-path">Not set up</div>
+          <div id="game-status" class="game-status"></div>
+          <div class="rail-actions">
+            <button id="btn-detect" class="link-btn" title="Search Steam, Epic, the Rockstar launcher and your drives again">search again</button>
+            <button id="btn-browse" class="link-btn" title="Point Swapmeet at the folder your game is installed in">choose folder…</button>
+            <button id="btn-open-game" class="link-btn" title="Open the game folder in Explorer">open in Explorer</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 1b: tabbed main column -->
+      <main class="main">
+        <nav class="tabs" id="tabs">
+          <button class="tab is-active" data-tab="mods">Mods</button>
+          <button class="tab" data-tab="order">Load order</button>
+          <button class="tab" data-tab="browse">Browse</button>
+          <button class="tab" data-tab="saves">Saves</button>
+          <button class="tab" data-tab="settings">Settings</button>
+        </nav>
+
+        <div class="toolbar" id="toolbar">
+          <div class="search">
+            <span class="search-slash">/</span>
+            <input id="search" type="search" placeholder="search your mods…" spellcheck="false" />
+          </div>
+          <div class="chips" id="chips"></div>
+          <button id="btn-add-mod" class="solid-btn" title="Add mod archives or loose files to your library">Add files</button>
+          <button id="btn-add-folder" class="outline-btn" title="Add an already-extracted mod folder to your library">Add folder</button>
+        </div>
+
+        <section class="view" id="view"></section>
+
+        <footer class="actionbar">
+          <div class="action-status" id="action-status"></div>
+          <div class="actionbar-spacer"></div>
+          <button id="btn-backup" class="outline-btn" title="Take a snapshot of your save games right now">Back up saves</button>
+          <button id="btn-verify" class="outline-btn" title="Check your game folder for mod files Swapmeet did not install">Check game folder</button>
+          <button id="btn-apply" class="primary-btn" title="Show what will change, then install this profile and start the game">Apply &amp; launch</button>
+        </footer>
+      </main>
+
+      <!-- 1b: needs-attention inspector -->
+      <aside class="inspector" id="inspector"></aside>
+    </div>
+
+    <!-- Busy overlay, shown during deploys -->
+    <div class="overlay" id="overlay" hidden>
+      <div class="overlay-card">
+        <div class="overlay-title" id="overlay-title">Working…</div>
+        <div class="overlay-bar"><div class="overlay-fill" id="overlay-fill"></div></div>
+        <div class="overlay-detail" id="overlay-detail"></div>
+      </div>
+    </div>
+
+    <!-- Generic modal: confirmations, prompts, swap preview -->
+    <div class="modal-scrim" id="modal-scrim" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-head">
+          <div class="modal-title" id="modal-title"></div>
+          <div class="modal-sub" id="modal-sub"></div>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-foot" id="modal-foot"></div>
+      </div>
+    </div>
+
+    <div class="toast-stack" id="toasts"></div>
+
+    <script src="../index.js"></script>
+  </body>
+</html>
