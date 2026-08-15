@@ -14,6 +14,7 @@ import {
   libraryFor,
   loadConfig,
   migrateLegacyUserData,
+  repointPaths,
   saveConfig,
 } from './config';
 import { GAME_ORDER } from '../shared/games';
@@ -125,6 +126,21 @@ app.whenReady().then(async () => {
   app.setAsDefaultProtocolClient('nxm');
 
   const config = await loadConfig(userDataDir);
+
+  // Moving the files was only half the job: the config records absolute
+  // paths, so they have to be repointed too or the app keeps quietly reading
+  // out of the old folder.
+  // Runs whenever the legacy folder is still around, not only on the launch
+  // that moved the files: an earlier partial migration can leave paths behind
+  // even though the data itself has moved. A no-op when nothing matches.
+  if (migrated) {
+    const repointed = repointPaths(config, migrated, userDataDir);
+    if (repointed > 0) {
+      console.log(`[swapmeet] repointed ${repointed} stored path(s) to the new data folder`);
+      await saveConfig(config);
+    }
+  }
+
   await ensureDir(config.libraryPath);
   await ensureDir(config.shelfPath);
 

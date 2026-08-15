@@ -49,6 +49,49 @@ export function defaultConfig(userDataDir: string): AppConfig {
 }
 
 /**
+ * Move save snapshots from an old shelf into a new one.
+ *
+ * Only `<game>/saves` is touched. The deploy manifest and the displaced
+ * originals are deliberately left alone: the new shelf's manifest describes
+ * what is actually on disk right now, and merging a stale one over it would
+ * make undeploy restore the wrong files.
+ */
+async function mergeSnapshots(fromShelf: string, toShelf: string): Promise<void> {
+  let games: string[];
+  try {
+    games = await fs.readdir(fromShelf);
+  } catch {
+    return;
+  }
+
+  for (const game of games) {
+    const fromSaves = path.join(fromShelf, game, 'saves');
+    if (!(await exists(fromSaves))) continue;
+    const toSaves = path.join(toShelf, game, 'saves');
+    await fs.mkdir(toSaves, { recursive: true });
+
+    for (const snapshot of await fs.readdir(fromSaves)) {
+      const dest = path.join(toSaves, snapshot);
+      if (await exists(dest)) continue; // timestamped, so this means identical
+      await fs
+        .rename(path.join(fromSaves, snapshot), dest)
+        .catch(async () => {
+          await fs.cp(path.join(fromSaves, snapshot), dest, { recursive: true });
+        });
+    }
+  }
+}
+
+/** True when the path is a directory with nothing in it. */
+async function isEmptyDir(p: string): Promise<boolean> {
+  try {
+    return (await fs.readdir(p)).length === 0;
+  } catch {
+    return false; // not a directory, or unreadable
+  }
+}
+
+/**
  * Move a previous installation's data across after the app was renamed.
  *
  * Electron derives `userData` from the product name, so renaming the app also
@@ -66,28 +109,85 @@ export async function migrateLegacyUserData(
   legacyDir: string,
 ): Promise<string | null> {
   try {
-    if (await exists(path.join(newDir, 'swapmeet.config.json'))) return null;
-    const legacyConfig = path.join(legacyDir, 'rigging.config.json');
-    if (!(await exists(legacyConfig))) return null;
-
+    if (!(await exists(legacyDir))) return null;
     await fs.mkdir(newDir, { recursive: true });
-    for (const entry of await fs.readdir(legacyDir)) {
+
+    // Only the folders that hold real user data. Everything else in there is
+    // Chromium's own cache, which is worthless and regenerates itself.
+    const wanted = ['library', 'shelf', 'rigging.config.json'];
+    let movedAnything = false;
+
+    for (const entry of wanted) {
       const from = path.join(legacyDir, entry);
+      if (!(await exists(from))) continue;
+
       const to = path.join(
         newDir,
         entry === 'rigging.config.json' ? 'swapmeet.config.json' : entry,
       );
-      if (await exists(to)) continue;
+
+      // A destination that exists but is empty is what a half-finished
+      // migration leaves behind, so it must not block a retry.
+      if (await exists(to)) {
+        if (!(await isEmptyDir(to))) {
+          // Save snapshots are the one thing worth merging rather than
+          // skipping: they are timestamped, so they cannot collide, and
+          // silently stranding someone's save backups in a folder the app no
+          // longer reads is the worst outcome of a rename.
+          if (entry === 'shelf') await mergeSnapshots(from, to);
+          continue;
+        }
+        await fs.rm(to, { recursive: true, force: true });
+      }
+
       await fs.rename(from, to).catch(async () => {
         // Across volumes, or locked: fall back to a copy.
         await fs.cp(from, to, { recursive: true });
       });
+      movedAnything = true;
     }
-    return legacyDir;
+
+    // Report the legacy dir whenever it still exists, not only when something
+    // moved: stored paths may still point into it from an earlier partial run,
+    // and the caller repoints them.
+    return movedAnything || (await exists(legacyDir)) ? legacyDir : null;
   } catch (err) {
     console.error('[swapmeet] could not migrate previous data:', err);
     return null;
   }
+}
+
+/**
+ * Rewrite stored absolute paths that still point at the old data folder.
+ *
+ * Moving the files is only half a migration. The config records absolute
+ * paths — `libraryPath`, `shelfPath` and every `mod.path` — so after a rename
+ * they all still point into the previous folder. The app keeps working, which
+ * is what makes this dangerous: everything looks fine until that folder is
+ * cleaned up and the library disappears with it.
+ *
+ * Returns the number of paths repointed, so startup can report it.
+ */
+export function repointPaths(
+  config: AppConfig,
+  legacyDir: string,
+  newDir: string,
+): number {
+  const legacy = path.resolve(legacyDir).toLowerCase();
+  let moved = 0;
+
+  const repoint = (value: string): string => {
+    const resolved = path.resolve(value);
+    if (!resolved.toLowerCase().startsWith(legacy)) return value;
+    moved += 1;
+    return path.join(newDir, path.relative(legacyDir, resolved));
+  };
+
+  config.libraryPath = repoint(config.libraryPath);
+  config.shelfPath = repoint(config.shelfPath);
+  for (const mod of config.mods) mod.path = repoint(mod.path);
+
+  return moved;
 }
 
 /** Point the store at a directory. Called once, at app startup. */
