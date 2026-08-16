@@ -10,6 +10,8 @@ moves rather than a reinstall.
 
 MIT licensed.
 
+**[Download the latest release →](https://github.com/DelusionalWizard/swapmeet/releases/latest)**
+
 ---
 
 > ### ⚠️ Beta — read this first
