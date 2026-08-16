@@ -21,7 +21,7 @@ const api = window.swapmeet;
  * view, because it is app configuration rather than one of the things you
  * switch between while managing mods.
  */
-type TabId = 'mods' | 'order' | 'browse' | 'saves' | 'settings';
+type TabId = 'mods' | 'order' | 'browse' | 'speedrun' | 'saves' | 'settings';
 
 let state: AppState | null = null;
 let tab: TabId = 'mods';
@@ -32,6 +32,12 @@ let hideDisabled = false;
 let saves: SaveSnapshotView[] = [];
 /** Hand-installed files found in the game folder, offered for import. */
 let adoptable: AdoptGroupView[] = [];
+/** Speedrun tools, refreshed when that tab is opened. */
+let speedrunTools: SpeedrunToolView[] = [];
+/** Community links for the speedrun tab, fetched once from the main process. */
+let speedrunGroups: SpeedrunResourceGroup[] = [];
+/** Kept in step with PRACTICE_PROFILE_NAME in shared/speedrun.ts. */
+const PRACTICE_PROFILE = 'Practice';
 /** Set once the ScriptHookV prompt has been shown or dismissed this session. */
 let hookPromptSettled = false;
 /** Timer used while waiting for a ScriptHookV download to appear. */
@@ -1149,6 +1155,159 @@ function nexusKeyModal(): void {
   });
 }
 
+// --- rendering: speedrun ----------------------------------------------------
+
+/**
+ * The speedrunning tab.
+ *
+ * A launcher and a directory, not a wrapper. Swapmeet does not reimplement
+ * LiveSplit or download installers on your behalf — it finds what you already
+ * have, starts it, and links what it cannot install.
+ */
+function renderSpeedrun(s: AppState, view: HTMLElement): void {
+  const cards = el('div', 'cards');
+
+  // --- tools ----------------------------------------------------------------
+  const toolCard = el('div', 'card');
+  const head = el('div', 'card-head');
+  head.appendChild(el('div', 'card-title', 'Tools'));
+  head.appendChild(
+    el('div', 'card-count', `${speedrunTools.filter((t) => t.installed).length} installed`),
+  );
+  toolCard.appendChild(head);
+
+  if (speedrunTools.length === 0) {
+    toolCard.appendChild(el('div', 'card-body', 'Looking…'));
+  }
+
+  for (const tool of speedrunTools) {
+    const row = el('div', 'setting');
+    const main = el('div', 'setting-main');
+
+    const title = el('div', 'setting-name', tool.name);
+    if (tool.core) {
+      const tag = el('span', 'inline-tag', 'essential');
+      title.appendChild(tag);
+    }
+    main.appendChild(title);
+    main.appendChild(el('div', 'setting-desc', tool.summary));
+    if (tool.path) main.appendChild(el('div', 'gfx-path', tool.path));
+    row.appendChild(main);
+
+    if (tool.installed) {
+      const start = el('button', 'small-btn is-primary', 'Start');
+      start.addEventListener('click', async () => {
+        if (!s.currentGameId) return;
+        try {
+          await api.launchSpeedrunTool(tool.id, s.currentGameId);
+          toast(`Starting ${tool.name}…`, 'ok');
+        } catch (err) {
+          toast((err as Error).message, 'error');
+        }
+      });
+      row.appendChild(start);
+    } else {
+      // Portable tools (LiveSplit especially) live wherever the user put
+      // them, so probing will never find them.
+      const locate = el('button', 'small-btn', 'Locate…');
+      locate.title = 'Point Swapmeet at it if you already have it';
+      locate.addEventListener('click', async () => {
+        if (!s.currentGameId) return;
+        const tools = await guard('Looking…', () =>
+          api.locateSpeedrunTool(tool.id, s.currentGameId!),
+        );
+        if (tools) {
+          speedrunTools = tools;
+          render();
+        }
+      });
+      row.appendChild(locate);
+
+      const get = el('button', 'small-btn', 'Get it');
+      get.addEventListener('click', () => {
+        void api.openExternal(tool.url).catch((err: Error) => toast(err.message, 'error'));
+      });
+      row.appendChild(get);
+    }
+
+    toolCard.appendChild(row);
+  }
+  cards.appendChild(toolCard);
+
+  // --- practice profile -----------------------------------------------------
+  const practice = el('div', 'card');
+  const phead = el('div', 'card-head');
+  phead.appendChild(el('div', 'card-title', 'Practice mods'));
+  practice.appendChild(phead);
+  practice.appendChild(
+    el(
+      'div',
+      'card-body',
+      'Practice mods must never be in a submitted run. Keep them in their own profile, and switching back to a clean game is one click — which is the whole reason a profile manager is useful here.',
+    ),
+  );
+
+  const hasPractice = s.profiles.some((p) => p.name === PRACTICE_PROFILE);
+  const prow = el('div', 'setting');
+  const pmain = el('div', 'setting-main');
+  pmain.appendChild(el('div', 'setting-name', `"${PRACTICE_PROFILE}" profile`));
+  pmain.appendChild(
+    el(
+      'div',
+      'setting-desc',
+      hasPractice
+        ? 'Ready. Install practice mods into it, and apply the vanilla profile before a real attempt.'
+        : 'Not created yet. Swapmeet can make an empty one to keep practice mods separate.',
+    ),
+  );
+  prow.appendChild(pmain);
+  if (!hasPractice) {
+    const make = el('button', 'small-btn is-primary', 'Create it');
+    make.addEventListener('click', async () => {
+      if (!s.currentGameId) return;
+      const next = await guard('Creating…', () =>
+        api.createProfile(s.currentGameId!, PRACTICE_PROFILE),
+      );
+      if (next) {
+        apply(next);
+        toast(`"${PRACTICE_PROFILE}" profile created.`, 'ok');
+      }
+    });
+    prow.appendChild(make);
+  }
+  practice.appendChild(prow);
+  cards.appendChild(practice);
+
+  // --- resources ------------------------------------------------------------
+  for (const group of speedrunGroups) {
+    const card = el('div', 'card');
+    const gh = el('div', 'card-head');
+    gh.appendChild(el('div', 'card-title', group.title));
+    card.appendChild(gh);
+    card.appendChild(el('div', 'card-body', group.blurb));
+
+    for (const item of group.items) {
+      const row = el('div', 'setting');
+      const main = el('div', 'setting-main');
+      const name = el('div', 'setting-name', item.name);
+      if (item.discord) name.appendChild(el('span', 'inline-tag', 'discord'));
+      main.appendChild(name);
+      if (item.note) main.appendChild(el('div', 'setting-desc', item.note));
+      row.appendChild(main);
+
+      const open = el('button', 'small-btn', 'Open');
+      open.addEventListener('click', () => {
+        void api.openExternal(item.url).catch((err: Error) => toast(err.message, 'error'));
+      });
+      row.appendChild(open);
+      card.appendChild(row);
+    }
+    cards.appendChild(card);
+  }
+
+  view.appendChild(cards);
+}
+
 // --- rendering: saves -------------------------------------------------------
 
 function renderSaves(s: AppState, view: HTMLElement): void {
@@ -1259,7 +1418,8 @@ function renderSettings(s: AppState, view: HTMLElement): void {
       | 'useHardlinks'
       | 'blockWhileGameRunning'
       | 'warnAboutOnline'
-      | 'graphicsPerProfile',
+      | 'graphicsPerProfile'
+      | 'speedrunMode',
   ) => {
     const row = el('div', 'setting');
     const main = el('div', 'setting-main');
@@ -1294,6 +1454,39 @@ function renderSettings(s: AppState, view: HTMLElement): void {
     s.settings.blockWhileGameRunning,
     'blockWhileGameRunning',
   );
+  // --- appearance -----------------------------------------------------------
+  const themeRow = el('div', 'setting');
+  const themeMain = el('div', 'setting-main');
+  themeMain.appendChild(el('div', 'setting-name', 'Theme'));
+  themeMain.appendChild(el('div', 'setting-desc', 'Dark suits a games library; light suits a bright room.'));
+  themeRow.appendChild(themeMain);
+  const themeSel = el('select', 'mini-select');
+  for (const [value, label] of [
+    ['dark', 'Dark'],
+    ['light', 'Light'],
+  ] as Array<['dark' | 'light', string]>) {
+    const option = el('option');
+    option.value = value;
+    option.textContent = label;
+    option.selected = (s.settings.theme ?? 'dark') === value;
+    themeSel.appendChild(option);
+  }
+  themeSel.addEventListener('change', async () => {
+    const next = await guard('Saving…', () =>
+      api.updateSettings({ theme: themeSel.value as 'dark' | 'light' }),
+    );
+    if (next) apply(next);
+  });
+  themeRow.appendChild(themeSel);
+  toggles.appendChild(themeRow);
+
+  addToggle(
+    'Speedrunning mode',
+    'Adds a Speedrun tab with the timer, frame limiter and capture tools, plus the community routing guides and split files. Off by default — most people modding for fun have no use for it.',
+    s.settings.speedrunMode,
+    'speedrunMode',
+  );
+
   addToggle(
     'Give each profile its own graphics settings',
     'Saves the game settings onto the profile you are leaving and restores the one you switch to, so a modded profile can run different settings from a vanilla one without reconfiguring every launch.',
@@ -1667,6 +1860,99 @@ function renderInspector(s: AppState): void {
       'Applying a profile copies mods into your game folder. If a mod would overwrite one of the game\u2019s own files, Swapmeet moves the original somewhere safe first \u2014 it is put back when you switch profiles. Nothing is ever deleted.',
     ),
   );
+}
+
+// --- speedrunning -----------------------------------------------------------
+
+/** Probe for installed tools and load the resource list, then re-render. */
+async function loadSpeedrun(): Promise<void> {
+  const s = state;
+  if (!s?.currentGameId) return;
+
+  const [tools, groups] = await Promise.all([
+    api.speedrunTools(s.currentGameId).catch(() => [] as SpeedrunToolView[]),
+    speedrunGroups.length > 0
+      ? Promise.resolve(speedrunGroups)
+      : api.speedrunResources().catch(() => [] as SpeedrunResourceGroup[]),
+  ]);
+
+  // Only re-render if something actually changed, or opening the tab would
+  // loop: render -> load -> render.
+  const changed =
+    tools.length !== speedrunTools.length ||
+    tools.some((t, i) => t.installed !== speedrunTools[i]?.installed);
+  speedrunTools = tools;
+  speedrunGroups = groups;
+  if (changed || groups.length !== speedrunGroups.length) render();
+}
+
+/**
+ * Offer speedrunning mode once, and only to someone who looks like a runner.
+ *
+ * Asking everybody would be noise. Project 127 being installed is a strong
+ * signal: it exists solely to put GTA V on the version the Classic category
+ * is run on, so nobody has it by accident.
+ */
+async function maybePromptForSpeedrun(): Promise<void> {
+  const s = state;
+  if (!s || s.settings.speedrunMode || s.settings.speedrunAsked) return;
+
+  const tools = await api.speedrunTools(s.currentGameId ?? 'gta5').catch(() => []);
+  const p127 = tools.find((t) => t.id === 'project127' && t.installed);
+  if (!p127) return;
+
+  openModal({
+    title: 'Set up for speedrunning?',
+    subtitle:
+      'Project 127 is installed, which is the launcher the Classic category runs on — so this looks like a speedrunning setup.',
+    build: (body) => {
+      body.appendChild(
+        el(
+          'div',
+          'alert-body',
+          'Speedrunning mode adds a Speedrun tab: start LiveSplit, RivaTuner, OBS and Project 127 from here, and reach the community routing guides, split files and practice mods without hunting through bookmarks.',
+        ),
+      );
+      body.appendChild(
+        el(
+          'div',
+          'alert-body',
+          'It also makes the point that practice mods belong in their own profile, so switching back to a clean game before a real attempt is one click.',
+        ),
+      );
+      const found = tools.filter((t) => t.installed).map((t) => t.name);
+      if (found.length > 0) {
+        body.appendChild(el('div', 'field-label', 'Already installed'));
+        body.appendChild(el('div', 'mono-list', found.join('\n')));
+      }
+    },
+    actions: [
+      {
+        label: 'No thanks',
+        onClick: async () => {
+          const next = await api.updateSettings({ speedrunAsked: true });
+          apply(next);
+          return true;
+        },
+      },
+      {
+        label: 'Turn it on',
+        kind: 'primary',
+        onClick: async () => {
+          const next = await guard('Enabling…', () =>
+            api.updateSettings({ speedrunMode: true, speedrunAsked: true }),
+          );
+          if (next) {
+            apply(next);
+            tab = 'speedrun';
+            render();
+            void loadSpeedrun();
+          }
+          return true;
+        },
+      },
+    ],
+  });
 }
 
 // --- ScriptHookV setup ------------------------------------------------------
@@ -2054,7 +2340,10 @@ async function refresh(): Promise<void> {
     adoptable = await api.scanAdoptable(next.currentGameId).catch(() => []);
     render();
     // Offered after the first render so the app is on screen behind it.
-    void maybePromptForHook();
+    // The hook prompt goes first: without ScriptHookV nothing loads at all,
+    // which matters more than a tab of convenience links.
+    await maybePromptForHook();
+    void maybePromptForSpeedrun();
   }
 }
 
@@ -2525,6 +2814,10 @@ function render(): void {
   const s = state;
   if (!s) return;
 
+  // Theme is a data attribute on the root; the stylesheet redefines only the
+  // colour tokens, so everything follows without a second stylesheet.
+  document.documentElement.dataset.theme = s.settings.theme ?? 'dark';
+
   renderTitlebar(s);
   renderSidebar(s);
   renderInspector(s);
@@ -2554,6 +2847,9 @@ function render(): void {
       case 'browse':
         renderBrowse(s, view);
         break;
+      case 'speedrun':
+        renderSpeedrun(s, view);
+        break;
       case 'saves':
         renderSaves(s, view);
         break;
@@ -2575,6 +2871,10 @@ function render(): void {
   byId<HTMLButtonElement>('btn-apply').disabled = !profile || !current?.installed;
   byId<HTMLButtonElement>('btn-launch').disabled = !current?.installed;
   byId<HTMLButtonElement>('btn-install').disabled = !current?.installed;
+
+  // Speedrunning is an opt-in surface; the tab only exists when it is on.
+  byId('tab-speedrun').hidden = !s.settings.speedrunMode;
+  if (!s.settings.speedrunMode && tab === 'speedrun') tab = 'mods';
 
   // The toolbar only makes sense on the mods list.
   byId('toolbar').hidden = tab !== 'mods';
@@ -2605,6 +2905,7 @@ byId('tabs').addEventListener('click', (event) => {
   render();
   // The browser only queries the network when it is actually on screen.
   if (tab === 'browse' && !browseResult && !browseLoading) void loadBrowse();
+  if (tab === 'speedrun') void loadSpeedrun();
 });
 
 /*

@@ -150,6 +150,24 @@ export interface ApplyReport {
   graphicsRestored: number;
 }
 
+/** A group of community links shown on the speedrun tab. */
+export interface SpeedrunResourceGroup {
+  title: string;
+  blurb: string;
+  items: Array<{ name: string; url: string; note?: string; discord?: boolean }>;
+}
+
+/** A speedrunning tool and whether it is installed. */
+export interface SpeedrunToolView {
+  id: string;
+  name: string;
+  summary: string;
+  url: string;
+  core: boolean;
+  installed: boolean;
+  path?: string;
+}
+
 /** A ScriptHookV copy found on the machine, offered for one-click setup. */
 export interface HookCandidateView {
   path: string;
@@ -262,6 +280,20 @@ export interface SwapmeetApi {
   scanAdoptable(gameId: GameId): Promise<AdoptGroupView[]>;
   /** Copy such files into the library so Swapmeet can manage them. */
   adopt(gameId: GameId, groupId: string): Promise<{ state: AppState; message: string }>;
+
+  /** Speedrunning tools relevant to this game, and whether each is installed. */
+  speedrunTools(gameId: GameId): Promise<SpeedrunToolView[]>;
+  /** Point Swapmeet at a portable tool it could not find, and remember it. */
+  locateSpeedrunTool(toolId: string, gameId: GameId): Promise<SpeedrunToolView[]>;
+  /** Start an installed speedrunning tool. */
+  launchSpeedrunTool(toolId: string, gameId: GameId): Promise<void>;
+  /**
+   * The community guides, splits and routing documents.
+   *
+   * Served over IPC rather than duplicated in the renderer, which cannot
+   * import at runtime — one source of truth for the list.
+   */
+  speedrunResources(): Promise<SpeedrunResourceGroup[]>;
 
   /** Is ScriptHookV missing, and is there a copy already on this machine? */
   hookStatus(): Promise<HookStatus>;

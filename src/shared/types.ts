@@ -302,6 +302,26 @@ export interface AppConfig {
      * share one settings file and overwrite each other.
      */
     graphicsPerProfile: boolean;
+    /** Interface theme. */
+    theme: 'dark' | 'light';
+    /**
+     * Show the speedrunning tools and community resources.
+     *
+     * Off by default: it is a whole extra surface that most people modding a
+     * game for fun have no use for, and burying the mod manager under a timer
+     * and a routing spreadsheet would be the wrong default.
+     */
+    speedrunMode: boolean;
+    /** Set once the first-run speedrun prompt has been answered either way. */
+    speedrunAsked?: boolean;
+    /**
+     * Where the user told us a speedrun tool lives, keyed by tool id.
+     *
+     * Needed because LiveSplit — the one tool every runner has — ships as a
+     * portable zip that people extract wherever they like, so probing install
+     * directories finds it for almost nobody.
+     */
+    speedrunToolPaths?: Record<string, string>;
     /**
      * Warn before applying a modded profile to a title that has an online
      * mode. Off by default: GTA V drops you at a story/online chooser on every

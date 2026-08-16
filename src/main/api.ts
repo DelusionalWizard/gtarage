@@ -45,6 +45,8 @@ import {
 import { promises as fs } from 'node:fs';
 
 import { findAdoptable } from './adopt';
+import { detectSpeedrunTools, launchSpeedrunTool } from './speedrun';
+import { PRACTICE_PROFILE_NAME, SPEEDRUN_RESOURCES } from '../shared/speedrun';
 import {
   SCRIPTHOOKV_URL,
   describeCandidate,
@@ -753,6 +755,45 @@ export const handlers: SwapmeetApi = {
     };
   },
 
+  async speedrunTools(gameId) {
+    const config = await loadConfig(userDataDir);
+    return detectSpeedrunTools(gameId, config.settings.speedrunToolPaths ?? {});
+  },
+
+  async launchSpeedrunTool(toolId, gameId) {
+    const config = await loadConfig(userDataDir);
+    await launchSpeedrunTool(toolId, gameId, config.settings.speedrunToolPaths ?? {});
+  },
+
+  async locateSpeedrunTool(toolId, gameId) {
+    const result = await dialog.showOpenDialog({
+      title: 'Find the program',
+      properties: ['openFile'],
+      filters: [{ name: 'Programs', extensions: ['exe'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      const config = await loadConfig(userDataDir);
+      return detectSpeedrunTools(gameId, config.settings.speedrunToolPaths ?? {});
+    }
+
+    // Remembered per tool: portable programs move around, and re-asking every
+    // launch would be worse than not offering it at all.
+    const chosen = result.filePaths[0];
+    await mutate((cfg) => {
+      cfg.settings.speedrunToolPaths = {
+        ...(cfg.settings.speedrunToolPaths ?? {}),
+        [toolId]: chosen,
+      };
+    });
+
+    const config = await loadConfig(userDataDir);
+    return detectSpeedrunTools(gameId, config.settings.speedrunToolPaths ?? {});
+  },
+
+  async speedrunResources() {
+    return SPEEDRUN_RESOURCES;
+  },
+
   async hookStatus() {
     const config = await loadConfig(userDataDir);
     const found = [
@@ -785,6 +826,31 @@ export const handlers: SwapmeetApi = {
   async installHook(sourcePath, gameIds) {
     if (gameIds.length === 0) throw new Error('No game chosen.');
 
+    /*
+     * When the copy lives in a game folder, take only ScriptHookV's own
+     * files. Passing the folder itself made the importer copy the entire
+     * ~100 GB game install into the library, which presented as the app
+     * hanging on "Setting up ScriptHookV...".
+     */
+    const config0 = await loadConfig(userDataDir);
+    const candidate = [
+      ...(await findInstalledHook(config0)),
+      ...(await findDownloadedHook()),
+    ].find((c) => c.path === sourcePath);
+
+    let payload = sourcePath;
+    let staged: string | null = null;
+
+    if (candidate?.files?.length) {
+      staged = path.join(stagingDir(config0, gameIds[0]!), 'scripthookv-from-game');
+      await fs.rm(staged, { recursive: true, force: true });
+      await ensureDir(staged);
+      for (const name of candidate.files) {
+        await fs.copyFile(path.join(sourcePath, name), path.join(staged, name));
+      }
+      payload = staged;
+    }
+
     const installedFor: GameId[] = [];
     const failures: string[] = [];
 
@@ -797,7 +863,7 @@ export const handlers: SwapmeetApi = {
      */
     for (const gameId of gameIds) {
       try {
-        const result = await handlers.importPaths(gameId, [sourcePath]);
+        const result = await handlers.importPaths(gameId, [payload]);
         const imported = result.report.imported[0];
         if (!imported) {
           failures.push(result.report.failed[0]?.error ?? 'import failed');
@@ -828,6 +894,8 @@ export const handlers: SwapmeetApi = {
     if (installedFor.length === 0) {
       throw new Error(failures[0] ?? 'ScriptHookV could not be installed.');
     }
+
+    if (staged) await fs.rm(staged, { recursive: true, force: true });
 
     const names = installedFor.map((id) => getGame(id).shortName).join(' and ');
     return {

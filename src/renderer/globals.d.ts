@@ -21,6 +21,7 @@ type NexusAccount = import('../shared/api').NexusAccount;
 type GraphicsView = import('../shared/api').GraphicsView;
 type AdoptGroupView = import('../shared/api').AdoptGroupView;
 type HookStatus = import('../shared/api').HookStatus;
+type SpeedrunToolView = import('../shared/api').SpeedrunToolView;
 type HookCandidateView = import('../shared/api').HookCandidateView;
 type SiteEvent = import('../shared/api').SiteEvent;
 
@@ -52,3 +53,6 @@ interface Window {
     onSiteEvent(handler: (event: SiteEvent) => void): () => void;
   };
 }
+
+type ResourceGroup = import('../shared/speedrun').ResourceGroup;
+type SpeedrunResourceGroup = import('../shared/api').SpeedrunResourceGroup;

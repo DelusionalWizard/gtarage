@@ -44,6 +44,83 @@
   --actionbar: 58px;
 }
 
+/*
+ * Light theme.
+ *
+ * Only the colour tokens are redefined — every rule below is written against
+ * the variables, so the whole interface follows without a second stylesheet
+ * to keep in sync.
+ *
+ * The status colours are darkened rather than reused. The dark palette's
+ * amber and green are tuned to glow against near-black; on white they lose
+ * almost all contrast, and "ok" in pale green on pale grey is unreadable.
+ * Same hues, lower lightness.
+ */
+:root[data-theme='light'] {
+  --bg: #f7f8f9;
+  --chrome: #eef0f2;
+  --panel: #ffffff;
+  --panel-2: #f2f4f6;
+  --raised: #e8ebee;
+  --line: #e2e6ea;
+  --line-strong: #d3d9df;
+  --line-dashed: #c2cad2;
+
+  --text: #14181c;
+  --text-2: #2f3843;
+  --muted: #55606c;
+  --dim: #6b7682;
+  --faint: #838d99;
+  --ghost: #9aa4af;
+
+  --amber: oklch(0.58 0.15 78);
+  --green: oklch(0.52 0.15 148);
+  --orange: oklch(0.58 0.17 48);
+  --blue: oklch(0.5 0.16 250);
+  --red: oklch(0.52 0.2 27);
+}
+
+/* The amber-on-light chips need dark text to stay legible. */
+:root[data-theme='light'] .seg-btn.is-active,
+:root[data-theme='light'] .chrome-btn.is-active,
+:root[data-theme='light'] .primary-btn,
+:root[data-theme='light'] .badge-live {
+  color: #fff;
+}
+
+/* The solid button inverts in dark mode; on light it must not go white-on-white. */
+:root[data-theme='light'] .solid-btn {
+  background: var(--text);
+  color: var(--bg);
+}
+
+:root[data-theme='light'] .solid-btn:hover {
+  background: #000;
+}
+
+/* Toast shadows read as smudges on a light ground. */
+:root[data-theme='light'] .toast {
+  box-shadow: 0 6px 18px rgba(20, 24, 28, 0.14);
+}
+
+/* The scrims are tuned for a dark page behind them. */
+:root[data-theme='light'] .overlay,
+:root[data-theme='light'] .modal-scrim {
+  background: rgba(20, 24, 28, 0.34);
+}
+
+/* The drag grip is drawn in a fixed colour that vanishes on white. */
+:root[data-theme='light'] .grip span {
+  background: var(--faint);
+}
+
+/* Row separators are hardcoded near-black elsewhere. */
+:root[data-theme='light'] .row,
+:root[data-theme='light'] .card-row,
+:root[data-theme='light'] .setting {
+  border-color: var(--line);
+}
+
 * {
   box-sizing: border-box;
 }

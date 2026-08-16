@@ -34,10 +34,29 @@ const NEEDS_HOOK: GameId[] = ['gta5', 'gta5e'];
 /** The official page, which is the only place it is published. */
 export const SCRIPTHOOKV_URL = 'http://www.dev-c.com/gtav/scripthookv/';
 
+/**
+ * The files the ScriptHookV distribution actually consists of.
+ *
+ * Used when taking a copy out of a game folder, so only these are lifted
+ * rather than everything sitting beside them.
+ */
+const HOOK_FILES = [
+  'ScriptHookV.dll',
+  'dinput8.dll',
+  'NativeTrainer.asi',
+  'xinput1_4.dll',
+  'args.txt',
+];
+
 /** A ScriptHookV archive or folder found somewhere on the machine. */
 export interface HookCandidate {
-  /** Absolute path to the archive or folder. */
+  /** Absolute path to the archive, or to the folder the files live in. */
   path: string;
+  /**
+   * For a game-folder copy: the specific files to take, relative to `path`.
+   * Absent for an archive, where the whole archive is the payload.
+   */
+  files?: string[];
   /** Which game this copy is built for, when we can tell. */
   gameId: GameId | null;
   /** How it was found, for the message shown to the user. */
@@ -164,10 +183,27 @@ export async function findInstalledHook(config: AppConfig): Promise<HookCandidat
     if (!NEEDS_HOOK.includes(install.gameId)) continue;
     const dll = path.join(install.path, 'ScriptHookV.dll');
     if (!(await exists(dll))) continue;
+
+    /*
+     * Name the individual files, not the folder they sit in.
+     *
+     * This used to report `install.path` — the whole game directory — which
+     * the importer then copied wholesale. Setting up from an existing install
+     * therefore tried to duplicate a ~100 GB game into the mod library, and
+     * looked exactly like the app had hung. Only ScriptHookV's own files are
+     * ever taken.
+     */
+    const files: string[] = [];
+    for (const name of HOOK_FILES) {
+      if (await exists(path.join(install.path, name))) files.push(name);
+    }
+    if (files.length === 0) continue;
+
     try {
       const stat = await fs.stat(dll);
       out.push({
         path: install.path,
+        files,
         // Left open: the same build works in every game that needs it, so a
         // copy sitting in one game folder can set up the other too.
         gameId: null,

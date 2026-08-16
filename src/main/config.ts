@@ -44,6 +44,8 @@ export function defaultConfig(userDataDir: string): AppConfig {
       blockWhileGameRunning: true,
       warnAboutOnline: false,
       graphicsPerProfile: true,
+      theme: 'dark',
+      speedrunMode: false,
     },
   };
 }
