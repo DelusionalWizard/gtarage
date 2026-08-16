@@ -13,6 +13,12 @@ import path from 'node:path';
 
 import { BrowserWindow, app, dialog, shell } from 'electron';
 
+import {
+  changedBuilds,
+  hookVerdict,
+  isBuildSensitive,
+  recordBuilds,
+} from '../shared/buildwatch';
 import { GAMES, GAME_ORDER, getGame } from '../shared/games';
 import {
   activeMods,
@@ -24,6 +30,7 @@ import {
 import type {
   AppState,
   ApplyReport,
+  BuildAlert,
   GameView,
   ImportReport,
   NexusAccount,
@@ -161,6 +168,56 @@ function gameViews(config: AppConfig): GameView[] {
   });
 }
 
+/**
+ * Work out whether the game updated under us, and what that broke.
+ *
+ * Kept next to buildState because it needs the same three things: the install
+ * (for the executable version), the library (for the mods that care) and the
+ * recorded build from the previous run.
+ *
+ * The Script Hook V half is deliberately allowed to answer "unknown". A copy
+ * adopted out of a game folder is just `ScriptHookV.dll` with no build in its
+ * name, and claiming a mismatch there would cry wolf on a working install.
+ */
+function buildAlertFor(
+  config: AppConfig,
+  gameId: GameId,
+  mods: Mod[],
+  enabled: Mod[],
+): BuildAlert | null {
+  const install = config.installs.find((i) => i.gameId === gameId);
+  if (!install) return null;
+
+  const [change] = changedBuilds(config.seenBuilds ?? {}, [install]);
+  if (!change) return null;
+
+  // ScriptHookVDotNet is excluded: it is a layer on top of Script Hook V and
+  // carries its own unrelated version, so matching it here would compare the
+  // game build against the wrong number entirely.
+  const hookMod = mods.find(
+    (m) => /script\s*hook\s*v/i.test(m.name) && !/\.net|dotnet|shvdn/i.test(m.name),
+  );
+  const hookName = hookMod ? `${hookMod.name} ${hookMod.version}` : '';
+  const verdict = hookVerdict(hookName, change.current);
+
+  return {
+    gameId,
+    gameName: getGame(gameId).shortName,
+    previous: change.previous,
+    current: change.current,
+    // Only enabled mods: an unenabled ASI plugin is not something the user
+    // needs to think about while working out why their game is unmodded.
+    affected: enabled
+      .filter((m) => isBuildSensitive(m))
+      .map((m) => ({ id: m.id, name: m.name })),
+    hook: {
+      state: verdict.state,
+      builds: verdict.builds,
+      ...(hookMod ? { name: hookMod.name } : {}),
+    },
+  };
+}
+
 async function buildState(config: AppConfig): Promise<AppState> {
   const gameId =
     config.lastGameId ??
@@ -210,6 +267,12 @@ async function buildState(config: AppConfig): Promise<AppState> {
     brokenMods: (
       await findBrokenMods((m) => libraryFor(config, m.gameId), mods)
     ).map(({ mod, missing }) => ({ id: mod.id, name: mod.name, missing })),
+    ...(gameId
+      ? (() => {
+          const alert = buildAlertFor(config, gameId, mods, ordered);
+          return alert ? { buildAlert: alert } : {};
+        })()
+      : {}),
     appVersion: app.getVersion(),
     nexus: nexusAccount,
     hasNexusKey: Boolean(config.nexusApiKey),
@@ -360,6 +423,23 @@ function requireInstall(config: AppConfig, gameId: GameId): string {
 export const handlers: SwapmeetApi = {
   async getState() {
     return state();
+  },
+
+  /**
+   * Accept the new build, clearing the alert.
+   *
+   * Recording happens here and nowhere else. The obvious alternative — record
+   * whatever we detect, at detection time — destroys the feature: the very
+   * first state refresh would overwrite the previous build and the alert would
+   * never be shown to anyone. The recorded build has to mean "the last build
+   * the user was told about", not "the last build we saw".
+   */
+  async acknowledgeBuild(gameId) {
+    return mutate((config) => {
+      const install = config.installs.find((i) => i.gameId === gameId);
+      if (!install) return;
+      config.seenBuilds = recordBuilds(config.seenBuilds ?? {}, [install]);
+    });
   },
 
   async selectGame(gameId) {

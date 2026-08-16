@@ -22,6 +22,7 @@ import {
 /** Every method name the bridge will forward. Anything else is ignored. */
 const METHODS: ApiMethod[] = [
   'getState',
+  'acknowledgeBuild',
   'selectGame',
   'detectGames',
   'browseForGame',

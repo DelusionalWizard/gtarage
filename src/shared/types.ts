@@ -268,6 +268,9 @@ export interface SwapPlan {
 }
 
 /** Persisted application state. */
+/** Executable build last seen per game. See shared/buildwatch.ts. */
+export type SeenBuilds = Partial<Record<GameId, string>>;
+
 export interface AppConfig {
   version: 1;
   /** Where mod files are kept. Defaults to userData/library. */
@@ -279,6 +282,17 @@ export interface AppConfig {
   profiles: Profile[];
   /** Active profile per game. */
   activeProfile: Partial<Record<GameId, string>>;
+
+  /**
+   * The game build last seen per game, so a Rockstar patch can be noticed.
+   *
+   * Every GTA V patch moves the memory addresses Script Hook V hooks, so every
+   * ASI plugin and .NET script stops loading until Script Hook V catches up.
+   * The game says nothing useful about this, and the usual next move is to
+   * start uninstalling mods at random. Recording the build is what turns that
+   * into one sentence on the next launch.
+   */
+  seenBuilds?: SeenBuilds;
   /** Last game the user had selected. */
   lastGameId?: GameId;
   /**

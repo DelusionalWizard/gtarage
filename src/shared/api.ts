@@ -14,6 +14,7 @@ import type {
   CatalogFile,
   CatalogMod,
 } from './catalog';
+import type { HookVerdict } from './buildwatch';
 import type { ModSite } from './sites';
 import type {
   AppConfig,
@@ -81,6 +82,20 @@ export interface DeployedView {
 }
 
 /** Everything the UI renders, recomputed after every mutation. */
+/**
+ * A game build that moved under us, with everything the UI needs to explain it.
+ */
+export interface BuildAlert {
+  gameId: GameId;
+  gameName: string;
+  previous: string;
+  current: string;
+  /** Enabled mods that run through Script Hook V and so stop loading. */
+  affected: Array<{ id: string; name: string }>;
+  /** What the installed Script Hook V says about the build it targets. */
+  hook: { state: HookVerdict['state']; builds: string[]; name?: string };
+}
+
 export interface AppState {
   games: GameView[];
   currentGameId: GameId | null;
@@ -111,6 +126,16 @@ export interface AppState {
    * already fallen two releases behind.
    */
   appVersion: string;
+  /**
+   * Set when the game executable is a different build than last run.
+   *
+   * This is the single most common way a working setup breaks: Rockstar
+   * patches, Script Hook V stops matching, and every ASI plugin silently
+   * fails to load with no error anywhere. The alert names the mods that are
+   * affected so the user is not left guessing which of forty things to blame.
+   */
+  buildAlert?: BuildAlert;
+
   /** Nexus account, when a working API key is configured. */
   nexus: NexusAccount | null;
   /** Whether a Nexus key is stored at all (it is never sent to the UI). */
@@ -250,6 +275,14 @@ export interface ProgressEvent {
  */
 export interface SwapmeetApi {
   getState(): Promise<AppState>;
+
+  /**
+   * Accept the new game build, clearing the update alert.
+   *
+   * Explicit rather than automatic: the alert must survive until the user has
+   * actually seen it, and a state refresh happens constantly.
+   */
+  acknowledgeBuild(gameId: GameId): Promise<AppState>;
   selectGame(gameId: GameId): Promise<AppState>;
 
   /** Re-run storefront and registry detection for every title. */

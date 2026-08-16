@@ -215,6 +215,7 @@ function hydrate(loaded: Partial<AppConfig>, userDataDir: string): AppConfig {
     ...loaded,
     settings: { ...base.settings, ...(loaded.settings ?? {}) },
     activeProfile: { ...(loaded.activeProfile ?? {}) },
+    seenBuilds: { ...(loaded.seenBuilds ?? {}) },
     installs: loaded.installs ?? [],
     mods: loaded.mods ?? [],
     profiles: loaded.profiles ?? [],
