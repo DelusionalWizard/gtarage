@@ -315,4 +315,21 @@ Not yet exercised: the Nexus provider against a live API key.
   `dependencies` is now detected automatically, but neither is user-editable).
 - Per-profile graphics settings (`settings.xml`/`commandline.txt`) carried
   through a swap, which the original design sketched.
-- Linux/macOS detection paths; the core is portable, `detect.ts` is not.
+- **Linux support** (publicly announced as planned; see the README roadmap).
+  The engine is already portable — library, deploy diff, hard links, ZIP,
+  planner. What is not:
+  - `detect.ts`: the registry probe and fixed-drive scan are Windows-only.
+    Steam library parsing already works anywhere.
+  - **Proton prefixes are the real work.** Game files live in the normal Steam
+    library, but everything the game *writes* is under
+    `steamapps/compatdata/<appid>/pfx/drive_c/users/steamuser/`. So
+    `saves.ts` and `graphics.ts` cannot resolve against `~/Documents`; both
+    need to route through the prefix for the right app id.
+  - `isGameRunning` uses `tasklist` and currently **fails open** off Windows
+    (returns false). That is a silent no-op, not a safe default — it must be
+    implemented via `/proc` before Linux is called supported, or deploys will
+    happily run under a live game.
+  - Case sensitivity: mod archives are inconsistent about casing, and on ext4
+    a mod shipping `Scripts/` lands somewhere the game never reads.
+  - Launching is nearly free: `steam://rungameid/<id>` works via `xdg-open`.
+- macOS is explicitly not planned; the games do not run there natively.

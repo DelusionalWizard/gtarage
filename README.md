@@ -27,7 +27,8 @@ MIT licensed.
 > - **The Windows builds are unsigned.** SmartScreen will warn you, and you
 >   should be sceptical of unsigned binaries from anyone. Building from source
 >   is three commands and is the option I would take.
-> - Windows is the only tested platform.
+> - Windows is the only tested platform today. Linux support is planned — see
+>   the roadmap.
 > - **The Definitive Edition trilogy is untested with actual mods** — see the
 >   caveats section before relying on it there.
 >
@@ -298,8 +299,9 @@ that have seen real use.
 
 ### Everything else
 
-- Windows is the tested platform. The core is cross-platform but game
-  detection is Windows-centric.
+- Windows is the only tested platform today. **Linux support is planned** —
+  see [Roadmap](#roadmap) for what already works and what is genuinely in the
+  way.
 - The Nexus provider is written against the documented API but has not been
   exercised against a live key — that needs your own account. It is the
   largest untested surface after the DE trilogy.
@@ -307,6 +309,57 @@ that have seen real use.
   profile, but it cannot make online modding safe — nothing can.
 - Definitive Edition Steam app ids in the registry are best-effort; detection
   confirms every folder by signature file, so a wrong id costs nothing.
+
+---
+
+## Roadmap
+
+### Linux support
+
+**Planned, and the hard part is smaller than it looks.** The engine is already
+platform-agnostic: the library, the deployment diff, hard links, the ZIP
+reader, load order and conflict resolution are all plain Node with no Windows
+assumptions. `sameVolume` already falls back to comparing device ids off
+Windows, and the archive extractor already looks for `7z` on `PATH` rather
+than only in `Program Files`.
+
+What actually needs doing, roughly in order of difficulty:
+
+- **Proton prefixes.** This is the real work, and it is not a port — it is a
+  mapping problem. Under Proton the game files sit in the normal Steam
+  library, but everything the game writes lives inside
+  `steamapps/compatdata/<appid>/pfx/drive_c/users/steamuser/`. So saves,
+  `settings.xml` and `commandline.txt` are not in `~/Documents` at all, and
+  every save-snapshot and per-profile-settings path has to resolve through the
+  prefix for the right app id.
+- **Game detection.** Steam library parsing already works anywhere; the
+  Windows registry probe and the fixed-drive scan simply do not apply, and
+  need replacing with the usual Linux Steam roots.
+- **Is the game running.** Currently `tasklist`, which does not exist. Needs a
+  `/proc`-based check. Note this fails *open* today on non-Windows — it
+  returns "not running" — so it must be implemented rather than left as a
+  silent no-op before Linux is called supported.
+- **Launching.** `steam://rungameid/<id>` already works through `xdg-open`, so
+  this is mostly free.
+- **Case sensitivity.** Windows filesystems are case-insensitive and mod
+  archives are wildly inconsistent about casing. On ext4 a mod shipping
+  `Scripts/` instead of `scripts/` lands in the wrong place, so path matching
+  needs to be deliberate about case rather than accidentally correct.
+
+macOS is not planned: the games do not run there natively, and nothing in the
+Rockstar catalogue targets it.
+
+### Also on the list
+
+- An end-to-end test against a real Definitive Edition install, which is the
+  largest untested surface (see [Caveats](#caveats)).
+- The Nexus provider exercised against a live API key.
+- Mod dependency editing in the UI — `requires` is enforced by the planner and
+  `dependencies` is detected automatically, but neither is user-editable yet.
+- `.rar`/`.7z` without needing 7-Zip or WinRAR installed.
+
+Contributions welcome, and the Linux work in particular is well-suited to
+someone who actually plays through Proton and can tell when a path is wrong.
 
 ---
 
