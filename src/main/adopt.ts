@@ -16,12 +16,13 @@
  * exactly as it was.
  */
 
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { getGame } from '../shared/games';
 import type { AppConfig, GameId } from '../shared/types';
 import { readManifest } from './deploy';
-import { exists, toPosix, walk } from './fsutil';
+import { exists, isDirectory, toPosix, walk } from './fsutil';
 
 /** A recognisable tool, so an adopted group gets a sensible name. */
 interface Signature {
@@ -227,11 +228,59 @@ export async function findAdoptable(
     });
   }
 
+  /*
+   * An .asi usually comes with a data folder of the same name.
+   *
+   * ChaosMod is `ChaosMod.asi` plus a `chaosmod/` folder holding its scripts,
+   * sounds and overlay; Menyoo and others follow the same convention. Taking
+   * only the .asi splits the mod in half: the library holds one file, the
+   * data folder stays unmanaged in the game folder forever, and disabling the
+   * mod leaves its leftovers behind. Worse, the two halves can then be
+   * removed independently.
+   *
+   * So a loose .asi claims a sibling directory matching its base name.
+   */
+  const claimSiblingFolder = async (rel: string): Promise<string[]> => {
+    const base = path.basename(rel, path.extname(rel)).toLowerCase();
+    const dir = path.dirname(rel) === '.' ? '' : `${path.dirname(rel)}/`;
+    const folder = path.join(gamePath, dir, base);
+
+    if (!(await isDirectory(folder))) return [];
+    const walked = await walk(folder, 4);
+    return walked.map((f) => toPosix(`${dir}${base}/${f.rel}`));
+  };
+
   // Anything left that is unmistakably a mod becomes its own entry. Only
   // files that passed the evidence bar qualify, so the game's own vendor
   // DLLs are never offered.
   for (const [rel, size] of remaining) {
     if (!evidence.has(rel)) continue;
+
+    // Pull in the mod's own data folder, when it has one.
+    let extraFiles: string[] = [];
+    let extraBytes = 0;
+    if (/\.asi$/i.test(rel)) {
+      extraFiles = await claimSiblingFolder(rel);
+      for (const f of extraFiles) {
+        try {
+          extraBytes += (await fs.stat(path.join(gamePath, f))).size;
+        } catch {
+          // counted for display only
+        }
+      }
+    }
+
+    if (extraFiles.length > 0) {
+      groups.push({
+        id: `loose-${path.basename(rel).toLowerCase()}`,
+        name: path.basename(rel),
+        files: [rel, ...extraFiles].sort(),
+        bytes: size + extraBytes,
+        core: false,
+      });
+      continue;
+    }
+
     groups.push({
       id: `loose-${path.basename(rel).toLowerCase()}`,
       name: path.basename(rel),

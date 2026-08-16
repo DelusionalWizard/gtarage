@@ -196,3 +196,47 @@ test('an empty game folder offers nothing', async () => {
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+test('an .asi brings its data folder with it', async () => {
+  // ChaosMod is ChaosMod.asi plus a chaosmod/ folder of scripts and sounds.
+  // Taking only the .asi splits the mod in half: the library gets one file,
+  // the data folder stays unmanaged in the game folder, and the two can then
+  // be removed independently — which is how a real user lost theirs.
+  const dir = await gameFolder([
+    'ChaosMod.asi',
+    'chaosmod/natives_def.lua',
+    'chaosmod/version.txt',
+    'chaosmod/scripts/thing.lua',
+    'chaosmod/twitchOverlay/index.html',
+    // ...and the game around it, which must stay out.
+    'steam_api64.dll',
+  ]);
+  try {
+    const groups = await findAdoptable(config(), 'gta5' as GameId, dir);
+    const chaos = groups.find((g) => g.name === 'ChaosMod.asi');
+    assert.ok(chaos, `expected ChaosMod, got: ${groups.map((g) => g.name).join(', ')}`);
+
+    assert.ok(chaos.files.includes('ChaosMod.asi'));
+    for (const wanted of [
+      'chaosmod/natives_def.lua',
+      'chaosmod/version.txt',
+      'chaosmod/scripts/thing.lua',
+      'chaosmod/twitchOverlay/index.html',
+    ]) {
+      assert.ok(chaos.files.includes(wanted), `should also claim ${wanted}`);
+    }
+    assert.ok(!chaos.files.includes('steam_api64.dll'));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('an .asi with no data folder is unaffected', async () => {
+  const dir = await gameFolder(['Simple.asi']);
+  try {
+    const groups = await findAdoptable(config(), 'gta5' as GameId, dir);
+    assert.deepEqual(groups.map((g) => g.files), [['Simple.asi']]);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});

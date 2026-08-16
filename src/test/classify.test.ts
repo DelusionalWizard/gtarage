@@ -17,6 +17,7 @@ import {
   classifyMod,
   repairClassifications,
   repairLayout,
+  sweepOrphanedModFolders,
 } from '../main/library';
 import type { Mod } from '../shared/types';
 import { deployRootFor, getGame } from '../shared/games';
@@ -220,4 +221,48 @@ test('a kind is never chosen that the game does not support', async () => {
     getGame('gtasade').supportedKinds.includes(kind),
     `${kind} is not supported on gtasade`,
   );
+});
+
+test('an unreferenced library folder with files is quarantined, not deleted', async () => {
+  // "Not in the config" is not the same as "worthless": if the app dies
+  // between writing a mod's files and saving the config, a perfectly good mod
+  // looks like an orphan. Deleting on that basis destroyed a real user's
+  // 15 MB ChaosMod, with only a log line to show for it.
+  const lib = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-lib-'));
+  const quarantine = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-q-'));
+  try {
+    // A real mod folder that config has forgotten.
+    await fs.mkdir(path.join(lib, 'goodmod', 'content'), { recursive: true });
+    await fs.writeFile(path.join(lib, 'goodmod', 'content', 'thing.asi'), 'payload');
+    // A failed import that never wrote anything.
+    await fs.mkdir(path.join(lib, 'deadimport'), { recursive: true });
+
+    const swept = await sweepOrphanedModFolders(lib, new Set<string>(), quarantine);
+
+    const good = swept.find((s) => s.id === 'goodmod');
+    assert.ok(good?.quarantined, 'a folder with files must be kept');
+    assert.equal(
+      await fs.readFile(path.join(quarantine, 'goodmod', 'content', 'thing.asi'), 'utf8'),
+      'payload',
+      'and must still be readable afterwards',
+    );
+
+    const dead = swept.find((s) => s.id === 'deadimport');
+    assert.equal(dead?.quarantined, false, 'an empty shell can just go');
+  } finally {
+    await fs.rm(lib, { recursive: true, force: true });
+    await fs.rm(quarantine, { recursive: true, force: true });
+  }
+});
+
+test('a referenced folder is never swept', async () => {
+  const lib = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-lib-'));
+  try {
+    await fs.mkdir(path.join(lib, 'keepme', 'content'), { recursive: true });
+    await fs.writeFile(path.join(lib, 'keepme', 'content', 'a.asi'), 'x');
+    assert.deepEqual(await sweepOrphanedModFolders(lib, new Set(['keepme'])), []);
+    assert.ok(await fs.readdir(path.join(lib, 'keepme')));
+  } finally {
+    await fs.rm(lib, { recursive: true, force: true });
+  }
 });

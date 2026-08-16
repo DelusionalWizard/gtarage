@@ -313,6 +313,35 @@ export async function deployProfile(
   const desired = desiredFiles(profile, mods);
   const problems: string[] = [];
 
+  /*
+   * Check the library still has what it claims, before touching anything.
+   *
+   * A mod's files can vanish underneath the index: antivirus quarantines an
+   * .asi, a cloud-sync client reclaims a folder, an import dies half-way, or
+   * someone tidies up by hand. Without this, deployment discovers each
+   * missing file individually and reports one ENOENT per file — a mod with
+   * twenty files produced twenty near-identical error toasts naming a path
+   * the user never chose, and no statement of the actual problem.
+   *
+   * One check, one message per mod, and the rest of the profile still
+   * deploys.
+   */
+  const missingSources = new Map<string, number>();
+  for (const [target, want] of [...desired]) {
+    if (await exists(want.source)) continue;
+    missingSources.set(want.modId, (missingSources.get(want.modId) ?? 0) + 1);
+    desired.delete(target);
+  }
+
+  for (const [modId, count] of missingSources) {
+    const mod = mods.find((m) => m.id === modId);
+    const name = mod?.name ?? modId;
+    problems.push(
+      `${name} could not be installed: ${count} of its file(s) are missing from your mod library. ` +
+        'Re-install the mod, or remove it from the library to stop this warning.',
+    );
+  }
+
   // Refuse anything aimed at a protected path before writing a single byte.
   for (const target of desired.keys()) {
     if (isProtected(gameId, target)) {

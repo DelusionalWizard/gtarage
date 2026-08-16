@@ -1666,6 +1666,54 @@ function renderInspector(s: AppState): void {
     actions.appendChild(browse);
     box.appendChild(actions);
     attention.appendChild(box);
+  } else if (s.brokenMods.length > 0) {
+    // Ranked first: a mod whose files are gone cannot be installed at all, and
+    // every other warning about it is downstream of that.
+    const first = s.brokenMods[0]!;
+
+    const box = el('div', 'alert alert-warn');
+    box.appendChild(
+      el(
+        'div',
+        'alert-title',
+        s.brokenMods.length === 1
+          ? `${first.name} is missing its files`
+          : `${s.brokenMods.length} mods are missing their files`,
+      ),
+    );
+    box.appendChild(
+      el(
+        'div',
+        'alert-body',
+        `${first.name} is in your library but its files are gone from disk. That usually means antivirus quarantined them, a cloud-sync folder reclaimed them, or an install did not finish. Re-install the mod, or remove it to clear this.`,
+      ),
+    );
+
+    const actions = el('div', 'alert-actions');
+    const removeBroken = el('button', 'small-btn is-primary', 'Remove from library');
+    removeBroken.addEventListener('click', async () => {
+      const ok = await confirmModal(
+        `Remove "${first.name}"?`,
+        'Its files are already gone, so this only clears the entry. Your game folder is not touched.',
+        'Remove it',
+      );
+      if (!ok) return;
+      const next = await guard('Removing…', () => api.removeMod(first.id));
+      if (next) {
+        apply(next);
+        toast(`${first.name} removed from the library.`, 'ok');
+      }
+    });
+    actions.appendChild(removeBroken);
+
+    const findAgain = el('button', 'small-btn', 'Re-install it');
+    findAgain.addEventListener('click', () => {
+      tab = 'browse';
+      render();
+    });
+    actions.appendChild(findAgain);
+    box.appendChild(actions);
+    attention.appendChild(box);
   } else if (adoptable.filter((g) => !g.alreadyInLibrary).length > 0) {
     // Ranked above everything else: until these are imported, the library is
     // not a true picture of what the game is actually loading.

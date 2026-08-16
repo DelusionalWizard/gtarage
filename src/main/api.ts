@@ -97,6 +97,7 @@ import {
 import { ensureDir, exists, freeSpace } from './fsutil';
 import {
   classifyFiles,
+  findBrokenMods,
   deleteModFiles,
   importMod,
   refreshMod,
@@ -204,6 +205,9 @@ async function buildState(config: AppConfig): Promise<AppState> {
         deps: missingDependencies(mod, mods),
       }))
       .filter((entry) => entry.deps.length > 0),
+    brokenMods: (
+      await findBrokenMods((m) => libraryFor(config, m.gameId), mods)
+    ).map(({ mod, missing }) => ({ id: mod.id, name: mod.name, missing })),
     appVersion: app.getVersion(),
     nexus: nexusAccount,
     hasNexusKey: Boolean(config.nexusApiKey),

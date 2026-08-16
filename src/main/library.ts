@@ -459,6 +459,42 @@ export function modRootFor(libraryRoot: string, mod: Mod): string {
   return root;
 }
 
+/**
+ * Mods whose library files have gone missing.
+ *
+ * The index and the disk can drift: antivirus quarantines a file, a sync
+ * client reclaims a folder, an import dies half-way. Checking the mod's own
+ * folder is cheap, and knowing about it before a deploy is far better than
+ * finding out one ENOENT at a time.
+ */
+export async function findBrokenMods(
+  libraryRootFor: (mod: Mod) => string,
+  mods: Mod[],
+): Promise<Array<{ mod: Mod; missing: number }>> {
+  const broken: Array<{ mod: Mod; missing: number }> = [];
+
+  for (const mod of mods) {
+    // An empty file list is odd but not broken; nothing to check.
+    if (mod.files.length === 0) continue;
+
+    if (!(await exists(mod.path))) {
+      broken.push({ mod, missing: mod.files.length });
+      continue;
+    }
+
+    // Sample rather than stat every file: a texture pack can hold thousands,
+    // and a folder that has lost some files has almost always lost all of
+    // them (the whole folder went). The deploy does the exhaustive check.
+    let missing = 0;
+    for (const rel of mod.files.slice(0, 12)) {
+      if (!(await exists(path.join(mod.path, rel)))) missing += 1;
+    }
+    if (missing > 0) broken.push({ mod, missing });
+  }
+
+  return broken;
+}
+
 /** Remove a mod's files from the library. */
 export async function deleteModFiles(libraryRoot: string, mod: Mod): Promise<void> {
   await fs.rm(modRootFor(libraryRoot, mod), { recursive: true, force: true });
@@ -480,7 +516,8 @@ export async function deleteModFiles(libraryRoot: string, mod: Mod): Promise<voi
 export async function sweepOrphanedModFolders(
   libraryRoot: string,
   knownIds: Set<string>,
-): Promise<Array<{ id: string; bytes: number }>> {
+  quarantineRoot?: string,
+): Promise<Array<{ id: string; bytes: number; quarantined: boolean }>> {
   let entries;
   try {
     entries = await fs.readdir(libraryRoot, { withFileTypes: true });
@@ -488,7 +525,8 @@ export async function sweepOrphanedModFolders(
     return []; // no library folder for this game yet
   }
 
-  const removed: Array<{ id: string; bytes: number }> = [];
+  const removed: Array<{ id: string; bytes: number; quarantined: boolean }> = [];
+
   for (const entry of entries) {
     if (!entry.isDirectory() || knownIds.has(entry.name)) continue;
 
@@ -501,9 +539,38 @@ export async function sweepOrphanedModFolders(
     } catch {
       // size is only for the log
     }
+
+    /*
+     * A folder holding real mod files is moved aside, not deleted.
+     *
+     * "Not referenced by the config" is not the same as "worthless". If the
+     * app is killed between writing a mod's files and saving the config — or
+     * a config write is lost — a perfectly good mod looks like an orphan.
+     * Deleting on that basis destroyed 15 MB of somebody's ChaosMod, and the
+     * only clue was a line in a log.
+     *
+     * So: an empty shell (a failed import that never got as far as writing
+     * `content/`) is deleted, and anything with actual files is quarantined
+     * where it can be recovered.
+     */
+    const hasContent = await exists(path.join(dir, 'content'));
+    const worthKeeping = hasContent && bytes > 0;
+
     try {
-      await fs.rm(dir, { recursive: true, force: true });
-      removed.push({ id: entry.name, bytes });
+      if (worthKeeping && quarantineRoot) {
+        const dest = path.join(quarantineRoot, entry.name);
+        await ensureDir(quarantineRoot);
+        // Never clobber an earlier quarantine of the same name.
+        const final = (await exists(dest)) ? `${dest}-${Date.now().toString(36)}` : dest;
+        await fs.rename(dir, final).catch(async () => {
+          await fs.cp(dir, final, { recursive: true });
+          await fs.rm(dir, { recursive: true, force: true });
+        });
+        removed.push({ id: entry.name, bytes, quarantined: true });
+      } else {
+        await fs.rm(dir, { recursive: true, force: true });
+        removed.push({ id: entry.name, bytes, quarantined: false });
+      }
     } catch {
       // Locked file: leave it, try again next launch.
     }

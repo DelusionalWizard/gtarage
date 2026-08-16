@@ -14,6 +14,7 @@ import {
   libraryFor,
   loadConfig,
   migrateLegacyUserData,
+  shelfFor,
   repointPaths,
   saveConfig,
 } from './config';
@@ -160,10 +161,13 @@ app.whenReady().then(async () => {
     const orphans = await sweepOrphanedModFolders(
       libraryFor(config, gameId),
       new Set(config.mods.filter((m) => m.gameId === gameId).map((m) => m.id)),
+      path.join(shelfFor(config, gameId), 'quarantine'),
     );
-    for (const { id, bytes } of orphans) {
+    for (const { id, bytes, quarantined } of orphans) {
       console.log(
-        `[swapmeet] removed orphaned library folder ${id} (${(bytes / 1048576).toFixed(2)} MB)`,
+        quarantined
+          ? `[swapmeet] quarantined unreferenced library folder ${id} (${(bytes / 1048576).toFixed(2)} MB) — recoverable from the shelf`
+          : `[swapmeet] removed empty library folder ${id}`,
       );
     }
   }

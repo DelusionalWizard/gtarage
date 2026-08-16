@@ -97,6 +97,13 @@ export interface AppState {
   /** Enabled mods whose detected prerequisites are not in the library. */
   missingDeps: MissingDeps[];
   /**
+   * Mods whose files have disappeared from the library.
+   *
+   * Surfaced so the user is told once, with a repair action, rather than
+   * discovering it as a wall of per-file errors on the next apply.
+   */
+  brokenMods: Array<{ id: string; name: string; missing: number }>;
+  /**
    * The running app version.
    *
    * Comes from the app rather than being written into the HTML, because a
