@@ -624,6 +624,9 @@ select {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* Named so the load-order split can size against this column rather than
+     the window - see the @container rule further down. */
+  container: view / inline-size;
 }
 
 /* --- mod table ---------------------------------------------------------- */
@@ -1705,4 +1708,441 @@ button:disabled {
 .alert-body,
 .stack-meta {
   overflow-wrap: anywhere;
+}
+
+/* ===========================================================================
+ * Home (design 2a), the swap diff (design 1c) and the alert banners.
+ *
+ * 2a and 1c are the two directions in the design that had never been built.
+ * 2a asks the only question that matters on opening the app - which setup do
+ * you want to play - and 1c answers the one that matters before committing:
+ * what is actually about to move. Everything here is expressed through the
+ * existing tokens, so both themes follow without a second palette.
+ * ======================================================================== */
+
+.banners {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 18px;
+}
+
+.banners:empty {
+  display: none;
+}
+
+.banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  border-left: 3px solid var(--dim);
+}
+
+.banner-warn {
+  border-left-color: var(--orange);
+  background: color-mix(in oklab, var(--orange) 8%, var(--panel));
+}
+
+.banner-info {
+  border-left-color: var(--blue);
+  background: color-mix(in oklab, var(--blue) 8%, var(--panel));
+}
+
+.banner-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.banner-title {
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.banner-body {
+  font: 400 12.5px/1.55 var(--sans);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* A copyable one-liner, for the dlclist entry people need to paste. */
+.banner-code {
+  font: 400 11.5px var(--mono);
+  color: var(--text-2);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 7px 9px;
+  user-select: all;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* --- home ---------------------------------------------------------------- */
+
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 26px 22px 30px;
+}
+
+.home-ask {
+  font: 600 24px/1.15 var(--sans);
+  letter-spacing: -0.015em;
+  color: var(--text);
+  margin: 0;
+}
+
+.home-lede {
+  font: 400 13.5px/1.6 var(--sans);
+  color: var(--muted);
+  max-width: 62ch;
+  margin: 0;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 14px;
+}
+
+.setup-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  text-align: left;
+}
+
+.setup-card.is-live {
+  border-color: var(--green);
+  background: color-mix(in oklab, var(--green) 6%, var(--panel));
+}
+
+.setup-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.setup-name {
+  flex: 1;
+  min-width: 0;
+  font: 600 15px var(--sans);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.setup-tag {
+  flex: none;
+  font: 500 9.5px var(--mono);
+  letter-spacing: 0.1em;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--dim);
+}
+
+.setup-tag.is-live {
+  background: var(--green);
+  color: var(--bg);
+}
+
+.setup-tag.is-safe {
+  background: color-mix(in oklab, var(--green) 22%, var(--panel));
+  color: var(--green);
+}
+
+.setup-blurb {
+  font: 400 12.5px/1.55 var(--sans);
+  color: var(--muted);
+}
+
+.setup-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.setup-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font: 400 12px var(--sans);
+  color: var(--text-2);
+}
+
+.setup-fact span:last-child {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-spacer {
+  flex: 1;
+}
+
+/* --- load order: stack + live diff (design 1c) ---------------------------- */
+
+.order-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+/*
+ * Stacks on the column's own width, not the window's.
+ *
+ * A viewport media query is the wrong instrument here and measurably so: with
+ * the profile rail and the inspector both open, a 1400px window leaves this
+ * column 714px, so a breakpoint on the window never fires and the diff gets
+ * squeezed into 300px while the window still looks wide.
+ */
+@container view (max-width: 820px) {
+  .order-split {
+    grid-template-columns: 1fr;
+  }
+  .order-diff {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+.order-stack {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 0 14px 14px;
+}
+
+.order-diff {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-left: 1px solid var(--line);
+  overflow: auto;
+  padding: 18px 20px 20px;
+  gap: 12px;
+}
+
+.swap-eyebrow {
+  font: 500 9.5px var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--faint);
+  text-transform: uppercase;
+}
+
+.swap-headline {
+  font: 600 19px/1.2 var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.swap-sub {
+  font: 400 12.5px/1.6 var(--sans);
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+.swap-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.swap-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 11px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border-left: 2px solid var(--dim);
+}
+
+.swap-row.is-in {
+  border-left-color: var(--green);
+}
+.swap-row.is-out {
+  border-left-color: var(--orange);
+}
+.swap-row.is-keep {
+  border-left-color: var(--line-strong);
+}
+
+.swap-sign {
+  flex: none;
+  width: 38px;
+  font: 700 10.5px var(--mono);
+  letter-spacing: 0.06em;
+}
+
+.swap-row.is-in .swap-sign {
+  color: var(--green);
+}
+.swap-row.is-out .swap-sign {
+  color: var(--orange);
+}
+.swap-row.is-keep .swap-sign {
+  color: var(--faint);
+}
+
+.swap-name {
+  flex: 1;
+  min-width: 0;
+  font: 500 12.5px var(--sans);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.swap-path {
+  flex: none;
+  font: 400 11px var(--mono);
+  color: var(--faint);
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The two summary cards under the diff, from 1c. */
+.swap-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.swap-card {
+  flex: 1 1 200px;
+  padding: 13px 14px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.swap-card-body {
+  font: 400 12.5px/1.5 var(--sans);
+  color: var(--text-2);
+}
+
+/* --- per-file toggles inside a mod --------------------------------------- */
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border-radius: 5px;
+}
+
+.file-row:hover {
+  background: var(--panel-2);
+}
+
+.file-path {
+  flex: 1;
+  min-width: 0;
+  font: 400 11.5px var(--mono);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.file-row.is-off .file-path {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.file-note {
+  flex: none;
+  font: 400 10.5px var(--mono);
+  color: var(--orange);
+}
+
+/* Plain-language badge, from design 2b. */
+.plain-badge {
+  flex: none;
+  font: 500 10px var(--mono);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+/* The reassurance list from 2b: what the app guarantees, stated plainly. */
+.assurances {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.assurance {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font: 400 12.5px/1.5 var(--sans);
+  color: var(--text-2);
+}
+
+.assurance-tick {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--green) 22%, var(--panel));
+  color: var(--green);
+  font: 700 9px var(--sans);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * `hidden` must actually hide.
+ *
+ * The UA stylesheet's `[hidden] { display: none }` is a bare attribute
+ * selector, so any component rule that sets `display` beats it — which meant
+ * `toolbar.hidden = true` silently did nothing and the search bar sat on top
+ * of the Load order, Browse and Saves tabs doing nothing. The overlay and the
+ * modal already carried hand-written guards for this exact reason; stating it
+ * once here is what stops the next component from hitting it.
+ */
+[hidden] {
+  display: none !important;
 }

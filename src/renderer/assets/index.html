@@ -78,7 +78,8 @@
       <!-- 1b: tabbed main column -->
       <main class="main">
         <nav class="tabs" id="tabs">
-          <button class="tab is-active" data-tab="mods">Mods</button>
+          <button class="tab is-active" data-tab="home">Home</button>
+          <button class="tab" data-tab="mods">Mods</button>
           <button class="tab" data-tab="order">Load order</button>
           <button class="tab" data-tab="browse">Browse</button>
           <!-- Hidden unless speedrunning mode is switched on in Settings. -->
@@ -111,6 +112,13 @@
             Install mod
           </button>
         </div>
+
+        <!--
+          Alerts sit above the view, not inside it, so a game update or a
+          missing dlclist entry stays on screen while the user moves between
+          tabs looking for the cause.
+        -->
+        <div class="banners" id="banners"></div>
 
         <section class="view" id="view"></section>
 
