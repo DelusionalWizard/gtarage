@@ -28,6 +28,8 @@ MIT licensed.
 >   should be sceptical of unsigned binaries from anyone. Building from source
 >   is three commands and is the option I would take.
 > - Windows is the only tested platform.
+> - **The Definitive Edition trilogy is untested with actual mods** — see the
+>   caveats section before relying on it there.
 >
 > Bug reports are genuinely useful right now — especially anything involving a
 > mod that did not deploy where you expected.
@@ -41,12 +43,17 @@ MIT licensed.
 | GTA V Enhanced | HD (RAGE) | ASI, ScriptHookV/.NET scripts, OpenIV `.oiv`, `mods/` replacements, ENB/ReShade |
 | GTA V Legacy | HD (RAGE) | ASI, ScriptHookV/.NET scripts, OpenIV `.oiv`, `mods/` replacements, ENB/ReShade |
 | GTA IV / EFLC | HD (RAGE) | ASI, scripts, ENB/ReShade |
-| San Andreas – Definitive Edition | UE4 | `.pak`/`.ucas`/`.utoc`, UE4SS Lua, DLL wrappers |
-| Vice City – Definitive Edition | UE4 | `.pak`/`.ucas`/`.utoc`, UE4SS Lua, DLL wrappers |
-| GTA III – Definitive Edition | UE4 | `.pak`/`.ucas`/`.utoc`, UE4SS Lua, DLL wrappers |
+| San Andreas – Definitive Edition | UE4 ⚠️ | `.pak`/`.ucas`/`.utoc`, UE4SS Lua, DLL wrappers |
+| Vice City – Definitive Edition | UE4 ⚠️ | `.pak`/`.ucas`/`.utoc`, UE4SS Lua, DLL wrappers |
+| GTA III – Definitive Edition | UE4 ⚠️ | `.pak`/`.ucas`/`.utoc`, UE4SS Lua, DLL wrappers |
 | San Andreas (original) | 3D | CLEO, modloader, ASI, ENB |
 | Vice City (original) | 3D | CLEO, modloader, ASI, ENB |
 | GTA III (original) | 3D | CLEO, modloader, ASI, ENB |
+
+> ⚠️ **The Definitive Editions are untested with real mods.** Detection and
+> deploy paths are verified, but no `.pak` has ever been confirmed loading
+> in-game. See
+> [Caveats](#the-definitive-editions-have-not-been-tested-with-actual-mods).
 
 The Definitive Editions are treated as genuinely different games rather than
 reskins, because they are: they are the classic titles hosted in Unreal Engine
@@ -264,10 +271,38 @@ refuses to write to a game's protected paths (executables, base archives).
 
 ## Caveats
 
+### The Definitive Editions have not been tested with actual mods
+
+This is the biggest gap, so it gets its own heading.
+
+What **is** verified for GTA III, Vice City and San Andreas – Definitive
+Edition: all three are detected correctly on a real machine, told apart from
+each other despite sharing an identical `Gameface.exe`, and their deploy paths
+are unit-tested — a `.pak` maps to `Gameface/Content/Paks/~mods/`, a Lua mod
+to the UE4SS folder, and the engine's own DLLs in `Gameface/Binaries/Win64`
+are correctly refused as adoption candidates.
+
+What is **not** verified: no real `.pak`, `.ucas`/`.utoc` or UE4SS Lua mod has
+ever been deployed to a Definitive Edition install and confirmed to load
+in-game. The paths come from how the UE4 `~mods` convention works, not from
+watching a mod actually run. If the layout is wrong in some way, the failure
+is a quiet one — Swapmeet will report a clean install and the game will simply
+ignore the files.
+
+So: on the DE trilogy, treat this as untested. Use "Check the game folder"
+after applying, keep a backup, and please open an issue either way — a report
+that it *worked* is as useful as one that it did not.
+
+The HD era (GTA V Legacy and Enhanced, GTA IV) and the 3D era are the paths
+that have seen real use.
+
+### Everything else
+
 - Windows is the tested platform. The core is cross-platform but game
   detection is Windows-centric.
 - The Nexus provider is written against the documented API but has not been
-  exercised against a live key here — that needs your own account.
+  exercised against a live key — that needs your own account. It is the
+  largest untested surface after the DE trilogy.
 - Modding GTA Online is a ban. Swapmeet warns and gives you a locked vanilla
   profile, but it cannot make online modding safe — nothing can.
 - Definitive Edition Steam app ids in the registry are best-effort; detection
