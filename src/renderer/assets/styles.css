@@ -12,6 +12,58 @@
  * utility" direction, restated in the dark palette.
  */
 
+/*
+ * The two faces the design specifies, bundled locally.
+ *
+ * They were named in --sans and --mono from the start but never shipped: the
+ * CSP is `font-src 'self'` and no font files were included, so every build
+ * until now silently rendered in Segoe UI and Consolas. A missing font does
+ * not error - it just quietly looks like something else, which is why this
+ * went unnoticed.
+ *
+ * Both faces are SIL Open Font License 1.1 (see the OFL.txt files in fonts/),
+ * so they can ship inside an MIT application. Only the weights the UI uses
+ * are included. `font-display: block` because a flash of fallback text inside
+ * a desktop chrome reads as a rendering bug rather than a loading state.
+ */
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("fonts/SpaceGrotesk-Regular.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("fonts/SpaceGrotesk-Medium.woff2") format("woff2");
+  font-weight: 500; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("fonts/SpaceGrotesk-SemiBold.woff2") format("woff2");
+  font-weight: 600; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("fonts/SpaceGrotesk-Bold.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: block;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/JetBrainsMono-Medium.woff2") format("woff2");
+  font-weight: 500; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: block;
+}
+
 :root {
   --bg: #0d0f11;
   --chrome: #111315;
