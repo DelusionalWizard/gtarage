@@ -74,6 +74,9 @@ export function findConflicts(ordered: Mod[]): Conflict[] {
   const conflicts: Conflict[] = [];
   for (const [target, modIds] of claims) {
     if (modIds.length < 2) continue;
+    // Two mods shipping a README are not in conflict in any sense the user
+    // cares about, and reporting it buries the conflicts that matter.
+    if (isInertFile(target)) continue;
     conflicts.push({
       target,
       modIds,
@@ -82,6 +85,76 @@ export function findConflicts(ordered: Mod[]): Conflict[] {
     });
   }
   return conflicts.sort((a, b) => a.target.localeCompare(b.target));
+}
+
+/**
+ * Files whose names are documentation or clutter rather than game content.
+ *
+ * Matched on the whole stem, not a substring, so a mod's own
+ * `install_settings.xml` or `readme_parser.dll` is untouched.
+ */
+const DOC_STEMS = new Set([
+  'readme',
+  'read me',
+  'read_me',
+  'readme-first',
+  'license',
+  'licence',
+  'copying',
+  'changelog',
+  'changes',
+  'credits',
+  'thanks',
+  'authors',
+  'contributors',
+  'how to install',
+  'how_to_install',
+  'install',
+  'installation',
+  'instructions',
+  'faq',
+  'todo',
+  'notes',
+]);
+
+/** Shortcut and OS-clutter files, which are never game content. */
+const CLUTTER = /\.(url|lnk)$/i;
+const OS_JUNK = new Set(['thumbs.db', 'desktop.ini', '.ds_store']);
+
+/**
+ * True when a file cannot affect the game, so two mods claiming it is not a
+ * conflict worth reporting.
+ *
+ * Deliberately narrow. `args.txt` is ScriptHookV's command line, `version.txt`
+ * is read by some mods, `.ini` files are configuration, and ChaosMod's Twitch
+ * overlay is real `.html` — none of those may be treated as inert. Only names
+ * that are unambiguously documentation qualify, and the files are still
+ * deployed either way; this only decides whether to *report* an overlap.
+ */
+export function isInertFile(target: string): boolean {
+  const base = (target.split('/').pop() ?? target).toLowerCase();
+  if (OS_JUNK.has(base)) return true;
+  if (CLUTTER.test(base)) return true;
+
+  const dot = base.lastIndexOf('.');
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  const ext = dot > 0 ? base.slice(dot + 1) : '';
+
+  // Only ever documentation formats: a `readme.dll` is not a readme.
+  const docExt = ext === '' || ['txt', 'md', 'nfo', 'rtf', 'pdf', 'doc', 'docx'].includes(ext);
+  if (!docExt) return false;
+
+  if (DOC_STEMS.has(stem)) return true;
+
+  // Variants like `readme_en`, `README (1)`, `license-mit`, and ScriptHookV's
+  // own `HOW_TO_INSTALL_2026.txt`.
+  //
+  // `[^a-z]` rather than `\b`: a word boundary does not exist between
+  // `how_to_install` and `_2026`, because `_` is a word character — which is
+  // precisely how that real filename slipped through first time.
+  return /^(readme|read_me|licen[cs]e|changelog|credits|how_to_install|how to install)([^a-z]|$)/.test(
+    stem,
+  );
 }
 
 /** Group conflicts by the pair of mods involved, for a readable UI summary. */

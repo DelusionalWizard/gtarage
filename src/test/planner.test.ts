@@ -10,6 +10,7 @@ import {
   activeMods,
   buildSwapPlan,
   findConflicts,
+  isInertFile,
   formatBytes,
   misorderedCoreMods,
   missingDependencies,
@@ -229,4 +230,70 @@ test('byte formatting stays readable', () => {
   assert.equal(formatBytes(512), '512 B');
   assert.equal(formatBytes(2048), '2.0 KB');
   assert.equal(formatBytes(5_368_709_120), '5.0 GB');
+});
+
+test('two mods shipping a README is not reported as a conflict', () => {
+  // The reported case: ScriptHookV .NET and ChaosMod both ship README.txt.
+  // Flagging it is noise, and it buries conflicts that actually matter.
+  const a = mod('shvdn', { files: ['ScriptHookVDotNet.asi', 'README.txt'] });
+  const b = mod('chaosmod', { files: ['ChaosMod.asi', 'README.txt'] });
+  const p = profile({ order: ['shvdn', 'chaosmod'], enabled: ['shvdn', 'chaosmod'] });
+
+  assert.deepEqual(findConflicts(activeMods(p, [a, b])), []);
+});
+
+test('a real conflict is still reported alongside ignored documentation', () => {
+  const a = mod('one', { files: ['README.txt', 'common/data/handling.meta'] });
+  const b = mod('two', { files: ['README.txt', 'common/data/handling.meta'] });
+  const p = profile({ order: ['one', 'two'], enabled: ['one', 'two'] });
+
+  const conflicts = findConflicts(activeMods(p, [a, b]));
+  assert.equal(conflicts.length, 1, 'only the meaningful one');
+  assert.equal(conflicts[0]?.target, 'mods/common/data/handling.meta');
+  assert.equal(conflicts[0]?.winnerId, 'two');
+});
+
+test('documentation and clutter are recognised', () => {
+  for (const name of [
+    'README.txt',
+    'readme',
+    'Read Me.txt',
+    'LICENSE',
+    'licence.md',
+    'CHANGELOG.md',
+    'HOW_TO_INSTALL_2026.txt',
+    'credits.txt',
+    'www.dev-c.com.url',
+    'Thumbs.db',
+    'desktop.ini',
+    'readme_en.txt',
+  ]) {
+    assert.ok(isInertFile(name), `${name} should be ignored`);
+  }
+});
+
+test('functional files are never mistaken for documentation', () => {
+  // Each of these has burned somebody somewhere: args.txt is ScriptHookV's
+  // command line, version.txt is read by mods, and ChaosMod's Twitch overlay
+  // is genuinely .html.
+  for (const name of [
+    'args.txt',
+    'version.txt',
+    'ScriptHookV.dll',
+    'ChaosMod.asi',
+    'chaosmod/natives_def.lua',
+    'chaosmod/twitchOverlay/index.html',
+    'settings.ini',
+    'commandline.txt',
+    'common/data/handling.meta',
+    'readme_parser.dll',
+    'install_settings.xml',
+  ]) {
+    assert.ok(!isInertFile(name), `${name} must NOT be ignored`);
+  }
+});
+
+test('documentation inside a folder is still recognised', () => {
+  assert.ok(isInertFile('scripts/README.txt'));
+  assert.ok(!isInertFile('scripts/config.txt'));
 });
