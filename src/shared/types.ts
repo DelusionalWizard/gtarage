@@ -199,6 +199,21 @@ export interface Profile {
   createdAt: string;
   lastLaunchedAt?: string;
   /**
+   * Files switched off inside a mod, keyed by mod id, as mod-relative paths.
+   *
+   * This is the one thing people leave Vortex for Mod Organizer 2 to get:
+   * losing a single file to another mod without unpacking and repacking the
+   * archive by hand.
+   *
+   * It lives on the profile, not the mod, and that is not an implementation
+   * detail. Two profiles routinely share a mod while wanting different parts
+   * of it — a texture pack whose road textures you want in one setup and not
+   * another — and hanging exclusions off the mod would make those two profiles
+   * silently overwrite each other every time you switched.
+   */
+  excludedFiles?: Record<string, string[]>;
+
+  /**
    * A locked profile deploys nothing and verifies the game folder is clean.
    * This is the GTA Online safety valve.
    */

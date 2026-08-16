@@ -23,6 +23,7 @@ import {
 const METHODS: ApiMethod[] = [
   'getState',
   'acknowledgeBuild',
+  'setFileExcluded',
   'selectGame',
   'detectGames',
   'browseForGame',

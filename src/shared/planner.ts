@@ -27,7 +27,19 @@ export function targetPath(mod: Mod, relFile: string): string {
   return root ? `${root}/${relFile}` : relFile;
 }
 
-/** The mods a profile will actually deploy, in load order. */
+/**
+ * The mods a profile will actually deploy, in load order.
+ *
+ * Per-file exclusions are applied here rather than at deploy time, and that
+ * placement is the whole feature: every consumer downstream — the file map,
+ * conflict detection, the swap plan, the deploy diff — reads `mod.files`, so
+ * filtering once here means an excluded file stops existing as far as the rest
+ * of the system is concerned. A file switched off stops winning conflicts,
+ * which is the entire point of switching it off.
+ *
+ * `size` is deliberately left alone. It is a whole-mod total and there are no
+ * per-file sizes to subtract, so recomputing it would mean inventing a number.
+ */
 export function activeMods(profile: Profile, mods: Mod[]): Mod[] {
   if (profile.vanillaLock) return [];
   const byId = new Map(mods.map((m) => [m.id, m]));
@@ -35,8 +47,25 @@ export function activeMods(profile: Profile, mods: Mod[]): Mod[] {
   return profile.order
     .filter((id) => enabled.has(id))
     .map((id) => byId.get(id))
-    .filter((m): m is Mod => m !== undefined);
+    .filter((m): m is Mod => m !== undefined)
+    .map((mod) => withExclusions(mod, profile));
 }
+
+/**
+ * Drop the files this profile has switched off for one mod.
+ *
+ * Returns the original object when there is nothing to exclude, so the common
+ * case allocates nothing and identity comparisons upstream still hold.
+ */
+function withExclusions(mod: Mod, profile: Profile): Mod {
+  const excluded = profile.excludedFiles?.[mod.id];
+  if (!excluded || excluded.length === 0) return mod;
+  const drop = new Set(excluded);
+  const files = mod.files.filter((f) => !drop.has(f));
+  if (files.length === mod.files.length) return mod;
+  return { ...mod, files };
+}
+
 
 /**
  * Map every game-relative path to the mod that owns it under the current

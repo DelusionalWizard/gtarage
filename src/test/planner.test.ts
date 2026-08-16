@@ -297,3 +297,86 @@ test('documentation inside a folder is still recognised', () => {
   assert.ok(isInertFile('scripts/README.txt'));
   assert.ok(!isInertFile('scripts/config.txt'));
 });
+
+// --- per-file exclusions ----------------------------------------------------
+//
+// The Mod Organizer 2 feature: lose one file to another mod without unpacking
+// the archive. The interesting cases are not "the file disappears" but what
+// that does to the conflict it was losing or winning.
+
+function exclusionFixture() {
+  const mods: Mod[] = [
+    mod('nve', {
+      name: 'NaturalVision Evolved',
+      files: ['common/data/timecycle.xml', 'x64/textures/road.ytd'],
+    }),
+    mod('roads', {
+      name: 'Better Roads',
+      files: ['x64/textures/road.ytd'],
+    }),
+  ];
+  const p = profile({
+    order: ['nve', 'roads'],
+    enabled: ['nve', 'roads'],
+  });
+  return { mods, profile: p };
+}
+
+test('excluding a file removes it from what the mod deploys', () => {
+  const { mods, profile } = exclusionFixture();
+  profile.excludedFiles = { nve: ['x64/textures/road.ytd'] };
+  const ordered = activeMods(profile, mods);
+  const nve = ordered.find((m) => m.id === 'nve');
+  assert.deepEqual(nve?.files, ['common/data/timecycle.xml']);
+});
+
+test('excluding a file does not disturb the original mod record', () => {
+  const { mods, profile } = exclusionFixture();
+  profile.excludedFiles = { nve: ['x64/textures/road.ytd'] };
+  activeMods(profile, mods);
+  assert.equal(mods[0]?.files.length, 2, 'the library entry is untouched');
+});
+
+test('excluding the losing side of a conflict resolves it', () => {
+  // `roads` is later in the order, so it wins road.ytd. Switching that one
+  // file off inside `roads` should hand the file back to NVE, not merely hide
+  // the row - this is the whole reason to have the feature.
+  const { mods, profile } = exclusionFixture();
+  profile.excludedFiles = { roads: ['x64/textures/road.ytd'] };
+  const ordered = activeMods(profile, mods);
+  assert.deepEqual(findConflicts(ordered), [], 'nothing is contested any more');
+  // Keyed by deploy target, so the "mods/" root for a replacement is included.
+  const target = targetPath(mods[0]!, 'x64/textures/road.ytd');
+  assert.equal(resolveFileMap(ordered).get(target), 'nve');
+});
+
+test('exclusions belong to the profile, not the mod', () => {
+  // Two profiles sharing one mod must be able to disagree about it. If this
+  // ever regresses, switching profiles silently rewrites the other one.
+  const { mods } = exclusionFixture();
+  const strict = profile({
+    id: 'strict',
+    order: ['nve'],
+    enabled: ['nve'],
+    excludedFiles: { nve: ['x64/textures/road.ytd'] },
+  });
+  const full = profile({ id: 'full', order: ['nve'], enabled: ['nve'] });
+
+  assert.equal(activeMods(strict, mods)[0]?.files.length, 1);
+  assert.equal(activeMods(full, mods)[0]?.files.length, 2);
+});
+
+test('an exclusion naming a file the mod does not have is harmless', () => {
+  // Left behind after a mod is updated and reimported with a different layout.
+  const { mods, profile } = exclusionFixture();
+  profile.excludedFiles = { nve: ['x64/textures/gone.ytd'] };
+  assert.equal(activeMods(profile, mods)[0]?.files.length, 2);
+});
+
+test('a mod with every file excluded deploys nothing but stays enabled', () => {
+  const { mods, profile } = exclusionFixture();
+  profile.excludedFiles = { roads: ['x64/textures/road.ytd'] };
+  const ordered = activeMods(profile, mods);
+  assert.ok(ordered.some((m) => m.id === 'roads'), 'still in the load order');
+  assert.equal(ordered.find((m) => m.id === 'roads')?.files.length, 0);
+});

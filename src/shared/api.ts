@@ -283,6 +283,19 @@ export interface SwapmeetApi {
    * actually seen it, and a state refresh happens constantly.
    */
   acknowledgeBuild(gameId: GameId): Promise<AppState>;
+
+  /**
+   * Switch one file inside a mod on or off for this profile.
+   *
+   * Scoped to the profile so two setups can share a mod and disagree about
+   * which parts of it they want.
+   */
+  setFileExcluded(args: {
+    profileId: string;
+    modId: string;
+    file: string;
+    excluded: boolean;
+  }): Promise<AppState>;
   selectGame(gameId: GameId): Promise<AppState>;
 
   /** Re-run storefront and registry detection for every title. */

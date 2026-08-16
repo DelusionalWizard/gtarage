@@ -442,6 +442,21 @@ export const handlers: SwapmeetApi = {
     });
   },
 
+  async setFileExcluded({ profileId, modId, file, excluded }) {
+    return mutate((config) => {
+      const profile = requireProfile(config, profileId);
+      const map = profile.excludedFiles ?? (profile.excludedFiles = {});
+      const current = new Set(map[modId] ?? []);
+      if (excluded) current.add(file);
+      else current.delete(file);
+      // Drop the key entirely when nothing is excluded, so a profile that has
+      // been toggled back and forth does not accumulate empty arrays in the
+      // config file forever.
+      if (current.size === 0) delete map[modId];
+      else map[modId] = [...current];
+    });
+  },
+
   async selectGame(gameId) {
     return mutate((config) => {
       config.lastGameId = gameId;
