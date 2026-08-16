@@ -205,6 +205,28 @@ interface RemovalResult {
  * Errors on individual files are collected rather than thrown, so one locked
  * file cannot leave the game folder half-reverted.
  */
+/**
+ * Turn a filesystem error into something a person can act on.
+ *
+ * `EPERM: operation not permitted, unlink '...'` is technically accurate and
+ * completely useless: on Windows it is what you get when the file is open in
+ * another process, which for a `.asi` sitting in a game folder almost always
+ * means the game is running with that plugin loaded. The callers guard
+ * against that up front, but the game can still be started mid-operation, so
+ * the message has to explain itself rather than leaking errno.
+ */
+function describeFileError(err: unknown, target: string): string {
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code === 'EPERM' || code === 'EBUSY' || code === 'EACCES') {
+    return (
+      `${path.basename(target)} is in use — the game is almost certainly running ` +
+      'with this mod loaded. Close it and try again.'
+    );
+  }
+  if (code === 'ENOSPC') return 'the drive is full.';
+  return (err as Error).message;
+}
+
 async function removeDeployed(
   gamePath: string,
   files: DeployedFile[],
@@ -225,7 +247,7 @@ async function removeDeployed(
         await pruneEmptyDirs(path.dirname(abs), gamePath);
       }
     } catch (err) {
-      problems.push(`${file.target}: ${(err as Error).message}`);
+      problems.push(`${file.target}: ${describeFileError(err, file.target)}`);
       remaining.push(file);
     }
     onProgress?.(++done, files.length, `Removing ${file.target}`);

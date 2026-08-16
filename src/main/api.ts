@@ -318,6 +318,29 @@ function requireProfile(config: AppConfig, profileId: string): Profile {
   return profile;
 }
 
+/**
+ * Refuse to touch the game folder while the game is running.
+ *
+ * Every operation that writes there must call this, not just "apply". The
+ * guard originally lived only in `applyProfile`, which left `removeMod`,
+ * `undeployAll`, `adopt` and `installHook` free to delete files out from
+ * under a live game — and Windows does not permit that, so it surfaced as a
+ * raw `EPERM: operation not permitted, unlink ...` after the operation had
+ * already half-run. A partially undeployed install is a genuinely bad state:
+ * some mod files gone, some still there, and a manifest that no longer
+ * describes either.
+ */
+async function assertGameNotRunning(config: AppConfig, gameId: GameId): Promise<void> {
+  if (!config.settings.blockWhileGameRunning) return;
+  if (!(await isGameRunning(gameId))) return;
+
+  const running = await runningGameProcesses(gameId);
+  throw new Error(
+    `${getGame(gameId).shortName} is running${running.length ? ` (${running.join(', ')})` : ''}. ` +
+      'Close the game first — Windows will not let its files be changed while it has them open.',
+  );
+}
+
 function requireInstall(config: AppConfig, gameId: GameId): string {
   const install = installFor(config, gameId);
   if (!install) throw new Error(`${getGame(gameId).shortName} is not set up yet.`);
@@ -464,6 +487,7 @@ export const handlers: SwapmeetApi = {
     // If the mod is currently deployed, take it out of the game folder first.
     const manifest = await readManifest(config, mod.gameId);
     if (manifest?.files.some((f) => f.modId === modId)) {
+      await assertGameNotRunning(config, mod.gameId);
       const gamePath = requireInstall(config, mod.gameId);
       const profile = activeProfileFor(config, mod.gameId);
       if (profile) {
@@ -602,12 +626,7 @@ export const handlers: SwapmeetApi = {
     const gameId = profile.gameId;
     const gamePath = requireInstall(config, gameId);
 
-    if (config.settings.blockWhileGameRunning && (await isGameRunning(gameId))) {
-      const running = await runningGameProcesses(gameId);
-      throw new Error(
-        `${getGame(gameId).shortName} is running${running.length ? ` (${running.join(', ')})` : ''}. Close the game before applying a profile.`,
-      );
-    }
+    await assertGameNotRunning(config, gameId);
 
     if (config.settings.backupSavesOnSwap) {
       await snapshotSaves(config, gameId, `before ${profile.name}`);
@@ -653,6 +672,7 @@ export const handlers: SwapmeetApi = {
 
   async undeployAll(gameId) {
     const config = await loadConfig(userDataDir);
+    await assertGameNotRunning(config, gameId);
     const gamePath = requireInstall(config, gameId);
     const problems = await undeployAll(config, gameId, gamePath, emitProgress);
     const vanilla = ensureVanillaProfile(config, gameId);
