@@ -19,6 +19,11 @@ import {
   isBuildSensitive,
   recordBuilds,
 } from '../shared/buildwatch';
+import {
+  countPacks,
+  dlcGaps,
+  needsGameconfig,
+} from '../shared/dlcpacks';
 import { GAMES, GAME_ORDER, getGame } from '../shared/games';
 import {
   activeMods,
@@ -26,11 +31,13 @@ import {
   findConflicts,
   normaliseOrder,
   reorder,
+  targetPath,
 } from '../shared/planner';
 import type {
   AppState,
   ApplyReport,
   BuildAlert,
+  DlcReport,
   GameView,
   ImportReport,
   NexusAccount,
@@ -218,6 +225,62 @@ function buildAlertFor(
   };
 }
 
+/**
+ * Add-on packs the enabled mods install that nothing has listed.
+ *
+ * The dlclist itself normally lives inside `update.rpf`, which we cannot open,
+ * so the usual answer is "unconfirmed" rather than "missing". The one case
+ * where we can do better is when a mod ships its own `dlclist.xml` — plenty
+ * do, precisely because the edit is such a common trip-up — in which case that
+ * copy is read out of the library and used as the source of truth.
+ */
+async function dlcReport(
+  config: AppConfig,
+  gameId: GameId,
+  ordered: Mod[],
+): Promise<AppState['dlc']> {
+  const game = getGame(gameId);
+  if (!game.supportedKinds.includes('oiv') && !game.supportedKinds.includes('replace')) {
+    return null;
+  }
+
+  const targetsPerMod = ordered.map((mod) => mod.files.map((f) => targetPath(mod, f)));
+  const packCount = countPacks(targetsPerMod);
+
+  // A mod that ships a dlclist is telling us what it expects to be listed.
+  let xml: string | null = null;
+  for (const mod of ordered) {
+    const rel = mod.files.find((f) => /(^|\/)dlclist\.xml$/i.test(f));
+    if (!rel) continue;
+    try {
+      xml = await fs.readFile(path.join(mod.path, 'content', rel), 'utf8');
+      break;
+    } catch {
+      // Unreadable is the same as absent here: fall through to "unconfirmed".
+    }
+  }
+
+  const gaps = ordered.flatMap((mod) => {
+    const targets = mod.files.map((f) => targetPath(mod, f));
+    return dlcGaps(targets, xml).map((gap) => ({
+      modId: mod.id,
+      modName: mod.name,
+      ...gap,
+    }));
+  });
+
+  if (gaps.length === 0 && !needsGameconfig(packCount)) return null;
+  return {
+    packCount,
+    // `confirmed` false means we never saw a dlclist at all, so the UI must say
+    // "needs an entry" rather than "the entry is missing" — on a setup where
+    // the user already added it by hand, the second wording would be a lie.
+    confirmed: xml !== null,
+    gaps,
+    needsGameconfig: needsGameconfig(packCount),
+  };
+}
+
 async function buildState(config: AppConfig): Promise<AppState> {
   const gameId =
     config.lastGameId ??
@@ -273,6 +336,7 @@ async function buildState(config: AppConfig): Promise<AppState> {
           return alert ? { buildAlert: alert } : {};
         })()
       : {}),
+    dlc: gameId ? await dlcReport(config, gameId, ordered) : null,
     appVersion: app.getVersion(),
     nexus: nexusAccount,
     hasNexusKey: Boolean(config.nexusApiKey),

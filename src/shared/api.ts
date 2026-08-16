@@ -85,6 +85,23 @@ export interface DeployedView {
 /**
  * A game build that moved under us, with everything the UI needs to explain it.
  */
+/**
+ * What the enabled mods imply about add-on DLC packs.
+ *
+ * An add-on installs into `dlcpacks/` and does nothing at all unless it is
+ * also named in `dlclist.xml` — which lives inside an encrypted archive, so
+ * this reports the gap rather than fixing it.
+ */
+export interface DlcReport {
+  /** Distinct add-on packs the enabled mods install between them. */
+  packCount: number;
+  /** False when no dlclist could be read, so nothing can be confirmed. */
+  confirmed: boolean;
+  gaps: Array<{ modId: string; modName: string; pack: string; line: string }>;
+  /** Enough packs that the stock memory pools are likely to crash on load. */
+  needsGameconfig: boolean;
+}
+
 export interface BuildAlert {
   gameId: GameId;
   gameName: string;
@@ -135,6 +152,12 @@ export interface AppState {
    * affected so the user is not left guessing which of forty things to blame.
    */
   buildAlert?: BuildAlert;
+
+  /**
+   * Add-on DLC packs that need a dlclist entry, and whether the memory pools
+   * are likely to need raising. Null when there is nothing to say.
+   */
+  dlc: DlcReport | null;
 
   /** Nexus account, when a working API key is configured. */
   nexus: NexusAccount | null;
