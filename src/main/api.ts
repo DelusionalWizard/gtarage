@@ -30,6 +30,7 @@ import type {
   SwapmeetApi,
   HookCandidateView,
   SaveSnapshotView,
+  UpdateView,
   SiteEvent,
   VerifyView,
 } from '../shared/api';
@@ -46,6 +47,7 @@ import { promises as fs } from 'node:fs';
 
 import { findAdoptable } from './adopt';
 import { detectSpeedrunTools, launchSpeedrunTool } from './speedrun';
+import { checkForUpdate, downloadUpdate, installUpdate } from './updater';
 import { PRACTICE_PROFILE_NAME, SPEEDRUN_RESOURCES } from '../shared/speedrun';
 import {
   SCRIPTHOOKV_URL,
@@ -756,6 +758,65 @@ export const handlers: SwapmeetApi = {
     return {
       state: next,
       message: `${group.name} imported into the library from your game folder and switched on. Your original files are untouched until you apply a profile.`,
+    };
+  },
+
+  async checkForUpdate() {
+    const info = await checkForUpdate();
+    const view: UpdateView = {
+      version: info.version,
+      current: info.current,
+      newer: info.newer,
+      url: info.url,
+      notes: info.notes,
+      verifiable: Boolean(info.sha512),
+    };
+    if (info.assetName) view.assetName = info.assetName;
+    if (info.sizeBytes) view.sizeBytes = info.sizeBytes;
+    if (info.cannotSelfUpdate) view.cannotSelfUpdate = true;
+    return view;
+  },
+
+  async installUpdate() {
+    const config = await loadConfig(userDataDir);
+    const info = await checkForUpdate();
+
+    if (!info.newer) {
+      return { started: false, message: 'Swapmeet is already up to date.' };
+    }
+    if (info.cannotSelfUpdate) {
+      await shell.openExternal(info.url);
+      return {
+        started: false,
+        message:
+          'The portable build cannot replace itself. The releases page is open — download the new portable exe and swap it in.',
+      };
+    }
+
+    /*
+     * Never restart out from under a live game or a half-applied profile.
+     *
+     * Quitting mid-deploy would leave the game folder in a state the manifest
+     * does not describe, which is the one outcome this app exists to prevent.
+     */
+    for (const install of config.installs) {
+      if (await isGameRunning(install.gameId)) {
+        return {
+          started: false,
+          message: `${getGame(install.gameId).shortName} is running. Close it before updating, so nothing is half-applied.`,
+        };
+      }
+    }
+
+    const dir = path.join(config.shelfPath, 'updates');
+    const file = await downloadUpdate(info, dir, (received, total) =>
+      emitProgress(received, total, `Downloading Swapmeet ${info.version}`),
+    );
+
+    installUpdate(file);
+    return {
+      started: true,
+      message: `Installing Swapmeet ${info.version}. Swapmeet will close.`,
     };
   },
 

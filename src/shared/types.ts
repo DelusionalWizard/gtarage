@@ -305,6 +305,15 @@ export interface AppConfig {
     /** Interface theme. */
     theme: 'dark' | 'light';
     /**
+     * What to do when a newer Swapmeet is published.
+     *
+     * `notify` is the default rather than `auto`: this app writes to game
+     * folders, and replacing itself without asking — potentially mid-session,
+     * with a profile half-applied — is not a decision to make on the user's
+     * behalf. `auto` is there for people who would rather not think about it.
+     */
+    autoUpdate: 'off' | 'notify' | 'auto';
+    /**
      * Show the speedrunning tools and community resources.
      *
      * Off by default: it is a whole extra surface that most people modding a

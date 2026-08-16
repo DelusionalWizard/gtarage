@@ -1454,6 +1454,44 @@ function renderSettings(s: AppState, view: HTMLElement): void {
     s.settings.blockWhileGameRunning,
     'blockWhileGameRunning',
   );
+  // --- updates --------------------------------------------------------------
+  const updRow = el('div', 'setting');
+  const updMain = el('div', 'setting-main');
+  updMain.appendChild(el('div', 'setting-name', 'Updates'));
+  updMain.appendChild(
+    el(
+      'div',
+      'setting-desc',
+      'Every download is checked against the checksum published with the release, and refused if it does not match. Swapmeet will not restart itself while a game is running.',
+    ),
+  );
+  updRow.appendChild(updMain);
+
+  const updSel = el('select', 'mini-select');
+  for (const [value, label] of [
+    ['notify', 'Tell me'],
+    ['auto', 'Install automatically'],
+    ['off', 'Never check'],
+  ] as Array<['notify' | 'auto' | 'off', string]>) {
+    const option = el('option');
+    option.value = value;
+    option.textContent = label;
+    option.selected = (s.settings.autoUpdate ?? 'notify') === value;
+    updSel.appendChild(option);
+  }
+  updSel.addEventListener('change', async () => {
+    const next = await guard('Saving…', () =>
+      api.updateSettings({ autoUpdate: updSel.value as 'notify' | 'auto' | 'off' }),
+    );
+    if (next) apply(next);
+  });
+  updRow.appendChild(updSel);
+
+  const updateCheckBtn = el('button', 'small-btn', 'Check now');
+  updateCheckBtn.addEventListener('click', () => void checkForUpdate(true));
+  updRow.appendChild(updateCheckBtn);
+  toggles.appendChild(updRow);
+
   // --- appearance -----------------------------------------------------------
   const themeRow = el('div', 'setting');
   const themeMain = el('div', 'setting-main');
@@ -1908,6 +1946,112 @@ function renderInspector(s: AppState): void {
       'Applying a profile copies mods into your game folder. If a mod would overwrite one of the game\u2019s own files, Swapmeet moves the original somewhere safe first \u2014 it is put back when you switch profiles. Nothing is ever deleted.',
     ),
   );
+}
+
+// --- updates ----------------------------------------------------------------
+
+/** Set once an update has been offered this session, so it asks only once. */
+let updateOffered = false;
+
+/**
+ * Check for a newer Swapmeet.
+ *
+ * `manual` means the user pressed the button, so silence is not an acceptable
+ * answer — they get told either way. The automatic check stays quiet when
+ * there is nothing to say.
+ */
+async function checkForUpdate(manual = false): Promise<void> {
+  const s = state;
+  if (!s) return;
+  if (!manual && (s.settings.autoUpdate ?? 'notify') === 'off') return;
+  if (!manual && updateOffered) return;
+
+  let info: UpdateView;
+  try {
+    info = manual
+      ? ((await guard('Checking for updates…', () => api.checkForUpdate())) as UpdateView)
+      : await api.checkForUpdate();
+    if (!info) return;
+  } catch (err) {
+    if (manual) toast((err as Error).message, 'error');
+    return;
+  }
+
+  if (!info.newer) {
+    if (manual) toast(`Swapmeet ${info.current} is the latest version.`, 'ok');
+    return;
+  }
+
+  updateOffered = true;
+
+  // "Install automatically" still shows what is happening; it just does not
+  // wait to be asked.
+  if (!manual && (s.settings.autoUpdate ?? 'notify') === 'auto' && !info.cannotSelfUpdate) {
+    await runUpdate(info);
+    return;
+  }
+
+  showUpdatePrompt(info);
+}
+
+function showUpdatePrompt(info: UpdateView): void {
+  openModal({
+    title: `Swapmeet ${info.version} is available`,
+    subtitle: `You are on ${info.current}.`,
+    build: (body) => {
+      if (info.cannotSelfUpdate) {
+        body.appendChild(
+          el(
+            'div',
+            'warning',
+            'You are running the portable build, which cannot replace itself. Download the new portable exe and swap it in.',
+          ),
+        );
+      }
+      body.appendChild(
+        el(
+          'div',
+          info.verifiable ? 'alert-body' : 'warning',
+          info.verifiable
+            ? 'The download is checked against the checksum published with the release, and refused if it does not match.'
+            : 'This release did not publish a checksum, so the download cannot be verified. Installing from the releases page yourself would be safer.',
+        ),
+      );
+
+      // Release notes, trimmed: the full text can be long.
+      const notes = info.notes.split('\n').slice(0, 24).join('\n').trim();
+      if (notes) {
+        body.appendChild(el('div', 'field-label', "What's new"));
+        body.appendChild(el('div', 'mono-list', notes));
+      }
+    },
+    actions: [
+      { label: 'Not now', onClick: () => true },
+      {
+        label: 'Release page',
+        onClick: () => {
+          void api.openExternal(info.url).catch((err: Error) => toast(err.message, 'error'));
+          return true;
+        },
+      },
+      {
+        label: info.cannotSelfUpdate ? 'Download' : 'Install and restart',
+        kind: 'primary',
+        onClick: () => {
+          void runUpdate(info);
+          return true;
+        },
+      },
+    ],
+  });
+}
+
+async function runUpdate(info: UpdateView): Promise<void> {
+  const result = await guard(`Downloading Swapmeet ${info.version}…`, () =>
+    api.installUpdate(),
+  );
+  if (!result) return;
+  toast(result.message, result.started ? 'ok' : 'warn');
 }
 
 // --- speedrunning -----------------------------------------------------------
@@ -2392,6 +2536,8 @@ async function refresh(): Promise<void> {
     // which matters more than a tab of convenience links.
     await maybePromptForHook();
     void maybePromptForSpeedrun();
+    // Last, and quiet unless there is something to say.
+    void checkForUpdate();
   }
 }
 

@@ -157,6 +157,21 @@ export interface ApplyReport {
   graphicsRestored: number;
 }
 
+/** What an update check found. */
+export interface UpdateView {
+  version: string;
+  current: string;
+  newer: boolean;
+  url: string;
+  notes: string;
+  assetName?: string;
+  sizeBytes?: number;
+  /** True when the checksum manifest was published, so the download is verifiable. */
+  verifiable: boolean;
+  /** True for the portable build, which cannot install over itself. */
+  cannotSelfUpdate?: boolean;
+}
+
 /** A group of community links shown on the speedrun tab. */
 export interface SpeedrunResourceGroup {
   title: string;
@@ -287,6 +302,14 @@ export interface SwapmeetApi {
   scanAdoptable(gameId: GameId): Promise<AdoptGroupView[]>;
   /** Copy such files into the library so Swapmeet can manage them. */
   adopt(gameId: GameId, groupId: string): Promise<{ state: AppState; message: string }>;
+
+  /** Ask GitHub whether a newer Swapmeet exists. */
+  checkForUpdate(): Promise<UpdateView>;
+  /**
+   * Download the update, verify it against its published checksum, then run
+   * the installer and quit.
+   */
+  installUpdate(): Promise<{ started: boolean; message: string }>;
 
   /** Speedrunning tools relevant to this game, and whether each is installed. */
   speedrunTools(gameId: GameId): Promise<SpeedrunToolView[]>;

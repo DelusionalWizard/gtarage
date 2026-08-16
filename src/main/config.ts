@@ -45,6 +45,7 @@ export function defaultConfig(userDataDir: string): AppConfig {
       warnAboutOnline: false,
       graphicsPerProfile: true,
       theme: 'dark',
+      autoUpdate: 'notify',
       speedrunMode: false,
     },
   };

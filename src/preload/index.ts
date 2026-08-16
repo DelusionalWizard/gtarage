@@ -43,6 +43,8 @@ const METHODS: ApiMethod[] = [
   'verify',
   'scanAdoptable',
   'adopt',
+  'checkForUpdate',
+  'installUpdate',
   'speedrunTools',
   'speedrunResources',
   'launchSpeedrunTool',

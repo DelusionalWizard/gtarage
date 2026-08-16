@@ -56,3 +56,4 @@ interface Window {
 
 type ResourceGroup = import('../shared/speedrun').ResourceGroup;
 type SpeedrunResourceGroup = import('../shared/api').SpeedrunResourceGroup;
+type UpdateView = import('../shared/api').UpdateView;
