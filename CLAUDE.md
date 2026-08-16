@@ -224,6 +224,34 @@ every kind in `supportedKinds`, plus `signatureFiles` for detection.
     `pathsFromDrop` (see gotcha 11) — it read the removed `File.path` and so
     silently ignored every drop outside the load-order dropzone.
 
+31. **`hidden` does not hide on its own.** The UA stylesheet's
+    `[hidden] { display: none }` is a bare attribute selector, so any component
+    rule that sets `display` outranks it. `.toolbar { display: flex }` meant
+    `toolbar.hidden = true` silently did nothing and the search bar sat on top
+    of the Load order, Browse and Saves tabs for months. There is now one
+    global `[hidden] { display: none !important }`; do not remove it in favour
+    of per-component guards, which is how this happened.
+32. **Check a new CSS class does not already exist.** `.diff-row` and
+    `.diff-sign` belonged to the ScriptHookV prompt long before the swap diff
+    wanted the same names, so the new rules quietly restyled an unrelated
+    dialog. The swap diff uses `swap-*`. `grep -c "^\.name" styles.css` before
+    inventing a class.
+33. **Layout inside the main column needs a container query, not a media
+    query.** With the profile rail (236px) and the inspector (330px) both open,
+    a 1400px window leaves the view 714px. A breakpoint on the viewport
+    therefore never fires when it needs to, and the load-order split squeezed
+    the diff into 300px while the window still looked wide. `.view` declares
+    `container: view / inline-size` for this.
+34. **The two typefaces are bundled, and must stay bundled.** `--sans` and
+    `--mono` name Space Grotesk and JetBrains Mono; the CSP is `font-src 'self'`
+    so a CDN link silently falls back to Segoe UI and Consolas, which is
+    exactly what happened for the project's first several releases. The woff2
+    files and their OFL licences live in `src/renderer/assets/fonts/`.
+35. **The recorded game build means "what the user was told about".** It is
+    written on acknowledge, never at detection time. Recording what is detected
+    destroys the feature outright: the first state refresh overwrites the
+    previous build and the alert is never shown to anyone.
+
 ## Verification
 
 ```bash
