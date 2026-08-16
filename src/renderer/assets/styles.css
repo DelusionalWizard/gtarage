@@ -1706,3 +1706,17 @@ button:disabled {
 .stack-meta {
   overflow-wrap: anywhere;
 }
+
+/*
+ * `hidden` must actually hide.
+ *
+ * The UA stylesheet's `[hidden] { display: none }` is a bare attribute
+ * selector, so any component rule that sets `display` beats it — which meant
+ * `toolbar.hidden = true` silently did nothing and the search bar sat on top
+ * of the Load order, Browse and Saves tabs doing nothing. The overlay and the
+ * modal already carried hand-written guards for this exact reason; stating it
+ * once here is what stops the next component from hitting it.
+ */
+[hidden] {
+  display: none !important;
+}
