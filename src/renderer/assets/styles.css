@@ -222,14 +222,6 @@ select {
   color: inherit;
 }
 
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
 /* --- title bar ---------------------------------------------------------- */
 
 .titlebar {
@@ -241,20 +233,6 @@ select {
   background: var(--chrome);
   border-bottom: 1px solid var(--line-strong);
   -webkit-app-region: drag;
-}
-
-.game-note {
-  font: 400 11px var(--mono);
-  color: var(--ghost);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 40vw;
-}
-
-.window-controls {
-  display: flex;
-  height: 100%;
 }
 
 /* --- shell -------------------------------------------------------------- */
@@ -300,11 +278,6 @@ select {
   border-left-color: var(--amber);
 }
 
-.profile-main {
-  flex: 1;
-  min-width: 0;
-}
-
 .profile-name {
   font: 600 13px var(--sans);
   color: var(--text-2);
@@ -317,76 +290,12 @@ select {
   color: var(--text);
 }
 
-.profile-meta {
-  font: 400 10.5px var(--mono);
-  color: var(--faint);
-  margin-top: 3px;
-}
-
 .badge {
   font: 500 9px var(--mono);
   padding: 2px 5px;
   border-radius: 3px;
   letter-spacing: 0.06em;
   flex: none;
-}
-
-.badge-live {
-  background: var(--green);
-  color: var(--bg);
-}
-
-.badge-lock {
-  background: var(--line-strong);
-  color: var(--muted);
-}
-
-.ghost-btn {
-  margin: 12px 8px 0;
-  padding: 9px 10px;
-  border: 1px dashed var(--line-dashed);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--dim);
-  font: 500 11px var(--mono);
-  cursor: pointer;
-}
-
-.ghost-btn:hover {
-  color: var(--text-2);
-  border-color: var(--faint);
-}
-
-.game-path {
-  font: 400 11px var(--mono);
-  color: var(--muted);
-  word-break: break-all;
-  line-height: 1.5;
-  user-select: text;
-}
-
-.game-status {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font: 400 10.5px var(--mono);
-  color: var(--dim);
-}
-
-.link-btn {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: 400 10.5px var(--mono);
-  color: var(--dim);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.link-btn:hover {
-  color: var(--amber);
 }
 
 /* --- main column -------------------------------------------------------- */
@@ -420,21 +329,6 @@ select {
 
 .chip.is-alert {
   color: var(--orange);
-}
-
-.solid-btn {
-  padding: 7px 13px;
-  border: 0;
-  border-radius: 5px;
-  background: var(--solid-bg);
-  color: var(--solid-fg);
-  font: 600 12px var(--sans);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.solid-btn:hover {
-  background: #fff;
 }
 
 /* --- mod table ---------------------------------------------------------- */
@@ -579,78 +473,12 @@ select {
   overflow: hidden;
 }
 
-.card-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.card-title {
-  font: 600 13px var(--sans);
-  color: var(--text);
-}
-
-.card-count {
-  font: 400 11px var(--mono);
-  color: var(--faint);
-}
-
-.card-spacer {
-  flex: 1;
-}
-
-.card-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 16px;
-  border-top: 1px solid #16191b;
-}
-
-.card-row:first-of-type {
-  border-top: 0;
-}
-
-.card-body {
-  padding: 14px 16px;
-  font: 400 12.5px/1.6 var(--sans);
-  color: var(--muted);
-}
-
 .setting {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
   border-top: 1px solid #16191b;
-}
-
-.setting-main {
-  flex: 1;
-}
-
-.setting-name {
-  font: 500 13px var(--sans);
-  color: var(--text-2);
-}
-
-.setting-desc {
-  font: 400 11.5px/1.5 var(--sans);
-  color: var(--faint);
-  margin-top: 3px;
-}
-
-.number-input {
-  width: 64px;
-  background: var(--panel-2);
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  padding: 6px 8px;
-  font: 400 12px var(--mono);
-  color: var(--text-2);
-  user-select: text;
 }
 
 /* --- inspector ---------------------------------------------------------- */
@@ -666,34 +494,11 @@ select {
   min-height: 0;
 }
 
-.insp-label {
-  font: 500 10px var(--mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--faint);
-  margin-bottom: 10px;
-}
-
 .alert {
   padding: 14px;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
   background: var(--panel-2);
-}
-
-.alert-warn {
-  border-color: color-mix(in oklch, var(--orange) 45%, var(--line-strong));
-  background: color-mix(in oklch, var(--orange) 8%, var(--panel-2));
-}
-
-.alert-ok {
-  border-color: color-mix(in oklch, var(--green) 35%, var(--line-strong));
-  background: color-mix(in oklch, var(--green) 7%, var(--panel-2));
-}
-
-.alert-title {
-  font: 600 13px var(--sans);
-  color: var(--text);
 }
 
 .alert-body {
@@ -714,40 +519,12 @@ select {
   flex-wrap: wrap;
 }
 
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font: 400 12.5px var(--sans);
-  color: var(--text-2);
-  padding: 4px 0;
-}
-
-.stat-value {
-  font: 400 11.5px var(--mono);
-  color: var(--muted);
-}
-
 .stat-value.is-good {
   color: var(--green);
 }
 
 .stat-value.is-warn {
   color: var(--orange);
-}
-
-.insp-spacer {
-  flex: 1;
-  min-height: 8px;
-}
-
-.note-box {
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  font: 400 12px/1.55 var(--sans);
-  color: var(--dim);
 }
 
 /* --- buttons ------------------------------------------------------------ */
@@ -761,26 +538,9 @@ select {
   white-space: nowrap;
 }
 
-.outline-btn {
-  padding: 9px 14px;
-  border: 1px solid var(--line-dashed);
-  background: transparent;
-  color: var(--text-2);
-  font: 500 12px var(--mono);
-}
-
 .outline-btn:hover:not(:disabled) {
   border-color: var(--faint);
   color: var(--text);
-}
-
-.primary-btn {
-  padding: 9px 18px;
-  border: 0;
-  background: var(--amber);
-  color: var(--bg);
-  font: 700 12px var(--mono);
-  letter-spacing: 0.02em;
 }
 
 .primary-btn:hover:not(:disabled) {
@@ -838,26 +598,6 @@ button:disabled {
 }
 
 /* --- action bar --------------------------------------------------------- */
-
-.actionbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: var(--actionbar);
-  padding: 0 18px;
-  border-top: 1px solid var(--line);
-  background: var(--chrome);
-  flex: none;
-}
-
-.action-status {
-  font: 400 11px var(--mono);
-  color: var(--dim);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* --- empty states ------------------------------------------------------- */
 
@@ -1151,20 +891,11 @@ button:disabled {
   color: var(--faint);
 }
 
-.diff-in {
-  border-left-color: var(--green);
-}
-.diff-in .diff-sign {
-  color: var(--green);
-}
 .diff-out {
   border-left-color: var(--orange);
 }
 .diff-out .diff-sign {
   color: var(--orange);
-}
-.diff-keep .diff-sign {
-  color: var(--faint);
 }
 
 .blocker {
@@ -1183,24 +914,6 @@ button:disabled {
   border: 1px solid color-mix(in oklch, var(--orange) 40%, var(--line-strong));
   background: color-mix(in oklch, var(--orange) 8%, var(--panel-2));
   color: var(--text-2);
-}
-
-/* Lead-in above the list of blockers, so a disabled Apply button is explained. */
-.blocker-lead {
-  font: 600 12.5px/1.5 var(--sans);
-  color: var(--text-2);
-  margin-bottom: 2px;
-}
-
-/* Legend for the IN / OUT / KEEP columns in the swap preview. */
-.diff-legend {
-  font: 400 11.5px/1.6 var(--sans);
-  color: var(--dim);
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  margin-bottom: 4px;
 }
 
 .mono-list {
@@ -1262,13 +975,6 @@ button:disabled {
 
 /* --- mod browser -------------------------------------------------------- */
 
-.browse-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .seg {
   display: flex;
   background: var(--panel);
@@ -1278,55 +984,10 @@ button:disabled {
   gap: 2px;
 }
 
-.seg-btn {
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  font: 500 11.5px var(--mono);
-  color: var(--dim);
-  cursor: pointer;
-}
-
-.seg-btn:hover {
-  color: var(--text-2);
-}
-
 .seg-btn.is-active {
   background: var(--amber);
   color: var(--bg);
   font-weight: 600;
-}
-
-.mini-select {
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  padding: 7px 10px;
-  font: 400 12px var(--sans);
-  color: var(--text-2);
-  cursor: pointer;
-}
-
-.browse-note {
-  padding: 10px 12px;
-  border-radius: 7px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  font: 400 12px/1.55 var(--sans);
-  color: var(--dim);
-}
-
-.inline-tag {
-  margin-left: 8px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--line-strong);
-  font: 500 9.5px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  vertical-align: middle;
 }
 
 /* Dependency rows reuse the diff layout but need room for a button. */
@@ -1373,26 +1034,6 @@ button:disabled {
 
 /* --- header settings button --------------------------------------------- */
 
-.chrome-btn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 26px;
-  padding: 0 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  background: var(--raised);
-  color: var(--muted);
-  font: 500 11.5px var(--mono);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chrome-btn:hover {
-  color: var(--text);
-  border-color: var(--faint);
-}
-
 .chrome-btn.is-active {
   background: var(--amber);
   border-color: var(--amber);
@@ -1400,25 +1041,7 @@ button:disabled {
   font-weight: 600;
 }
 
-.chrome-btn-icon {
-  font-size: 12px;
-  line-height: 1;
-}
-
 /* --- hide-disabled toggle ------------------------------------------------ */
-
-.mini-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 9px;
-  border-radius: 5px;
-  font: 500 11px var(--mono);
-  color: var(--dim);
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-}
 
 /*
  * Long values (paths, timestamps) must wrap rather than be clipped: a
@@ -1445,7 +1068,6 @@ button:disabled {
 [hidden] {
   display: none !important;
 }
-
 
 /* ===========================================================================
  * Shell and screens, rebuilt to designs 2a and 2b.

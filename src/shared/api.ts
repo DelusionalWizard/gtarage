@@ -352,8 +352,6 @@ export interface SwapmeetApi {
   toggleMod(profileId: string, modId: string, enabled: boolean): Promise<AppState>;
   /** Move a mod to a new index in the load order. */
   moveMod(profileId: string, modId: string, toIndex: number): Promise<AppState>;
-  /** Push core mods to the top of the load order. */
-  tidyOrder(profileId: string): Promise<AppState>;
 
   createProfile(gameId: GameId, name: string, copyFromId?: string): Promise<AppState>;
   renameProfile(profileId: string, name: string): Promise<AppState>;
@@ -410,8 +408,6 @@ export interface SwapmeetApi {
    */
   speedrunResources(): Promise<SpeedrunResourceGroup[]>;
 
-  /** Is ScriptHookV missing, and is there a copy already on this machine? */
-  hookStatus(): Promise<HookStatus>;
   /**
    * Install a found ScriptHookV copy into the given games. Used by the
    * first-run prompt and by the watcher when a download appears.
@@ -457,8 +453,6 @@ export interface SwapmeetApi {
     file: CatalogFile,
     gameId: GameId,
   ): Promise<{ state: AppState; imported: boolean; message: string }>;
-  /** Discard cached provider metadata and re-query. */
-  refreshCatalog(): Promise<void>;
   /**
    * Install the Essentials entry that provides a detected dependency.
    * Returns a message when the tool has to be fetched by hand instead.

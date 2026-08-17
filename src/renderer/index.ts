@@ -244,6 +244,33 @@ function closeModal(): void {
   byId('modal-scrim').hidden = true;
 }
 
+/** Ask for one line of text. Resolves null when cancelled. */
+function promptModal(title: string, label: string, value: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    let input: HTMLInputElement;
+    openModal({
+      title,
+      build: (body) => {
+        body.appendChild(el('div', 'field-label', label));
+        input = el('input', 'text-input') as HTMLInputElement;
+        input.type = 'text';
+        input.value = value;
+        body.appendChild(input);
+        // The field is the only thing here, so focusing it saves a click.
+        window.setTimeout(() => input.select(), 30);
+      },
+      actions: [
+        { label: 'Cancel', onClick: () => (resolve(null), true) },
+        {
+          label: 'Save',
+          kind: 'primary',
+          onClick: () => (resolve(input.value.trim() || null), true),
+        },
+      ],
+    });
+  });
+}
+
 function confirmModal(title: string, message: string, confirmLabel: string): Promise<boolean> {
   return new Promise((resolve) => {
     openModal({
@@ -577,6 +604,16 @@ function modMenu(mod: Mod): void {
     },
     actions: [
       { label: 'Close', onClick: () => true },
+      {
+        label: 'Rename…',
+        onClick: async () => {
+          const name = await promptModal('Rename this mod', 'Name', mod.name);
+          if (!name || name === mod.name) return true;
+          const next = await guard('Renaming…', () => api.updateMod(mod.id, { name }));
+          if (next) apply(next);
+          return true;
+        },
+      },
       {
         label: 'Remove from library',
         kind: 'danger',
@@ -1683,7 +1720,7 @@ function readyPanel(s: AppState, profile: Profile): HTMLElement {
       'ready-sub',
       profile.vanillaLock
         ? 'This setup puts your game back to completely unmodded.'
-        : `${on} thing${on === 1 ? '' : 's'} on, ${off} off.`,
+        : `${on} thing${on === 1 ? '' : 's'} on, ${off} off · ${formatBytes(s.activeBytes)}.`,
     ),
   );
   panel.appendChild(head);
@@ -1942,6 +1979,23 @@ function renderSettings(s: AppState, view: HTMLElement): void {
         game.path ?? 'No folder found — choose it yourself if the game is installed',
       ),
     );
+    // Only offered where there is something to forget. Forgetting drops the
+    // folder from Swapmeet; it does not touch the game or the library.
+    if (game.installed) {
+      const forget = el('button', 'btn', 'Forget');
+      forget.title = `Stop managing ${game.shortName}. Nothing is deleted.`;
+      forget.addEventListener('click', async () => {
+        const ok = await confirmModal(
+          `Forget ${game.shortName}?`,
+          'Swapmeet stops managing this folder. Your game, your mods and your library are all left exactly as they are, and you can point it back at the folder any time.',
+          'Forget it',
+        );
+        if (!ok) return;
+        const next = await guard('Forgetting…', () => api.forgetGame(game.id));
+        if (next) apply(next);
+      });
+      row.appendChild(forget);
+    }
     gameRows.appendChild(row);
   }
   folders.appendChild(gameRows);
@@ -1951,6 +2005,26 @@ function renderSettings(s: AppState, view: HTMLElement): void {
   const choose = el('button', 'btn', 'Choose folder');
   choose.addEventListener('click', () => browseForGame());
   folderActs.append(again, choose);
+
+  // The escape hatch. Applying the vanilla setup does the same thing, but
+  // someone looking for "undo everything" looks in Settings, not in a setup.
+  const strip = el('button', 'btn', 'Remove all mods from my game folder');
+  strip.title = 'Put the game folder back to how it was, without deleting anything';
+  strip.addEventListener('click', async () => {
+    if (!s.currentGameId) return;
+    const ok = await confirmModal(
+      'Put your game back to unmodded?',
+      'Every file Swapmeet installed comes out, and anything it displaced goes back. Your library keeps all the mods, so you can put a setup back whenever you like.',
+      'Remove them',
+    );
+    if (!ok) return;
+    const result = await guard('Removing…', () => api.undeployAll(s.currentGameId!));
+    if (!result) return;
+    apply(result.state);
+    for (const problem of result.problems) toast(problem, 'warn');
+    if (result.problems.length === 0) toast('Your game folder is back to unmodded.', 'ok');
+  });
+  folderActs.appendChild(strip);
   folders.appendChild(folderActs);
 
   // --- how files are placed -------------------------------------------------

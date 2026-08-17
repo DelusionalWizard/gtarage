@@ -669,14 +669,6 @@ export const handlers: SwapmeetApi = {
     });
   },
 
-  async tidyOrder(profileId) {
-    return mutate((config) => {
-      const profile = requireProfile(config, profileId);
-      profile.order = normaliseOrder(profile.order, config.mods);
-      profile.enabled = profile.order.filter((id) => profile.enabled.includes(id));
-    });
-  },
-
   async createProfile(gameId, name, copyFromId) {
     return mutate((config) => {
       const trimmed = name.trim();
@@ -1066,35 +1058,6 @@ export const handlers: SwapmeetApi = {
     return SPEEDRUN_RESOURCES;
   },
 
-  async hookStatus() {
-    const config = await loadConfig(userDataDir);
-    const found = [
-      ...(await findInstalledHook(config)),
-      ...(await findDownloadedHook()),
-    ];
-
-    const candidates: HookCandidateView[] = [];
-    for (const candidate of found) {
-      const view: HookCandidateView = {
-        path: candidate.path,
-        gameId: candidate.gameId,
-        source: candidate.source,
-        modifiedAt: candidate.modifiedAt,
-        contents: await describeCandidate(candidate),
-      };
-      if (candidate.version) view.version = candidate.version;
-      candidates.push(view);
-    }
-
-    const coverage = hookCoverage(config);
-    return {
-      missingFor: coverage.missing,
-      presentFor: coverage.present,
-      candidates,
-      url: SCRIPTHOOKV_URL,
-    };
-  },
-
   async installHook(sourcePath, gameIds) {
     if (gameIds.length === 0) throw new Error('No game chosen.');
 
@@ -1359,10 +1322,6 @@ export const handlers: SwapmeetApi = {
     }
 
     return { state: await state(), imported: outcome.imported, message: outcome.message };
-  },
-
-  async refreshCatalog() {
-    invalidateCaches();
   },
 
   async installDependency(essentialId, gameId) {
