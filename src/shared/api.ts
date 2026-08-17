@@ -51,6 +51,8 @@ export interface SiteEvent {
 export interface EssentialView {
   id: string;
   name: string;
+  /** The catalogue's grouping. 'core' means other mods need it to load. */
+  category: string;
   /** The catalogue's version string, as published. */
   version: string;
   summary: string;
@@ -509,6 +511,8 @@ export interface GTArageApi {
     id: string,
     gameId: GameId,
   ): Promise<{ state: AppState; imported: boolean; message: string }>;
+  /** Record that the first-launch prompt has been answered. */
+  dismissSetupPrompt(): Promise<AppState>;
   /** Whether Enhanced is set to launch without BattlEye. */
   battlEyeState(): Promise<BattlEyeView>;
   /**

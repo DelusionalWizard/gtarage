@@ -351,6 +351,14 @@ export interface AppConfig {
      */
     themeChosen?: boolean;
     /**
+     * Set once the first-launch setup prompt has been answered either way.
+     *
+     * Separate from themeChosen because it is answered once per install, not
+     * once per preference — reappearing after someone declined it would be a
+     * nag, and it offers to download things.
+     */
+    setupPromptSeen?: boolean;
+    /**
      * What to do when a newer GTArage is published.
      *
      * `notify` is the default rather than `auto`: this app writes to game

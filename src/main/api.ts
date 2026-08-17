@@ -494,6 +494,7 @@ async function essentialsFor(
     const entry: EssentialView = {
       id: mod.id,
       name: mod.name,
+      category: mod.category,
       version: mod.version,
       summary: mod.summary,
       url: mod.url,
@@ -1455,6 +1456,12 @@ export const handlers: GTArageApi = {
     const file = mod.files.find((f) => f.primary) ?? mod.files[0];
     if (!file) throw new Error(`${mod.name} has no downloadable file right now.`);
     return installCatalogFile(mod, file, gameId);
+  },
+
+  async dismissSetupPrompt() {
+    return mutate((config) => {
+      config.settings.setupPromptSeen = true;
+    });
   },
 
   async battlEyeState() {

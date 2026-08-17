@@ -3137,6 +3137,60 @@ button:disabled {
  * A button whose non-default state is worth seeing at a glance — currently
  * only the BattlEye toggle, where "already off" is the whole answer.
  */
+/* --- the first-launch tool checklist -------------------------------------- */
+
+.setup-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+}
+
+.setup-tool {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.setup-tool:hover {
+  background: var(--panel-2);
+}
+
+/* A disabled box still needs to read as "nothing to do here", not broken. */
+.setup-tool:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.setup-tool input {
+  margin: 2px 0 0;
+  accent-color: var(--blue);
+  flex: none;
+}
+
+.setup-tool-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.setup-tool-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font: 600 13px var(--sans);
+  color: var(--text);
+}
+
+.setup-tool-sub {
+  font: 400 12px/1.5 var(--sans);
+  color: var(--dim);
+  margin-top: 2px;
+}
+
 .btn.is-on {
   background: var(--orange-soft);
   border-color: var(--orange-line);

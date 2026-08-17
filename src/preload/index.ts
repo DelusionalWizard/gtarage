@@ -66,6 +66,7 @@ const METHODS: ApiMethod[] = [
   'updateSettings',
   'listEssentials',
   'installEssential',
+  'dismissSetupPrompt',
   'battlEyeState',
   'setBattlEye',
   'listSites',

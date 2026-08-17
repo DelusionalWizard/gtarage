@@ -3677,9 +3677,202 @@ async function refresh(): Promise<void> {
  * reasonably conclude the app is broken -- so say what happened and offer a
  * retry instead.
  */
+// --- first launch -------------------------------------------------------------
+
+/**
+ * The one prompt GTArage shows unasked.
+ *
+ * Nearly every "my mods do nothing" report comes down to the same two things:
+ * Script Hook V is missing or mismatched, and the game folder already has
+ * half-installed leftovers from a previous attempt. Both are cheap to fix
+ * before you start and miserable to diagnose afterwards, which is the only
+ * reason this interrupts at all.
+ *
+ * It offers to install the load-bearing tools for the detected game, and says
+ * plainly that a clean game install is the easier starting point. It is shown
+ * once per install, whichever way it is answered — an offer to download things
+ * that comes back every launch is a nag.
+ */
+
+/** Guards against the prompt opening twice while its state round-trips. */
+let setupPromptShown = false;
+
+function coreEssentials(view: EssentialsView): EssentialView[] {
+  return view.entries.filter((entry) => {
+    if (entry.category !== 'core') return false;
+    // The nightly is an alternative to the stable build of the same tool, not
+    // an addition to it. Offering both by default installs a conflict.
+    if (/nightly/i.test(entry.id)) return false;
+    return true;
+  });
+}
+
+async function maybeShowSetupPrompt(s: AppState): Promise<void> {
+  if (setupPromptShown) return;
+  if (s.settings.setupPromptSeen) return;
+  const gameId = s.currentGameId;
+  if (!gameId) return;
+  const game = s.games.find((g) => g.id === gameId);
+  if (!game?.installed) return;
+
+  setupPromptShown = true;
+
+  // Fetched before opening so the list is never an empty box that fills in.
+  let view: EssentialsView;
+  try {
+    view = await api.listEssentials(gameId);
+  } catch {
+    view = { entries: [], error: 'offline' };
+  }
+
+  const core = coreEssentials(view);
+  const wanted = new Set(core.filter((e) => !e.installedVersion).map((e) => e.id));
+
+  const dismiss = async (): Promise<void> => {
+    const next = await api.dismissSetupPrompt().catch(() => null);
+    if (next) apply(next);
+  };
+
+  openModal({
+    title: `Before you mod ${game.shortName}`,
+    subtitle: 'Two things worth doing first. This only appears once.',
+    build: (body) => {
+      // 1. The clean-install advice.
+      const clean = el('div', 'note-card');
+      clean.appendChild(el('div', 'note-icon', '1'));
+      const cleanMain = el('div', 'note-main');
+      cleanMain.appendChild(el('div', 'note-title', 'Start from a clean game folder'));
+      cleanMain.appendChild(
+        el(
+          'div',
+          'note-body',
+          'If this game has been modded before, files from those attempts are probably still in the folder, and GTArage cannot tell them apart from the game’s own. Verifying the files in your launcher — or reinstalling — is the shortest route to a folder it can reason about. Your saves live elsewhere and are not affected.',
+        ),
+      );
+      clean.appendChild(cleanMain);
+      body.appendChild(clean);
+
+      // 2. The tools.
+      const tools = el('div', 'note-card');
+      tools.appendChild(el('div', 'note-icon', '2'));
+      const toolsMain = el('div', 'note-main');
+      toolsMain.appendChild(el('div', 'note-title', 'Install the tools mods rely on'));
+
+      if (view.error) {
+        toolsMain.appendChild(
+          el(
+            'div',
+            'note-body',
+            'GTArage could not reach the release pages just now, so it cannot offer these yet. Open Tools once you are back online.',
+          ),
+        );
+      } else if (core.length === 0) {
+        toolsMain.appendChild(
+          el('div', 'note-body', `${game.shortName} needs no extra tools to load mods.`),
+        );
+      } else {
+        toolsMain.appendChild(
+          el(
+            'div',
+            'note-body',
+            'Almost nothing loads without these. Script mods in particular fail silently when they are missing — the game starts and simply ignores them.',
+          ),
+        );
+        const list = el('div', 'setup-tools');
+        for (const entry of core) {
+          const row = el('label', 'setup-tool');
+          const box = el('input') as HTMLInputElement;
+          box.type = 'checkbox';
+          if (entry.installedVersion) {
+            box.checked = false;
+            box.disabled = true;
+          } else {
+            box.checked = wanted.has(entry.id);
+            box.addEventListener('change', () => {
+              if (box.checked) wanted.add(entry.id);
+              else wanted.delete(entry.id);
+            });
+          }
+          row.appendChild(box);
+          const text = el('div', 'setup-tool-main');
+          const name = el('div', 'setup-tool-name', entry.name);
+          if (entry.installedVersion) {
+            name.appendChild(el('span', 'tag is-ok', 'already installed'));
+          } else if (entry.manualOnly) {
+            name.appendChild(el('span', 'tag', 'opens its page'));
+            row.title = entry.manualReason ?? 'GTArage cannot fetch this one directly.';
+          }
+          text.appendChild(name);
+          text.appendChild(el('div', 'setup-tool-sub', entry.summary));
+          row.appendChild(text);
+          list.appendChild(row);
+        }
+        toolsMain.appendChild(list);
+      }
+
+      tools.appendChild(toolsMain);
+      body.appendChild(tools);
+    },
+    actions: [
+      {
+        label: 'Get the ticked tools',
+        kind: 'primary',
+        disabled: wanted.size === 0,
+        onClick: async () => {
+          const ids = core.filter((e) => wanted.has(e.id));
+          let installed = 0;
+          // Opened, not failed. An entry GTArage cannot fetch has its page
+          // opened instead, which is a different outcome from a broken
+          // download and has to be reported as one — otherwise a prompt that
+          // did exactly what it could says it could not install anything.
+          const opened: string[] = [];
+          const failed: string[] = [];
+          for (const entry of ids) {
+            try {
+              const result = await api.installEssential(entry.id, gameId);
+              apply(result.state);
+              if (result.imported) installed += 1;
+              else if (entry.manualOnly) opened.push(entry.name);
+              else failed.push(entry.name);
+            } catch (err) {
+              failed.push(`${entry.name} (${(err as Error).message})`);
+            }
+          }
+          await dismiss();
+          if (installed > 0) {
+            toast(
+              `${installed} tool${installed === 1 ? '' : 's'} added to your library.`,
+              'ok',
+            );
+          }
+          if (opened.length > 0) {
+            toast(
+              `${opened.join(', ')} cannot be fetched automatically — the page is open in your browser. Drop the file back here when you have it.`,
+              'warn',
+            );
+          }
+          if (failed.length > 0) {
+            toast(`Could not install: ${failed.join(', ')}`, 'error');
+          }
+          return true;
+        },
+      },
+      {
+        label: 'Skip for now',
+        kind: 'plain',
+        onClick: async () => {
+          await dismiss();
+          return true;
+        },
+      },
+    ],
+  });
+}
+
 async function boot(): Promise<void> {
   try {
     await refresh();
+    if (state) void maybeShowSetupPrompt(state);
   } catch (err) {
     const view = byId('view');
     clear(view);
