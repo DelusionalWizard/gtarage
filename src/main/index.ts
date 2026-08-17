@@ -154,21 +154,37 @@ app.whenReady().then(async () => {
     await saveConfig(config);
   }
 
-  // Delete library folders no mod refers to. Only runs once the config has
-  // loaded successfully, so a damaged config can never present an empty mod
-  // list and take the library with it.
-  for (const gameId of GAME_ORDER) {
-    const orphans = await sweepOrphanedModFolders(
-      libraryFor(config, gameId),
-      new Set(config.mods.filter((m) => m.gameId === gameId).map((m) => m.id)),
-      path.join(shelfFor(config, gameId), 'quarantine'),
-    );
-    for (const { id, bytes, quarantined } of orphans) {
-      console.log(
-        quarantined
-          ? `[swapmeet] quarantined unreferenced library folder ${id} (${(bytes / 1048576).toFixed(2)} MB) — recoverable from the shelf`
-          : `[swapmeet] removed empty library folder ${id}`,
+  /*
+   * Move aside library folders no mod refers to.
+   *
+   * Guarded on the mod list being non-empty, and that guard is the whole
+   * safety property. A damaged config was already handled (readJsonStrict
+   * distinguishes "corrupt" from "absent"), but an *absent* one is a first
+   * run, and a first run has an empty mod list by definition. Sweeping on
+   * that basis means: config lost or app freshly installed over an existing
+   * library -> every folder is "unreferenced" -> the entire library is
+   * quarantined. That is precisely how a real user's ChaosMod disappeared.
+   *
+   * Zero known mods can never justify sweeping a non-empty library. There is
+   * no case where the right answer is "the config knows about nothing, so
+   * remove everything".
+   */
+  if (config.mods.length === 0) {
+    console.log('[swapmeet] no mods in the config — leaving the library untouched');
+  } else {
+    for (const gameId of GAME_ORDER) {
+      const orphans = await sweepOrphanedModFolders(
+        libraryFor(config, gameId),
+        new Set(config.mods.filter((m) => m.gameId === gameId).map((m) => m.id)),
+        path.join(shelfFor(config, gameId), 'quarantine'),
       );
+      for (const { id, bytes, quarantined } of orphans) {
+        console.log(
+          quarantined
+            ? `[swapmeet] quarantined unreferenced library folder ${id} (${(bytes / 1048576).toFixed(2)} MB) — recoverable from the shelf`
+            : `[swapmeet] removed empty library folder ${id}`,
+        );
+      }
     }
   }
 

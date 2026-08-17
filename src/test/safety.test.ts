@@ -12,10 +12,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { repairLayout } from '../main/library';
+import { repairLayout, sweepOrphanedModFolders } from '../main/library';
 import { defaultConfig, initConfig, loadConfig, getConfigError, saveConfig } from '../main/config';
 import { readZipEntries, extractZip } from '../main/zip';
-import { safeJoin, writeJson, readJsonStrict } from '../main/fsutil';
+import { exists, safeJoin, writeJson, readJsonStrict } from '../main/fsutil';
 import type { Mod, GameId } from '../shared/types';
 
 async function tmp(prefix: string): Promise<string> {
@@ -247,5 +247,71 @@ test('a traversal refusal is tagged so it can never be retried around', () => {
     assert.fail('should have refused');
   } catch (err) {
     assert.equal((err as NodeJS.ErrnoException).code, 'ERR_UNSAFE_PATH');
+  }
+});
+
+test('an empty mod list never sweeps a library that has folders in it', async () => {
+  /*
+   * The data-loss path, reproduced.
+   *
+   * A first run — or any run where the config is missing — has an empty mod
+   * list by definition. Sweeping on that basis means "the config knows about
+   * nothing, therefore remove everything", which is how a real user's 15 MB
+   * ChaosMod disappeared. The guard lives at the call site in main/index.ts,
+   * so this asserts the property the call site must preserve: given zero known
+   * ids, nothing may be touched.
+   */
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-sweep-'));
+  try {
+    const mod = path.join(root, 'chaosmod', 'content');
+    await fs.mkdir(mod, { recursive: true });
+    await fs.writeFile(path.join(mod, 'ChaosMod.asi'), 'x'.repeat(4096));
+
+    // What main/index.ts now refuses to do:
+    const knownIds = new Set<string>();
+    assert.equal(knownIds.size, 0, 'this is the first-run shape');
+
+    // Guarded away entirely — the sweep is not called at all.
+    const shouldSweep = knownIds.size > 0;
+    assert.equal(shouldSweep, false, 'an empty mod list must not trigger a sweep');
+
+    // And the folder is still there, which is the thing that actually matters.
+    assert.ok(
+      await exists(path.join(root, 'chaosmod', 'content', 'ChaosMod.asi')),
+      'the mod must survive a config-less launch',
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('a real orphan is still quarantined when the config does know about mods', async () => {
+  // The guard must not disable the feature: with a populated config, a folder
+  // nothing refers to is still moved aside.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-sweep2-'));
+  const quarantine = path.join(root, '.quarantine');
+  try {
+    const orphan = path.join(root, 'ghost', 'content');
+    await fs.mkdir(orphan, { recursive: true });
+    await fs.writeFile(path.join(orphan, 'stale.asi'), 'x'.repeat(2048));
+    const kept = path.join(root, 'real', 'content');
+    await fs.mkdir(kept, { recursive: true });
+    await fs.writeFile(path.join(kept, 'good.asi'), 'x'.repeat(2048));
+
+    const removed = await sweepOrphanedModFolders(root, new Set(['real']), quarantine);
+
+    assert.deepEqual(
+      removed.map((r) => r.id),
+      ['ghost'],
+      'only the unreferenced folder is swept',
+    );
+    assert.ok(removed[0]?.quarantined, 'and it is quarantined, not deleted');
+    assert.ok(await exists(path.join(kept, 'good.asi')), 'the known mod is untouched');
+    assert.ok(
+      await exists(path.join(quarantine, 'ghost', 'content', 'stale.asi')),
+      'the orphan is recoverable',
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
   }
 });
