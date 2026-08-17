@@ -2740,3 +2740,425 @@ button:disabled {
   font: 500 12px var(--sans);
   color: var(--muted);
 }
+
+/* ===========================================================================
+ * Library, from mockup 2a/2b/2c.
+ *
+ * A table of everything owned beside a detail panel for one mod. The panel's
+ * bottom half is a deliberate cliff: "take out of a setup" is a quiet link
+ * beside each setup name, while "delete from the library" is a bordered
+ * warning that names what would break. They must never be confusable —
+ * deleting is the only irreversible action in the app.
+ * ======================================================================== */
+
+.lib {
+  display: grid;
+  grid-template-columns: 1fr 372px;
+  gap: 20px;
+  padding: 24px 32px 26px;
+  height: 100%;
+  min-height: 0;
+}
+
+@container view (max-width: 900px) {
+  .lib {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lib-left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.lib-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.lib-head > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.lib-totals {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.lib-total {
+  font: 500 13px var(--mono);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.lib-total-sub {
+  font: 400 11.5px var(--mono);
+  color: var(--faint);
+  margin-top: 3px;
+}
+
+.lib-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* A search box earns its place here: a library holds hundreds of mods, where
+   the Essentials list holds eight. */
+.lib-search {
+  flex: none;
+  width: 210px;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font: 400 12.5px var(--sans);
+  color: var(--text);
+}
+
+.lib-search::placeholder {
+  color: var(--faint);
+}
+
+.lib-pills {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lib-pills .pill {
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.lib-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lib-thead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  font: 500 10px var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+
+.lib-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.lib-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.lib-row:hover {
+  background: var(--panel-2);
+}
+
+.lib-row.is-selected {
+  background: color-mix(in oklab, var(--blue) 8%, var(--panel));
+}
+
+.lib-col-mod {
+  flex: 1;
+  min-width: 0;
+}
+
+.lib-col-used {
+  flex: none;
+  width: 212px;
+  font: 400 12.5px var(--sans);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Nothing uses it, which is the one row state worth colouring. */
+.lib-col-used.is-unused {
+  color: var(--orange);
+}
+
+.lib-col-size {
+  flex: none;
+  width: 74px;
+  text-align: right;
+  font: 500 12.5px var(--mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lib-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lib-name {
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.lib-row-meta {
+  font: 400 11.5px var(--mono);
+  color: var(--faint);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lib-empty {
+  padding: 20px 18px;
+  font: 400 13px var(--sans);
+  color: var(--dim);
+}
+
+/* --- detail panel --------------------------------------------------------- */
+
+.lib-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.lib-detail-name {
+  font: 600 18px var(--sans);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.lib-detail-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.lib-detail-ver {
+  font: 400 11.5px var(--mono);
+  color: var(--faint);
+}
+
+.lib-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.lib-fact-label {
+  font: 400 11px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.lib-fact-value {
+  font: 500 13px var(--sans);
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.lib-fact-value.is-good {
+  color: var(--green);
+}
+
+.lib-detail-h {
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.lib-setups {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.lib-setup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.lib-setup:last-child {
+  border-bottom: 0;
+}
+
+.lib-setup-name {
+  flex: 1;
+  min-width: 0;
+  font: 400 13px var(--sans);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+/* Quiet on purpose: this is the reversible one. */
+.lib-take-out {
+  flex: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 500 12px var(--sans);
+  color: var(--dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.lib-take-out:hover {
+  color: var(--text);
+}
+
+.lib-detail-note {
+  font: 400 12px/1.5 var(--sans);
+  color: var(--faint);
+  margin-top: 8px;
+}
+
+.lib-add {
+  flex: none;
+  height: 42px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--blue);
+  color: #fff;
+  font: 600 13.5px var(--sans);
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.lib-grow {
+  flex: 1;
+  min-height: 8px;
+}
+
+/* --- the irreversible one ------------------------------------------------- */
+
+.lib-danger {
+  flex: none;
+  border: 1px solid var(--orange-line);
+  background: var(--orange-soft);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.lib-danger-h {
+  font: 600 13.5px var(--sans);
+  color: var(--text-2);
+}
+
+.lib-danger-body {
+  font: 400 12.5px/1.6 var(--sans);
+  color: var(--muted);
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.lib-danger-body b {
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.lib-danger-acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.lib-delete {
+  padding: 9px 13px;
+  border: 1px solid var(--red);
+  background: none;
+  border-radius: 7px;
+  font: 600 12.5px var(--sans);
+  color: var(--red);
+  cursor: pointer;
+}
+
+.lib-delete:hover {
+  background: color-mix(in oklab, var(--red) 12%, transparent);
+}
+
+/* --- empty state (2c) ----------------------------------------------------- */
+
+.lib-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  min-height: 70vh;
+}
+
+.lib-empty-inner {
+  max-width: 620px;
+}
+
+.lib-empty-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.lib-empty-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+/* --- nav in the title strip ----------------------------------------------- */
+
+.topnav button.is-active {
+  background: none;
+  color: var(--text);
+  font-weight: 600;
+  border-radius: 0;
+  border-bottom: 2px solid var(--text);
+  padding-bottom: 5px;
+}
+
+:root[data-theme='dark'] .topnav button.is-active {
+  border-bottom-color: var(--blue);
+}

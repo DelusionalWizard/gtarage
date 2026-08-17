@@ -919,6 +919,23 @@ export const handlers: SwapmeetApi = {
     return { dropped, restored, orphans: report.orphans.length };
   },
 
+  async setModInProfile({ profileId, modId, present }) {
+    return mutate((config) => {
+      const profile = requireProfile(config, profileId);
+      if (present) {
+        if (!profile.order.includes(modId)) profile.order.push(modId);
+        if (!profile.enabled.includes(modId)) profile.enabled.push(modId);
+      } else {
+        profile.order = profile.order.filter((id) => id !== modId);
+        profile.enabled = profile.enabled.filter((id) => id !== modId);
+        // Exclusions are keyed by mod id; leaving them behind would silently
+        // re-apply if the mod were ever added back.
+        if (profile.excludedFiles) delete profile.excludedFiles[modId];
+      }
+      profile.order = normaliseOrder(profile.order, config.mods);
+    });
+  },
+
   async scanAdoptable(gameId) {
     const config = await loadConfig(userDataDir);
     const install = installFor(config, gameId);

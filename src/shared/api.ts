@@ -342,6 +342,20 @@ export interface SwapmeetApi {
   importPaths(gameId: GameId, paths: string[]): Promise<{ state: AppState; report: ImportReport }>;
   /** Delete a mod from the library. Undeploys it first if it is live. */
   removeMod(modId: string): Promise<AppState>;
+
+  /**
+   * Put a mod into a setup, or take it out again.
+   *
+   * Distinct from removeMod, and the distinction is the point: taking a mod
+   * out of a setup leaves it in the library for every other setup to use,
+   * while removeMod deletes it from disk. Conflating them is how someone
+   * loses a 6 GB download they meant to keep.
+   */
+  setModInProfile(args: {
+    profileId: string;
+    modId: string;
+    present: boolean;
+  }): Promise<AppState>;
   /** Update editable mod fields (name, category, requires, core). */
   updateMod(modId: string, patch: Partial<Pick<Mod, 'name' | 'category' | 'requires' | 'core' | 'notes'>>): Promise<AppState>;
 

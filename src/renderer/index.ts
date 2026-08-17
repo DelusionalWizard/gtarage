@@ -21,7 +21,15 @@ const api = window.swapmeet;
  * view, because it is app configuration rather than one of the things you
  * switch between while managing mods.
  */
-type TabId = 'home' | 'profile' | 'order' | 'speedrun' | 'saves' | 'browse' | 'settings';
+type TabId =
+  | 'home'
+  | 'profile'
+  | 'order'
+  | 'library'
+  | 'browse'
+  | 'settings'
+  | 'speedrun'
+  | 'saves';
 
 let state: AppState | null = null;
 // Home is the landing screen: nearly every session is 'play what I already
@@ -703,6 +711,7 @@ function renderCrumbs(s: AppState): void {
 
 const TAB_LABELS: Record<string, string> = {
   home: 'Setups',
+  library: 'Library',
   browse: 'Browse',
   settings: 'Settings',
   profile: 'Setup',
@@ -716,8 +725,9 @@ function renderTopnav(s: AppState): void {
   const host = byId('topnav');
   clear(host);
 
-  const items: TabId[] = ['browse', 'saves'];
+  const items: TabId[] = ['home', 'browse', 'library'];
   if (s.settings.speedrunMode) items.push('speedrun');
+  items.push('saves');
   items.push('settings');
 
   // Load order only makes sense once you are inside a setup that has one.
@@ -1745,6 +1755,389 @@ function essentialRow(s: AppState, mod: CatalogMod): HTMLElement {
   act.addEventListener('click', () => void installEssential(mod));
   row.appendChild(act);
   return row;
+}
+
+// --- Library ------------------------------------------------------------------
+
+/** Which mod the Library detail panel is showing. */
+let librarySelection: string | null = null;
+let librarySearch = '';
+let libraryFilter = 'all';
+
+/**
+ * The Library, from mockup 2a.
+ *
+ * A mod lives here whether or not a setup uses it, and that is the whole point
+ * of the screen: before this existed, a mod imported while one setup was open
+ * was invisible from every other setup, still on disk, with no way to add it
+ * to a second setup short of importing it again.
+ *
+ * The design's other insistence is that "take out of a setup" and "delete from
+ * the library" must never be confusable. The first is a link beside each setup
+ * name; the second is a bordered warning card at the bottom of the panel that
+ * names what would break. Deleting is the only irreversible thing in the app.
+ */
+function renderLibrary(s: AppState, view: HTMLElement): void {
+  const mods = s.mods;
+  if (mods.length === 0) {
+    view.appendChild(emptyLibrary());
+    return;
+  }
+
+  // Keep the selection pointing at something that still exists.
+  if (!librarySelection || !mods.some((m) => m.id === librarySelection)) {
+    librarySelection = mods[0]?.id ?? null;
+  }
+
+  const wrap = el('div', 'lib');
+  const left = el('div', 'lib-left');
+
+  // --- heading and totals ---------------------------------------------------
+  const head = el('div', 'lib-head');
+  const headText = el('div');
+  const gameName = s.games.find((g) => g.id === s.currentGameId)?.shortName ?? 'this game';
+  headText.appendChild(el('div', 'ask', `Everything you have for ${gameName}`));
+  headText.appendChild(
+    el(
+      'div',
+      'lede',
+      'A mod lives here whether or not a setup uses it. Adding it to a setup does not copy it again.',
+    ),
+  );
+  head.appendChild(headText);
+
+  const bytes = mods.reduce((n, m) => n + m.size, 0);
+  const unused = mods.filter((m) => setupsUsing(s, m.id).length === 0);
+  const unusedBytes = unused.reduce((n, m) => n + m.size, 0);
+  const totals = el('div', 'lib-totals');
+  totals.appendChild(
+    el('div', 'lib-total', `${mods.length} mod${mods.length === 1 ? '' : 's'} · ${formatBytes(bytes)}`),
+  );
+  // Only worth saying when it is true; "0 B used by nothing" is noise.
+  if (unused.length > 0) {
+    totals.appendChild(el('div', 'lib-total-sub', `${formatBytes(unusedBytes)} used by nothing`));
+  }
+  head.appendChild(totals);
+  left.appendChild(head);
+
+  // --- search and filters ---------------------------------------------------
+  const bar = el('div', 'lib-bar');
+  const search = el('input', 'lib-search') as HTMLInputElement;
+  search.type = 'search';
+  search.placeholder = `Search ${mods.length} mods`;
+  search.value = librarySearch;
+  search.addEventListener('input', () => {
+    librarySearch = search.value;
+    renderLibraryRows(s, rowHost);
+  });
+  bar.appendChild(search);
+
+  const pills = el('div', 'lib-pills');
+  const filters: Array<[string, string]> = [
+    ['all', 'Everything'],
+    ...(unused.length > 0
+      ? ([['unused', `In no setup · ${unused.length}`]] as Array<[string, string]>)
+      : []),
+    ['plays', 'How it plays'],
+    ['looks', 'How it looks'],
+    ['files', 'Game files'],
+    ['core', 'Needed to run mods'],
+  ];
+  for (const [id, label] of filters) {
+    if (id !== 'all' && id !== 'unused' && libraryMods(s, id, '').length === 0) continue;
+    const pill = el('button', `pill${libraryFilter === id ? ' is-active' : ''}`, label);
+    pill.addEventListener('click', () => {
+      libraryFilter = id;
+      render();
+    });
+    pills.appendChild(pill);
+  }
+  bar.appendChild(pills);
+  left.appendChild(bar);
+
+  // --- the table ------------------------------------------------------------
+  const table = el('div', 'lib-table');
+  const thead = el('div', 'lib-thead');
+  thead.appendChild(el('div', 'lib-col-mod', 'MOD'));
+  thead.appendChild(el('div', 'lib-col-used', 'USED BY'));
+  thead.appendChild(el('div', 'lib-col-size', 'SIZE'));
+  table.appendChild(thead);
+  const rowHost = el('div', 'lib-rows');
+  table.appendChild(rowHost);
+  renderLibraryRows(s, rowHost);
+  left.appendChild(table);
+
+  wrap.appendChild(left);
+  wrap.appendChild(libraryDetail(s, mods.find((m) => m.id === librarySelection)!));
+  view.appendChild(wrap);
+}
+
+/** The setups that reference a mod, by name. */
+function setupsUsing(s: AppState, modId: string): Profile[] {
+  return s.profiles.filter((p) => !p.vanillaLock && p.order.includes(modId));
+}
+
+function libraryMods(s: AppState, which: string, needle: string): Mod[] {
+  const q = needle.trim().toLowerCase();
+  return s.mods.filter((mod) => {
+    if (q && !mod.name.toLowerCase().includes(q)) return false;
+    switch (which) {
+      case 'unused':
+        return setupsUsing(s, mod.id).length === 0;
+      case 'core':
+        return mod.core || mod.kind === 'modloader';
+      case 'looks':
+        return mod.kind === 'graphics';
+      case 'files':
+        return mod.kind === 'replace' || mod.kind === 'oiv';
+      case 'plays':
+        return ['asi', 'script', 'cleo'].includes(mod.kind);
+      default:
+        return true;
+    }
+  });
+}
+
+function renderLibraryRows(s: AppState, host: HTMLElement): void {
+  clear(host);
+  const rows = libraryMods(s, libraryFilter, librarySearch);
+  if (rows.length === 0) {
+    host.appendChild(el('div', 'lib-empty', 'Nothing matches that.'));
+    return;
+  }
+  for (const mod of rows) {
+    const used = setupsUsing(s, mod.id);
+    const row = el('div', `lib-row${mod.id === librarySelection ? ' is-selected' : ''}`);
+
+    const main = el('div', 'lib-col-mod');
+    const title = el('div', 'lib-row-title');
+    title.appendChild(el('span', 'lib-name', mod.name));
+    title.appendChild(el('span', 'tag', plainKind(mod.kind)));
+    const needers = s.mods.filter((m) => m.requires.includes(mod.id));
+    if (needers.length > 0) {
+      title.appendChild(
+        el('span', 'tag', `${needers.length} mod${needers.length === 1 ? '' : 's'} need it`),
+      );
+    }
+    main.appendChild(title);
+    main.appendChild(
+      el(
+        'div',
+        'lib-row-meta',
+        `${mod.version} · ${mod.files.length} file${mod.files.length === 1 ? '' : 's'} · added ${formatDate(mod.addedAt)}`,
+      ),
+    );
+    row.appendChild(main);
+
+    const usedCell = el(
+      'div',
+      `lib-col-used${used.length === 0 ? ' is-unused' : ''}`,
+      used.length === 0
+        ? 'In no setup'
+        : used.length <= 2
+          ? used.map((p) => p.name).join(', ')
+          : `${used.length} setups`,
+    );
+    usedCell.title = used.map((p) => p.name).join(', ');
+    row.appendChild(usedCell);
+
+    row.appendChild(el('div', 'lib-col-size', formatBytes(mod.size)));
+
+    row.addEventListener('click', () => {
+      librarySelection = mod.id;
+      render();
+    });
+    host.appendChild(row);
+  }
+}
+
+function libraryDetail(s: AppState, mod: Mod): HTMLElement {
+  const panel = el('div', 'lib-detail');
+
+  const head = el('div');
+  head.appendChild(el('div', 'lib-detail-name', mod.name));
+  const sub = el('div', 'lib-detail-sub');
+  sub.appendChild(el('span', 'tag', plainKind(mod.kind)));
+  sub.appendChild(el('span', 'lib-detail-ver', mod.version));
+  head.appendChild(sub);
+  panel.appendChild(head);
+
+  // The four facts, as a 2x2.
+  const deployedProfile = s.profiles.find((p) => p.id === s.deployed?.profileId);
+  const live = Boolean(deployedProfile?.enabled.includes(mod.id));
+  const needers = s.mods.filter((m) => m.requires.includes(mod.id));
+
+  const facts = el('div', 'lib-facts');
+  const factCell = (label: string, value: string, good = false) => {
+    const cell = el('div');
+    cell.appendChild(el('div', 'lib-fact-label', label));
+    cell.appendChild(el('div', `lib-fact-value${good ? ' is-good' : ''}`, value));
+    facts.appendChild(cell);
+  };
+  factCell('SIZE ON DISK', `${formatBytes(mod.size)} · ${mod.files.length} files`);
+  factCell('ADDED', formatDate(mod.addedAt));
+  factCell('IN THE GAME FOLDER', live ? '✓ Yes, right now' : 'Not right now', live);
+  factCell(
+    'NEEDED BY',
+    needers.length === 0 ? 'Nothing else' : `${needers.length} of your mods`,
+  );
+  panel.appendChild(facts);
+
+  // --- the setups using it --------------------------------------------------
+  const used = setupsUsing(s, mod.id);
+  const usable = s.profiles.filter((p) => !p.vanillaLock);
+  const section = el('div');
+  section.appendChild(
+    el(
+      'div',
+      'lib-detail-h',
+      used.length === 0
+        ? 'Not in any setup yet'
+        : `In ${used.length} of your ${usable.length} setup${usable.length === 1 ? '' : 's'}`,
+    ),
+  );
+  const list = el('div', 'lib-setups');
+  for (const profile of used) {
+    const row = el('div', 'lib-setup');
+    row.appendChild(el('div', 'lib-setup-name', profile.name));
+    const out = el('button', 'lib-take-out', 'Take out');
+    out.addEventListener('click', async () => {
+      const next = await guard('Updating…', () =>
+        api.setModInProfile({ profileId: profile.id, modId: mod.id, present: false }),
+      );
+      if (next) apply(next);
+    });
+    row.appendChild(out);
+    list.appendChild(row);
+  }
+  section.appendChild(list);
+  section.appendChild(
+    el('div', 'lib-detail-note', 'Taking it out leaves the mod here in the library.'),
+  );
+  panel.appendChild(section);
+
+  // --- add to another setup -------------------------------------------------
+  const free = usable.filter((p) => !p.order.includes(mod.id));
+  if (free.length > 0) {
+    const add = el('select', 'lib-add') as HTMLSelectElement;
+    const placeholder = el('option', undefined, 'Add to another setup');
+    placeholder.value = '';
+    add.appendChild(placeholder);
+    for (const profile of free) {
+      const option = el('option', undefined, profile.name);
+      option.value = profile.id;
+      add.appendChild(option);
+    }
+    add.addEventListener('change', async () => {
+      if (!add.value) return;
+      const next = await guard('Adding…', () =>
+        api.setModInProfile({ profileId: add.value, modId: mod.id, present: true }),
+      );
+      if (next) apply(next);
+    });
+    panel.appendChild(add);
+  }
+
+  panel.appendChild(el('div', 'lib-grow'));
+
+  // --- the one irreversible action ------------------------------------------
+  const danger = el('div', 'lib-danger');
+  danger.appendChild(el('div', 'lib-danger-h', 'Delete from the library for good?'));
+  const body = el('div', 'lib-danger-body');
+  if (needers.length > 0) {
+    body.appendChild(
+      document.createTextNode(
+        needers.length === 1
+          ? 'Another mod needs this to run: '
+          : `${needers.length} of your mods need this to run, including `,
+      ),
+    );
+    body.appendChild(el('b', undefined, needers[0]!.name));
+    body.appendChild(
+      document.createTextNode(
+        needers.length === 1
+          ? '. It would stop working, and the files leave your disk. Swapmeet cannot undo this one.'
+          : '. They would stop working, and the files leave your disk. Swapmeet cannot undo this one.',
+      ),
+    );
+  } else {
+    body.appendChild(
+      document.createTextNode(
+        used.length > 0
+          ? `It would come out of ${used.length} setup${used.length === 1 ? '' : 's'}, and the files leave your disk. Swapmeet cannot undo this one.`
+          : 'No setup uses it. The files leave your disk — Swapmeet cannot undo this one.',
+      ),
+    );
+  }
+  danger.appendChild(body);
+
+  const acts = el('div', 'lib-danger-acts');
+  const del = el('button', 'lib-delete', 'Delete for good');
+  del.addEventListener('click', async () => {
+    const next = await guard('Deleting…', () => api.removeMod(mod.id));
+    if (next) {
+      librarySelection = null;
+      apply(next);
+      toast(`${mod.name} deleted from the library.`, 'ok');
+    }
+  });
+  acts.appendChild(del);
+  const keep = el('button', 'btn', 'Keep it');
+  keep.addEventListener('click', () => toast('Nothing was deleted.', 'ok'));
+  acts.appendChild(keep);
+  danger.appendChild(acts);
+  panel.appendChild(danger);
+
+  return panel;
+}
+
+/** Mockup 2c: the empty state points at both ways in. */
+function emptyLibrary(): HTMLElement {
+  const wrap = el('div', 'lib-empty-state');
+  const inner = el('div', 'lib-empty-inner');
+  inner.appendChild(el('div', 'ask', 'Nothing in your library yet'));
+  inner.appendChild(
+    el(
+      'div',
+      'lede',
+      'Mods land here first. Once one is in the library you can put it in any setup, as many times as you like, without downloading it again.',
+    ),
+  );
+
+  const cards = el('div', 'lib-empty-cards');
+
+  const first = el('div', 'note-card lib-empty-card');
+  const firstMain = el('div', 'note-main');
+  firstMain.appendChild(el('div', 'note-title', 'Start with the essentials'));
+  firstMain.appendChild(
+    el('div', 'note-body', 'The few pieces that let other mods run. Swapmeet installs these itself.'),
+  );
+  first.appendChild(firstMain);
+  const openBrowse = el('button', 'btn is-blue btn-wide', 'Open Browse');
+  openBrowse.addEventListener('click', () => {
+    tab = 'browse';
+    render();
+    void loadEssentials();
+  });
+  first.appendChild(openBrowse);
+  cards.appendChild(first);
+
+  const second = el('div', 'note-card is-dashed lib-empty-card');
+  const secondMain = el('div', 'note-main');
+  secondMain.appendChild(el('div', 'note-title', 'Drop in a file you have'));
+  secondMain.appendChild(
+    el('div', 'note-body', '.zip, .rar, .7z, .oiv or a folder. Drop it anywhere on this window.'),
+  );
+  second.appendChild(secondMain);
+  const choose = el('button', 'btn btn-wide', 'Choose a file');
+  choose.addEventListener('click', () => installMod('files'));
+  second.appendChild(choose);
+  wireDropzone(second);
+  cards.appendChild(second);
+
+  inner.appendChild(cards);
+  wrap.appendChild(inner);
+  return wrap;
 }
 
 // --- rendering: speedrun ----------------------------------------------------
@@ -2827,6 +3220,9 @@ function render(): void {
       break;
     case 'speedrun':
       renderSpeedrun(s, view);
+      break;
+    case 'library':
+      renderLibrary(s, view);
       break;
     case 'browse':
       renderBrowse(s, view);
