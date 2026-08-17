@@ -21,14 +21,7 @@ const api = window.swapmeet;
  * view, because it is app configuration rather than one of the things you
  * switch between while managing mods.
  */
-type TabId =
-  | 'home'
-  | 'profile'
-  | 'order'
-  | 'browse'
-  | 'speedrun'
-  | 'saves'
-  | 'settings';
+type TabId = 'home' | 'profile' | 'order' | 'speedrun' | 'saves';
 
 let state: AppState | null = null;
 // Home is the landing screen: nearly every session is 'play what I already
@@ -49,16 +42,33 @@ let speedrunGroups: SpeedrunResourceGroup[] = [];
 const PRACTICE_PROFILE = 'Practice';
 /** Set once the ScriptHookV prompt has been shown or dismissed this session. */
 let hookPromptSettled = false;
+/**
+ * Whether the game is running right now.
+ *
+ * Not part of AppState: it changes without anything in the app happening, so
+ * it is polled rather than pushed. Drives the difference between 'Play now'
+ * and 'Running'.
+ */
+let gameRunning = false;
+let runningTimer: number | null = null;
+
+async function refreshRunning(): Promise<void> {
+  const id = state?.currentGameId;
+  if (!id) return;
+  try {
+    const now = await api.gameRunning(id);
+    if (now !== gameRunning) {
+      gameRunning = now;
+      render();
+    }
+  } catch {
+    // Not being able to tell is not worth reporting; the buttons simply stay
+    // as they were.
+  }
+}
 /** Timer used while waiting for a ScriptHookV download to appear. */
 let hookWatchTimer: number | null = null;
 
-// Browser tab state
-let provider: ProviderId = 'essentials';
-let browseSort: BrowseSort = 'trending';
-let browseSearch = '';
-let browseResult: BrowseResult | null = null;
-let browseLoading = false;
-let sites: ModSite[] = [];
 
 // --- tiny DOM helpers -------------------------------------------------------
 
@@ -691,9 +701,7 @@ const TAB_LABELS: Record<string, string> = {
   home: 'Home',
   profile: 'Setup',
   order: 'Load order',
-  browse: 'Browse',
   saves: 'Backups',
-  settings: 'Settings',
   speedrun: 'Speedrun',
 };
 
@@ -702,9 +710,8 @@ function renderTopnav(s: AppState): void {
   const host = byId('topnav');
   clear(host);
 
-  const items: TabId[] = ['browse', 'saves'];
+  const items: TabId[] = ['saves'];
   if (s.settings.speedrunMode) items.push('speedrun');
-  items.push('settings');
 
   // Load order only makes sense once you are inside a setup that has one.
   if (tab === 'profile' || tab === 'order') items.unshift('order');
@@ -714,7 +721,6 @@ function renderTopnav(s: AppState): void {
     btn.addEventListener('click', () => {
       tab = id;
       render();
-      if (id === 'browse' && !browseResult && !browseLoading) void loadBrowse();
       if (id === 'speedrun') void loadSpeedrun();
     });
     host.appendChild(btn);
@@ -849,13 +855,35 @@ function setupCard(s: AppState, profile: Profile): HTMLElement {
   open.addEventListener('click', () => void openProfile(profile));
   card.appendChild(open);
 
-  const play = el(
-    'button',
-    `btn btn-wide ${live ? 'is-blue' : ''}`,
-    live ? 'Play now' : 'Switch and play',
-  );
-  play.addEventListener('click', () => void switchAndPlay(profile));
-  card.appendChild(play);
+  /*
+   * Three states, not two.
+   *
+   * "Play now" used to mean "this setup is the one installed", which is not
+   * the same as "the game is open" — so pressing it and watching it stay on
+   * Play now read as nothing having happened. Running is its own state, and
+   * starting a second copy is a separate, explicitly labelled button rather
+   * than the same button pressed twice.
+   */
+  if (live && gameRunning) {
+    const running = el('button', 'btn btn-wide is-running', 'Running');
+    running.disabled = true;
+    running.title = 'The game is open with this setup installed';
+    card.appendChild(running);
+
+    const again = el('button', 'btn btn-wide', 'Launch another instance');
+    again.title =
+      'Start a second copy. Both share the same save files and mod folder.';
+    again.addEventListener('click', () => void startGame(profile.gameId));
+    card.appendChild(again);
+  } else {
+    const play = el(
+      'button',
+      `btn btn-wide ${live ? 'is-blue' : ''}`,
+      live ? 'Play now' : 'Switch and play',
+    );
+    play.addEventListener('click', () => void switchAndPlay(profile));
+    card.appendChild(play);
+  }
 
   return card;
 }
@@ -972,6 +1000,15 @@ function renderProfile(s: AppState, view: HTMLElement): void {
       toast(bits.join(' · '), 'warn');
     }
   });
+  const install = el('button', 'btn is-primary', 'Install a mod');
+  install.title = 'Add a .zip, .rar, .oiv, a loose file, or a folder';
+  install.addEventListener('click', () => installMod('files'));
+  head.appendChild(install);
+
+  const installFolder = el('button', 'btn', 'Add a folder');
+  installFolder.addEventListener('click', () => installMod('folder'));
+  head.appendChild(installFolder);
+
   head.appendChild(rescan);
 
   main.appendChild(renderPills(s, profile));
@@ -1209,9 +1246,20 @@ function readyPanel(s: AppState, profile: Profile): HTMLElement {
 
   panel.appendChild(el('div', 'ready-grow'));
 
-  const play = el('button', 'play', 'Play with this setup');
-  play.addEventListener('click', () => void applyProfile(true));
-  panel.appendChild(play);
+  const live = s.deployed?.profileId === profile.id;
+  if (live && gameRunning) {
+    const running = el('button', 'play is-running', 'Running');
+    running.disabled = true;
+    panel.appendChild(running);
+    const again = el('button', 'btn', 'Launch another instance');
+    again.title = 'Start a second copy. Both share the same saves and mod folder.';
+    again.addEventListener('click', () => void startGame(profile.gameId));
+    panel.appendChild(again);
+  } else {
+    const play = el('button', 'play', live ? 'Play with this setup' : 'Apply and play');
+    play.addEventListener('click', () => void applyProfile(true));
+    panel.appendChild(play);
+  }
 
   const alt = el('div', 'play-alt');
   alt.appendChild(document.createTextNode('or '));
@@ -1258,335 +1306,11 @@ async function switchAndPlay(profile: Profile): Promise<void> {
 
 // --- rendering: browse ------------------------------------------------------
 
-/**
- * The mod browser.
- *
- * Two halves, because mods come from two kinds of place. The top is an
- * in-app listing of the sources with real APIs (the curated Essentials
- * catalog, and Nexus). The bottom opens the big community sites in a proper
- * browser window, where the user logs in themselves and Swapmeet only catches
- * the resulting download.
- */
-function renderBrowse(s: AppState, view: HTMLElement): void {
-  const cards = el('div', 'cards');
 
-  // --- provider switch ------------------------------------------------------
-  const bar = el('div', 'browse-bar');
 
-  const providers: Array<{ id: ProviderId; label: string }> = [
-    { id: 'essentials', label: 'Essentials' },
-    { id: 'nexus', label: 'Nexus Mods' },
-  ];
-  const switcher = el('div', 'seg');
-  for (const p of providers) {
-    const btn = el('button', `seg-btn${provider === p.id ? ' is-active' : ''}`, p.label);
-    btn.addEventListener('click', () => {
-      provider = p.id;
-      browseResult = null;
-      render();
-      void loadBrowse();
-    });
-    switcher.appendChild(btn);
-  }
-  bar.appendChild(switcher);
 
-  cards.appendChild(bar);
 
-  // --- listing --------------------------------------------------------------
-  if (browseLoading) {
-    cards.appendChild(el('div', 'card-body', 'Loading…'));
-  } else if (browseResult?.needsSetup) {
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(el('div', 'alert-title', 'Nexus needs an API key'));
-    box.appendChild(el('div', 'alert-body', browseResult.error ?? ''));
-    const actions = el('div', 'alert-actions');
-    const setKey = el('button', 'small-btn is-primary', 'Add API key');
-    setKey.addEventListener('click', () => nexusKeyModal());
-    actions.appendChild(setKey);
-    const openNexus = el('button', 'small-btn', 'Or just browse Nexus');
-    openNexus.addEventListener('click', () => {
-      if (s.currentGameId) void api.openSite('nexus', s.currentGameId);
-    });
-    actions.appendChild(openNexus);
-    box.appendChild(actions);
-    cards.appendChild(box);
-  } else if (browseResult?.error) {
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(el('div', 'alert-title', 'That provider is unavailable'));
-    box.appendChild(el('div', 'alert-body', browseResult.error));
-    cards.appendChild(box);
-  } else if (browseResult) {
-    if (provider === 'nexus' && s.nexus) {
-      cards.appendChild(
-        el(
-          'div',
-          'browse-note',
-          `Signed in as ${s.nexus.name}${s.nexus.premium ? ' (Premium — direct downloads work)' : ' — direct API downloads need Premium, so Swapmeet will open the mod page and catch the download'}. The Nexus API has no full-text search, so this box filters the feed rather than searching the site.`,
-        ),
-      );
-    }
-    if (browseResult.mods.length === 0) {
-      cards.appendChild(el('div', 'card-body', 'Nothing matched.'));
-    }
-    for (const mod of browseResult.mods) {
-      cards.appendChild(catalogCard(mod, s));
-    }
-  }
 
-  // --- the site browser -----------------------------------------------------
-  const siteCard = el('div', 'card');
-  const head = el('div', 'card-head');
-  head.appendChild(el('div', 'card-title', 'Browse the mod sites'));
-  head.appendChild(el('div', 'card-spacer'));
-  siteCard.appendChild(head);
-  siteCard.appendChild(
-    el(
-      'div',
-      'card-body',
-      'These sites have no public API, so Swapmeet opens them in a real browser window instead of pretending to index them. You log in and browse normally; when you start a download, Swapmeet catches the file and imports it into the library automatically. Your password is never seen by Swapmeet.',
-    ),
-  );
-
-  for (const site of sites) {
-    const row = el('div', 'card-row');
-    const main = el('div', 'setting-main');
-    const title = el('div', 'setting-name', site.name);
-    if (site.docsOnly) {
-      const tag = el('span', 'inline-tag', 'docs only');
-      title.appendChild(tag);
-    }
-    main.appendChild(title);
-    main.appendChild(
-      el('div', 'setting-desc', site.loginNote ? `${site.blurb} ${site.loginNote}` : site.blurb),
-    );
-    row.appendChild(main);
-
-    const openIn = el('button', 'small-btn is-primary', site.docsOnly ? 'Read' : 'Open');
-    openIn.addEventListener('click', () => {
-      if (s.currentGameId) void api.openSite(site.id, s.currentGameId);
-    });
-    row.appendChild(openIn);
-
-    const external = el('button', 'small-btn', '↗');
-    external.title = 'Open in my normal browser instead';
-    external.addEventListener('click', () => {
-      void api.openExternal(site.home).catch((err: Error) => toast(err.message, 'error'));
-    });
-    row.appendChild(external);
-
-    siteCard.appendChild(row);
-  }
-  cards.appendChild(siteCard);
-
-  view.appendChild(cards);
-}
-
-/** One mod in the browser listing. */
-function catalogCard(mod: CatalogMod, s: AppState): HTMLElement {
-  const card = el('div', 'card');
-
-  const head = el('div', 'card-head');
-  const title = el('div', 'card-title', mod.name);
-  head.appendChild(title);
-  head.appendChild(el('div', 'card-count', mod.version));
-  if (mod.installedModId) {
-    const badge = el(
-      'div',
-      'badge badge-live',
-      mod.installedVersion && mod.installedVersion !== mod.version ? 'UPDATE' : 'INSTALLED',
-    );
-    head.appendChild(badge);
-  }
-  head.appendChild(el('div', 'card-spacer'));
-  head.appendChild(el('div', 'card-count', mod.author));
-  card.appendChild(head);
-
-  card.appendChild(el('div', 'card-body', mod.summary || 'No description.'));
-
-  const row = el('div', 'card-row');
-  const meta = el('div', 'setting-main');
-  const bits: string[] = [];
-  if (mod.updatedAt) bits.push(`updated ${formatDate(mod.updatedAt)}`);
-  if (mod.endorsements) bits.push(`${mod.endorsements} endorsements`);
-  if (mod.files.length > 0) bits.push(`${mod.files.length} file(s)`);
-  meta.appendChild(el('div', 'setting-desc', bits.join(' · ')));
-  row.appendChild(meta);
-
-  const page = el('button', 'small-btn', 'Open page');
-  page.addEventListener('click', () => {
-    void api.openExternal(mod.url).catch((err: Error) => toast(err.message, 'error'));
-  });
-  row.appendChild(page);
-
-  if (mod.manualOnly) {
-    const why = el('button', 'small-btn', 'Why?');
-    why.addEventListener('click', () => {
-      openModal({
-        title: `${mod.name} has to be downloaded by hand`,
-        build: (body) => {
-          body.appendChild(el('div', 'alert-body', mod.manualReason ?? ''));
-        },
-        actions: [
-          { label: 'Close', onClick: () => true },
-          {
-            label: 'Open the site',
-            kind: 'primary',
-            onClick: () => {
-              void api.openExternal(mod.url);
-              return true;
-            },
-          },
-        ],
-      });
-    });
-    row.appendChild(why);
-  } else {
-    const install = el('button', 'small-btn is-primary', mod.installedModId ? 'Reinstall' : 'Install');
-    install.addEventListener('click', () => void installFromCatalog(mod, s));
-    row.appendChild(install);
-  }
-
-  card.appendChild(row);
-  return card;
-}
-
-async function installFromCatalog(mod: CatalogMod, s: AppState): Promise<void> {
-  if (!s.currentGameId) return;
-  const gameId = s.currentGameId;
-
-  let files = mod.files;
-  if (files.length === 0) {
-    const fetched = await guard('Getting file list…', () => api.catalogFiles(mod, gameId));
-    if (!fetched) return;
-    files = fetched;
-  }
-
-  if (files.length === 0) {
-    toast(`${mod.name} has no downloadable files. Open its page instead.`, 'warn');
-    return;
-  }
-
-  const chosen = files.length === 1 ? files[0]! : await pickFile(mod, files);
-  if (!chosen) return;
-
-  if (chosen.executable) {
-    const ok = await confirmModal(
-      `${chosen.name} is an installer`,
-      'Swapmeet will download it but will not run it or import it — installers have to be run by you, deliberately. Continue?',
-      'Download it',
-    );
-    if (!ok) return;
-  }
-
-  const result = await guard(`Downloading ${chosen.name}…`, () =>
-    api.installCatalogFile(mod, chosen, gameId),
-  );
-  if (!result) return;
-
-  apply(result.state);
-  toast(result.message, result.imported ? 'ok' : 'warn');
-  void loadBrowse();
-}
-
-function pickFile(mod: CatalogMod, files: CatalogFile[]): Promise<CatalogFile | null> {
-  return new Promise((resolve) => {
-    let selected = files.find((f) => f.primary) ?? files[0]!;
-    openModal({
-      title: `Choose a file for ${mod.name}`,
-      subtitle: 'Release pages often carry debug builds and extras alongside the main download.',
-      build: (body) => {
-        for (const file of files) {
-          const row = el('div', 'diff-row');
-          const radio = el('input');
-          radio.type = 'radio';
-          radio.name = 'catalog-file';
-          radio.checked = file.id === selected.id;
-          radio.addEventListener('change', () => {
-            selected = file;
-          });
-          row.appendChild(radio);
-          const name = el('div', 'diff-name', file.name);
-          row.appendChild(name);
-          const tags: string[] = [];
-          if (file.size) tags.push(formatBytes(file.size));
-          if (file.executable) tags.push('installer');
-          if (file.primary) tags.push('main');
-          row.appendChild(el('div', 'diff-path', tags.join(' · ')));
-          body.appendChild(row);
-        }
-      },
-      actions: [
-        { label: 'Cancel', onClick: () => (resolve(null), true) },
-        { label: 'Download', kind: 'primary', onClick: () => (resolve(selected), true) },
-      ],
-    });
-  });
-}
-
-async function loadBrowse(): Promise<void> {
-  const s = state;
-  if (!s?.currentGameId) return;
-  browseLoading = true;
-  render();
-  try {
-    browseResult = await api.browse({
-      gameId: s.currentGameId,
-      providerId: provider,
-      sort: browseSort,
-      search: browseSearch,
-    });
-  } catch (err) {
-    browseResult = { mods: [], error: (err as Error).message };
-  } finally {
-    browseLoading = false;
-    render();
-  }
-}
-
-function nexusKeyModal(): void {
-  openModal({
-    title: 'Connect Nexus Mods',
-    subtitle:
-      'Generate a personal API key on nexusmods.com under Account settings → API keys, then paste it here. It is stored encrypted with your Windows credential store, never in plain text.',
-    build: (body) => {
-      body.appendChild(el('div', 'field-label', 'Personal API key'));
-      const input = el('input', 'text-input');
-      input.type = 'password';
-      input.id = 'nexus-key';
-      input.placeholder = 'paste your key';
-      body.appendChild(input);
-
-      const link = el('button', 'small-btn', 'Open the Nexus API key page');
-      link.addEventListener('click', () => {
-        void api.openExternal('https://www.nexusmods.com/users/myaccount?tab=api');
-      });
-      body.appendChild(link);
-    },
-    actions: [
-      { label: 'Cancel', onClick: () => true },
-      {
-        label: 'Connect',
-        kind: 'primary',
-        onClick: async () => {
-          const input = document.getElementById('nexus-key') as HTMLInputElement;
-          const result = await guard('Checking the key…', () => api.setNexusKey(input.value));
-          if (!result) return true;
-          if (result.error) {
-            toast(result.error, 'error');
-            return true;
-          }
-          apply(result.state);
-          toast(
-            `Connected to Nexus as ${result.account?.name}${result.account?.premium ? ' (Premium)' : ''}.`,
-            'ok',
-          );
-          void loadBrowse();
-          return true;
-        },
-      },
-    ],
-  });
-}
 
 // --- rendering: speedrun ----------------------------------------------------
 
@@ -1834,259 +1558,6 @@ function renderSaves(s: AppState, view: HTMLElement): void {
 
 // --- rendering: settings ----------------------------------------------------
 
-function renderSettings(s: AppState, view: HTMLElement): void {
-  const cards = el('div', 'cards');
-
-  const toggles = el('div', 'card');
-  const head = el('div', 'card-head');
-  head.appendChild(el('div', 'card-title', 'Behaviour'));
-  toggles.appendChild(head);
-
-  const addToggle = (
-    name: string,
-    desc: string,
-    value: boolean,
-    key:
-      | 'backupSavesOnSwap'
-      | 'useHardlinks'
-      | 'blockWhileGameRunning'
-      | 'warnAboutOnline'
-      | 'graphicsPerProfile'
-      | 'speedrunMode',
-  ) => {
-    const row = el('div', 'setting');
-    const main = el('div', 'setting-main');
-    main.appendChild(el('div', 'setting-name', name));
-    main.appendChild(el('div', 'setting-desc', desc));
-    row.appendChild(main);
-    const sw = el('button', `switch${value ? ' is-on' : ''}`);
-    sw.appendChild(el('div', 'switch-knob'));
-    sw.addEventListener('click', async () => {
-      const next = await guard('Saving…', () => api.updateSettings({ [key]: !value }));
-      if (next) apply(next);
-    });
-    row.appendChild(sw);
-    toggles.appendChild(row);
-  };
-
-  addToggle(
-    'Snapshot saves before every swap',
-    'Copies the game save folder into the shelf before applying a profile.',
-    s.settings.backupSavesOnSwap,
-    'backupSavesOnSwap',
-  );
-  addToggle(
-    'Use hard links',
-    'Deploys files as hard links instead of copies, so profiles cost almost no extra disk space. Only works when the library and the game are on the same drive.',
-    s.settings.useHardlinks,
-    'useHardlinks',
-  );
-  addToggle(
-    'Refuse to deploy while the game is running',
-    'Writing into a running game corrupts the install. Only the game executable counts — having Steam or the Rockstar launcher open is fine.',
-    s.settings.blockWhileGameRunning,
-    'blockWhileGameRunning',
-  );
-  // --- updates --------------------------------------------------------------
-  const updRow = el('div', 'setting');
-  const updMain = el('div', 'setting-main');
-  updMain.appendChild(el('div', 'setting-name', 'Updates'));
-  updMain.appendChild(
-    el(
-      'div',
-      'setting-desc',
-      'Every download is checked against the checksum published with the release, and refused if it does not match. Swapmeet will not restart itself while a game is running.',
-    ),
-  );
-  updRow.appendChild(updMain);
-
-  const updSel = el('select', 'mini-select');
-  for (const [value, label] of [
-    ['notify', 'Tell me'],
-    ['auto', 'Install automatically'],
-    ['off', 'Never check'],
-  ] as Array<['notify' | 'auto' | 'off', string]>) {
-    const option = el('option');
-    option.value = value;
-    option.textContent = label;
-    option.selected = (s.settings.autoUpdate ?? 'notify') === value;
-    updSel.appendChild(option);
-  }
-  updSel.addEventListener('change', async () => {
-    const next = await guard('Saving…', () =>
-      api.updateSettings({ autoUpdate: updSel.value as 'notify' | 'auto' | 'off' }),
-    );
-    if (next) apply(next);
-  });
-  updRow.appendChild(updSel);
-
-  const updateCheckBtn = el('button', 'small-btn', 'Check now');
-  updateCheckBtn.addEventListener('click', () => void checkForUpdate(true));
-  updRow.appendChild(updateCheckBtn);
-  toggles.appendChild(updRow);
-
-  // --- appearance -----------------------------------------------------------
-  const themeRow = el('div', 'setting');
-  const themeMain = el('div', 'setting-main');
-  themeMain.appendChild(el('div', 'setting-name', 'Theme'));
-  themeMain.appendChild(el('div', 'setting-desc', 'The interface is designed light. Dark is available if you prefer it.'));
-  themeRow.appendChild(themeMain);
-  const themeSel = el('select', 'mini-select');
-  for (const [value, label] of [
-    ['dark', 'Dark'],
-    ['light', 'Light'],
-  ] as Array<['dark' | 'light', string]>) {
-    const option = el('option');
-    option.value = value;
-    option.textContent = label;
-    option.selected = (s.settings.theme ?? 'light') === value;
-    themeSel.appendChild(option);
-  }
-  themeSel.addEventListener('change', async () => {
-    const next = await guard('Saving…', () =>
-      // themeChosen marks this as a real decision, so the one-time reset in
-      // hydrate() never overrides it again.
-      api.updateSettings({
-        theme: themeSel.value as 'dark' | 'light',
-        themeChosen: true,
-      }),
-    );
-    if (next) apply(next);
-  });
-  themeRow.appendChild(themeSel);
-  toggles.appendChild(themeRow);
-
-  addToggle(
-    'Speedrunning mode',
-    'Adds a Speedrun tab with the timer, frame limiter and capture tools, plus the community routing guides and split files. Off by default — most people modding for fun have no use for it.',
-    s.settings.speedrunMode,
-    'speedrunMode',
-  );
-
-  addToggle(
-    'Give each profile its own graphics settings',
-    'Saves the game settings onto the profile you are leaving and restores the one you switch to, so a modded profile can run different settings from a vanilla one without reconfiguring every launch.',
-    s.settings.graphicsPerProfile,
-    'graphicsPerProfile',
-  );
-  addToggle(
-    'Warn before applying mods to a game with online play',
-    'Off by default, because GTA V asks you to choose story or online on every launch, so this would fire on every swap. Turn it on if you actually play online.',
-    s.settings.warnAboutOnline,
-    'warnAboutOnline',
-  );
-
-  const limitRow = el('div', 'setting');
-  const limitMain = el('div', 'setting-main');
-  limitMain.appendChild(el('div', 'setting-name', 'Save snapshots to keep'));
-  limitMain.appendChild(el('div', 'setting-desc', 'Oldest snapshots beyond this are pruned.'));
-  limitRow.appendChild(limitMain);
-  const limitInput = el('input', 'number-input');
-  limitInput.type = 'number';
-  limitInput.min = '1';
-  limitInput.value = String(s.settings.saveBackupLimit);
-  limitInput.addEventListener('change', async () => {
-    const value = Math.max(1, Number(limitInput.value) || 1);
-    const next = await guard('Saving…', () => api.updateSettings({ saveBackupLimit: value }));
-    if (next) apply(next);
-  });
-  limitRow.appendChild(limitInput);
-  toggles.appendChild(limitRow);
-  cards.appendChild(toggles);
-
-  // The folder check lives here now: it is a maintenance tool you reach for
-  // occasionally, not something that belongs in the action bar next to the
-  // buttons used on every visit.
-  const checks = el('div', 'card');
-  const chead = el('div', 'card-head');
-  chead.appendChild(el('div', 'card-title', 'Game folder'));
-  checks.appendChild(chead);
-
-  const checkRow = el('div', 'setting');
-  const checkMain = el('div', 'setting-main');
-  checkMain.appendChild(el('div', 'setting-name', 'Check the game folder'));
-  checkMain.appendChild(
-    el(
-      'div',
-      'setting-desc',
-      'Looks for mod files in your game folder that Swapmeet did not install — usually left behind by a manual install — and for anything it expected that has gone missing.',
-    ),
-  );
-  checkRow.appendChild(checkMain);
-  const checkBtn = el('button', 'small-btn is-primary', 'Check now');
-  checkBtn.disabled = !s.games.find((g) => g.id === s.currentGameId)?.installed;
-  checkBtn.addEventListener('click', () => verify());
-  checkRow.appendChild(checkBtn);
-  checks.appendChild(checkRow);
-
-  const undeployRow = el('div', 'setting');
-  const undeployMain = el('div', 'setting-main');
-  undeployMain.appendChild(el('div', 'setting-name', 'Remove all mods from the game folder'));
-  undeployMain.appendChild(
-    el(
-      'div',
-      'setting-desc',
-      'Takes every file Swapmeet installed back out and restores anything it displaced. Your library and profiles are untouched.',
-    ),
-  );
-  undeployRow.appendChild(undeployMain);
-  const undeployBtn = el('button', 'danger-btn', 'Remove all');
-  undeployBtn.disabled = !s.deployed;
-  undeployBtn.addEventListener('click', async () => {
-    if (!s.currentGameId) return;
-    const ok = await confirmModal(
-      'Remove every installed mod?',
-      'This puts your game folder back the way Swapmeet found it. Nothing is deleted from your library.',
-      'Remove all',
-    );
-    if (!ok) return;
-    const result = await guard('Removing…', () => api.undeployAll(s.currentGameId!));
-    if (!result) return;
-    apply(result.state);
-    for (const problem of result.problems) toast(problem, 'warn');
-    toast('Game folder returned to vanilla.', 'ok');
-  });
-  undeployRow.appendChild(undeployBtn);
-  checks.appendChild(undeployRow);
-  cards.appendChild(checks);
-
-  const folders = el('div', 'card');
-  const fhead = el('div', 'card-head');
-  fhead.appendChild(el('div', 'card-title', 'Folders'));
-  folders.appendChild(fhead);
-
-  const addFolder = (name: string, value: string, which: 'library' | 'shelf' | 'config' | 'game') => {
-    const row = el('div', 'setting');
-    const main = el('div', 'setting-main');
-    main.appendChild(el('div', 'setting-name', name));
-    main.appendChild(el('div', 'setting-desc', value));
-    row.appendChild(main);
-    const open = el('button', 'small-btn', 'Open');
-    open.addEventListener('click', () => api.openPath(which, s.currentGameId ?? undefined));
-    row.appendChild(open);
-    folders.appendChild(row);
-  };
-
-  addFolder('Mod library', s.libraryPath, 'library');
-  addFolder('Shelf (displaced files, snapshots)', s.shelfPath, 'shelf');
-  addFolder('Config', 'swapmeet.config.json', 'config');
-  cards.appendChild(folders);
-
-  const about = el('div', 'card');
-  const ahead = el('div', 'card-head');
-  ahead.appendChild(el('div', 'card-title', 'About'));
-  about.appendChild(ahead);
-  about.appendChild(
-    el(
-      'div',
-      'card-body',
-      'Swapmeet is an open-source universal mod manager for the Grand Theft Auto games, released under the MIT licence. It manages GTA III, Vice City and San Andreas (original and Definitive Edition), GTA IV, and GTA V Legacy and Enhanced.',
-    ),
-  );
-  cards.appendChild(about);
-
-  view.appendChild(cards);
-}
 
 // --- rendering: inspector ---------------------------------------------------
 
@@ -2669,8 +2140,13 @@ async function refresh(): Promise<void> {
   const next = await api.getState();
   apply(next);
   if (next.currentGameId) {
+    void refreshRunning();
+    if (runningTimer === null) {
+      // Polled, because the game starting or stopping is not something the app
+      // is told about. Slow enough to be invisible in a process list.
+      runningTimer = window.setInterval(() => void refreshRunning(), 4000);
+    }
     saves = await api.listSaves(next.currentGameId);
-    sites = await api.listSites(next.currentGameId);
     // Best-effort: a scan failure must not stop the app from rendering.
     adoptable = await api.scanAdoptable(next.currentGameId).catch(() => []);
     render();
@@ -2933,47 +2409,16 @@ async function goVanilla(s: AppState): Promise<void> {
  * than a deliberate second instance.
  */
 async function startGame(gameId: GameId): Promise<void> {
-  let running = false;
-  try {
-    running = await api.gameRunning(gameId);
-  } catch {
-    // If we cannot tell, do not block the launch — the check is a courtesy,
-    // not a lock.
-  }
-
-  if (running) {
-    const ok = await confirmModal(
-      'The game is already running',
-      'A copy of the game is open right now. Starting another one means two copies sharing the same save files and the same mod folder, which can lose progress. Only do this if you meant to.',
-      'Launch another anyway',
-    );
-    if (!ok) return;
-  }
-
   const launched = await api.launchGame(gameId);
   if (launched.ok) toast('Starting the game…', 'ok');
   else toast(launched.error ?? 'Could not start the game.', 'error');
+  // Re-check shortly afterwards so the button can settle on 'Running'.
+  window.setTimeout(() => void refreshRunning(), 2500);
 }
 
 async function launchOnly(): Promise<void> {
   const s = state;
   if (!s?.currentGameId) return;
-
-  const selected = s.profiles.find((p) => p.id === s.activeProfileId);
-  const deployedId = s.deployed?.profileId ?? null;
-  const mismatch = selected && deployedId !== selected.id;
-
-  if (mismatch) {
-    const ok = await confirmModal(
-      'Launch without applying?',
-      s.deployed
-        ? `Your game folder currently has "${s.deployed.profileName}" installed, but "${selected.name}" is selected. Launching now runs ${s.deployed.profileName}.`
-        : `No mods are installed in your game folder right now, but "${selected.name}" is selected. Launching now runs the game unmodded.`,
-      'Launch anyway',
-    );
-    if (!ok) return;
-  }
-
   await startGame(s.currentGameId);
 }
 
@@ -2981,12 +2426,6 @@ async function launchOnly(): Promise<void> {
 async function applyProfile(launch = false): Promise<void> {
   if (!state?.activeProfileId) return;
   const profileId = state.activeProfileId;
-
-  const plan = await guard('Working out what would change…', () => api.planSwap(profileId));
-  if (!plan) return;
-
-  const proceed = await showSwapPlan(plan, launch);
-  if (!proceed) return;
 
   const result = await guard('Applying profile…', () => api.applyProfile(profileId));
   if (!result) return;
@@ -3008,79 +2447,6 @@ async function applyProfile(launch = false): Promise<void> {
   }
 }
 
-/** Renders 1c's swap diff as the confirmation step. */
-function showSwapPlan(plan: SwapPlan, launch: boolean): Promise<boolean> {
-  const s = state!;
-  const toName = s.profiles.find((p) => p.id === plan.toProfileId)?.name ?? 'profile';
-  const moving = plan.filesIn + plan.filesOut;
-
-  return new Promise((resolve) => {
-    openModal({
-      title:
-        moving === 0
-          ? 'Nothing to change'
-          : `Here is what will change (${moving} file${moving === 1 ? '' : 's'} move, nothing is deleted)`,
-      subtitle:
-        `Switching to ${toName}. Mods leaving your game folder are put back in Swapmeet's library, ` +
-        `and ${plan.filesKept} file(s) are in both profiles so they stay exactly where they are.` +
-        (plan.bytesToWrite > 0 ? ` About ${formatBytes(plan.bytesToWrite)} to write.` : ''),
-      build: (body) => {
-        if (plan.blockers.length > 0) {
-          body.appendChild(
-            el(
-              'div',
-              'blocker-lead',
-              plan.blockers.length === 1
-                ? 'This has to be sorted out before you can apply:'
-                : 'These have to be sorted out before you can apply:',
-            ),
-          );
-        }
-        for (const blocker of plan.blockers) {
-          body.appendChild(el('div', 'blocker', blocker));
-        }
-        for (const warning of plan.warnings) {
-          body.appendChild(el('div', 'warning', warning));
-        }
-        if (plan.entries.length === 0) {
-          body.appendChild(
-            el(
-              'div',
-              'alert-body',
-              'Your game folder already matches this profile, so there is nothing to move.',
-            ),
-          );
-        } else {
-          body.appendChild(
-            el(
-              'div',
-              'diff-legend',
-              'IN = copied into your game folder \u00b7 OUT = taken back out \u00b7 KEEP = in both profiles, left alone',
-            ),
-          );
-        }
-        for (const entry of plan.entries) {
-          const row = el('div', `diff-row diff-${entry.kind}`);
-          row.appendChild(
-            el('div', 'diff-sign', entry.kind === 'in' ? 'IN' : entry.kind === 'out' ? 'OUT' : 'KEEP'),
-          );
-          row.appendChild(el('div', 'diff-name', entry.name));
-          row.appendChild(el('div', 'diff-path', `${entry.fileCount} files ${entry.path}`));
-          body.appendChild(row);
-        }
-      },
-      actions: [
-        { label: 'Cancel', onClick: () => (resolve(false), true) },
-        {
-          label: launch ? 'Apply and launch' : 'Apply',
-          kind: 'primary',
-          disabled: plan.blockers.length > 0,
-          onClick: () => (resolve(true), true),
-        },
-      ],
-    });
-  });
-}
 
 function newProfile(): void {
   if (!state?.currentGameId) return;
@@ -3193,7 +2559,7 @@ function render(): void {
   clear(view);
 
   const current = s.games.find((g) => g.id === s.currentGameId);
-  if (!current?.installed && tab !== 'settings') {
+  if (!current?.installed) {
     renderSetup(s, view);
     return;
   }
@@ -3212,17 +2578,11 @@ function render(): void {
     case 'order':
       renderOrder(s, view);
       break;
-    case 'browse':
-      renderBrowse(s, view);
-      break;
     case 'speedrun':
       renderSpeedrun(s, view);
       break;
     case 'saves':
       renderSaves(s, view);
-      break;
-    case 'settings':
-      renderSettings(s, view);
       break;
   }
 }
@@ -3243,8 +2603,6 @@ byId('game-select').addEventListener('change', async (event) => {
   const next = await api.selectGame(gameId);
   apply(next);
   saves = await api.listSaves(gameId);
-  sites = await api.listSites(gameId);
-  browseResult = null;
   // Switching game invalidates which setup you were looking at.
   tab = 'home';
   render();

@@ -2232,3 +2232,20 @@ button:disabled {
 .thing .more-btn:focus-visible {
   opacity: 1;
 }
+
+/*
+ * "Running" is a state, not an action.
+ *
+ * It reads as a status pill rather than a button, because pressing it does
+ * nothing — starting a second copy is the separate, explicitly labelled
+ * button beneath it.
+ */
+.btn.is-running,
+.play.is-running {
+  background: var(--green-soft);
+  border-color: color-mix(in oklab, var(--green) 35%, var(--line));
+  color: var(--green);
+  font-weight: 600;
+  opacity: 1;
+  cursor: default;
+}
