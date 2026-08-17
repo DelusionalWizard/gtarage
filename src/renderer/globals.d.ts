@@ -14,22 +14,18 @@
 type AppState = import('../shared/api').AppState;
 type GameView = import('../shared/api').GameView;
 type ProgressEvent_ = import('../shared/api').ProgressEvent;
-type SwapmeetApi = import('../shared/api').SwapmeetApi;
+type GTArageApi = import('../shared/api').GTArageApi;
 type SaveSnapshotView = import('../shared/api').SaveSnapshotView;
 type ImportReport = import('../shared/api').ImportReport;
-type NexusAccount = import('../shared/api').NexusAccount;
 type GraphicsView = import('../shared/api').GraphicsView;
 type AdoptGroupView = import('../shared/api').AdoptGroupView;
 type HookStatus = import('../shared/api').HookStatus;
 type SpeedrunToolView = import('../shared/api').SpeedrunToolView;
 type HookCandidateView = import('../shared/api').HookCandidateView;
 type SiteEvent = import('../shared/api').SiteEvent;
-
-type BrowseResult = import('../shared/catalog').BrowseResult;
-type BrowseSort = import('../shared/catalog').BrowseSort;
-type CatalogFile = import('../shared/catalog').CatalogFile;
-type CatalogMod = import('../shared/catalog').CatalogMod;
-type ProviderId = import('../shared/catalog').ProviderId;
+type EssentialView = import('../shared/api').EssentialView;
+type EssentialsView = import('../shared/api').EssentialsView;
+type BattlEyeView = import('../shared/api').BattlEyeView;
 type ModSite = import('../shared/sites').ModSite;
 
 type Conflict = import('../shared/types').Conflict;
@@ -42,13 +38,13 @@ type ModDependency = import('../shared/types').ModDependency;
 type MissingDeps = import('../shared/api').MissingDeps;
 
 interface Window {
-  swapmeet: SwapmeetApi;
+  gtarage: GTArageApi;
   /**
    * Electron 32 removed `File.path`, so a dropped file's real location has to
    * come back through the preload.
    */
-  swapmeetFiles: { getPathForFile(file: File): string };
-  swapmeetEvents: {
+  gtarageFiles: { getPathForFile(file: File): string };
+  gtarageEvents: {
     onProgress(handler: (event: ProgressEvent_) => void): () => void;
     onSiteEvent(handler: (event: SiteEvent) => void): () => void;
   };

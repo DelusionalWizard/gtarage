@@ -1,9 +1,9 @@
 {
-  "name": "swapmeet",
-  "version": "0.5.0-beta.1",
-  "description": "Swapmeet - an open-source universal mod manager for the Grand Theft Auto games.",
+  "name": "gtarage",
+  "version": "1.0.0",
+  "description": "GTArage - an open-source universal mod manager for the Grand Theft Auto games.",
   "license": "MIT",
-  "author": "Swapmeet contributors",
+  "author": "GTArage contributors",
   "main": "dist/main/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
@@ -21,9 +21,9 @@
     "typescript": "^5.7.2"
   },
   "build": {
-    "appId": "app.swapmeet",
-    "productName": "Swapmeet",
-    "copyright": "Copyright (c) 2026 Swapmeet contributors",
+    "appId": "app.gtarage",
+    "productName": "GTArage",
+    "copyright": "Copyright (c) 2026 GTArage contributors",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -57,11 +57,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Swapmeet",
-      "artifactName": "Swapmeet-Setup-${version}.${ext}"
+      "shortcutName": "GTArage",
+      "artifactName": "GTArage-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "Swapmeet-${version}-portable.${ext}"
+      "artifactName": "GTArage-${version}-portable.${ext}"
     },
     "linux": {
       "icon": "build/icon.png",
@@ -74,7 +74,7 @@
       {
         "provider": "github",
         "owner": "DelusionalWizard",
-        "repo": "swapmeet"
+        "repo": "gtarage"
       }
     ]
   }

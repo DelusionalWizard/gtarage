@@ -1,29 +1,26 @@
 /**
  * The mod browser's data model.
  *
- * Swapmeet does not host mods and does not scrape sites that do not want to be
+ * GTArage does not host mods and does not scrape sites that do not want to be
  * scraped. It talks to two sources, both of which are meant to be talked to:
  *
  *  - **Essentials** - a curated catalog of the load-bearing tools the whole
  *    modding scene depends on (script hooks, ASI loaders, CLEO, UE4SS),
  *    resolved live through the public GitHub Releases API. Works with no
  *    account and no configuration.
- *  - **Nexus Mods** - the official, documented Nexus API, using the user's
- *    own personal API key.
  *
  * A few essential tools are not distributed through either (ScriptHookV and
  * OpenIV are hosted on their authors' own sites). Those appear in the catalog
- * as link-outs: Swapmeet shows what they are and opens the official page, and
+ * as link-outs: GTArage shows what they are and opens the official page, and
  * never invents a download URL for them.
  */
 
 import type { GameId } from './types';
 
-export type ProviderId = 'essentials' | 'nexus';
+export type ProviderId = 'essentials';
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   essentials: 'Essentials',
-  nexus: 'Nexus Mods',
 };
 
 /** One downloadable file belonging to a catalog mod. */
@@ -35,7 +32,7 @@ export interface CatalogFile {
   /** Direct download URL when the provider gives one without a handshake. */
   url?: string;
   /**
-   * True for installers and loose executables. Swapmeet will download them
+   * True for installers and loose executables. GTArage will download them
    * only on an explicit second confirmation and never imports or runs them.
    */
   executable: boolean;
@@ -61,11 +58,20 @@ export interface CatalogMod {
   endorsements?: number;
   /**
    * Set when the mod cannot be fetched automatically - either the provider
-   * requires a handshake Swapmeet cannot perform, or the author distributes it
+   * requires a handshake GTArage cannot perform, or the author distributes it
    * from their own site.
    */
   manualOnly?: boolean;
   manualReason?: string;
+  /**
+   * Set when GTArage could not reach the provider for this entry.
+   *
+   * Distinct from manualOnly, which is a permanent property of the mod.
+   * This one is a property of the attempt, and must never be presented as
+   * though the mod itself cannot be fetched.
+   */
+  unavailable?: boolean;
+  unavailableReason?: string;
   /** Library mod id, when this is already installed. */
   installedModId?: string;
   /** Library mod version, when installed, so the UI can flag updates. */
@@ -86,7 +92,7 @@ export interface BrowseResult {
   mods: CatalogMod[];
   /** Set when the provider is unavailable, so the UI can explain why. */
   error?: string;
-  /** True when the provider needs setup (e.g. a missing Nexus API key). */
+  /** True when the provider needs setup before it can return anything. */
   needsSetup?: boolean;
 }
 
@@ -263,7 +269,7 @@ export const ESSENTIALS: EssentialDef[] = [
     games: ['gta5', 'gta5e'],
     homepage: 'http://www.dev-c.com/gtav/scripthookv/',
     manualReason:
-      'ScriptHookV is released only from the author’s own site, which has no download API. Swapmeet will open the page so you can fetch it, then you can drag the archive straight in.',
+      'ScriptHookV is released only from the author’s own site, which has no download API. GTArage will open the page so you can fetch it, then you can drag the archive straight in.',
   },
   {
     id: 'openiv',
@@ -275,7 +281,7 @@ export const ESSENTIALS: EssentialDef[] = [
     games: ['gta4', 'gta5', 'gta5e'],
     homepage: 'https://openiv.com/',
     manualReason:
-      'OpenIV is distributed from openiv.com with its own installer. Swapmeet will open the page rather than guess at a download link.',
+      'OpenIV is distributed from openiv.com with its own installer. GTArage will open the page rather than guess at a download link.',
   },
   {
     id: 'cleo-redux',
@@ -367,21 +373,3 @@ export function essentialsFor(gameId: GameId): EssentialDef[] {
   return ESSENTIALS.filter((e) => e.games.includes(gameId));
 }
 
-// --- Nexus game domains -----------------------------------------------------
-
-/**
- * Nexus addresses each game by a URL domain rather than a numeric id.
- *
- * The Definitive Editions are deliberately absent: Nexus groups them in ways
- * that have moved around, and guessing a domain would produce confident-
- * looking empty results. A missing entry disables the Nexus provider for that
- * game and says so, which is the honest failure.
- */
-export const NEXUS_DOMAINS: Partial<Record<GameId, string>> = {
-  gta5: 'grandtheftautov',
-  gta5e: 'grandtheftautov',
-  gta4: 'grandtheftauto4',
-  gtasa: 'grandtheftautosanandreas',
-  gtavc: 'grandtheftautovicecity',
-  gta3: 'grandtheftauto3',
-};

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import { CALL_CHANNEL, type ApiMethod } from '../shared/api';
-import { handlers, initApi, modSiteHooks, primeNexus } from './api';
+import { handlers, initApi, modSiteHooks } from './api';
 import {
   initConfig,
   libraryFor,
@@ -18,41 +18,14 @@ import {
   repointPaths,
   saveConfig,
 } from './config';
+import { initModSites } from './modsites';
 import { GAME_ORDER } from '../shared/games';
 import { detectGames } from './detect';
 import { ensureVanillaProfile } from './config';
 import { ensureDir } from './fsutil';
 import { repairLibrary, sweepOrphanedModFolders } from './library';
-import { initModSites } from './modsites';
-import { gameIdForDomain, parseNxmUrl } from './providers/nexus';
 
 const isDev = process.argv.includes('--dev');
-
-/**
- * Nexus's "Mod Manager Download" button hands over an `nxm://` URL. Claiming
- * the protocol is what lets a browser download become a Swapmeet import.
- *
- * On Windows the URL arrives as an argv entry on a *second* instance, so a
- * single-instance lock is required for this to work at all.
- */
-function handleNxmUrl(url: string): void {
-  const parsed = parseNxmUrl(url);
-  if (!parsed) return;
-  const gameId = gameIdForDomain(parsed.domain);
-  if (!gameId) return;
-  // Surfaced to the renderer; the user confirms before anything downloads.
-  BrowserWindow.getAllWindows()[0]?.webContents.send('swapmeet:nxm', {
-    gameId,
-    modId: parsed.modId,
-    fileId: parsed.fileId,
-    key: parsed.key,
-    expires: parsed.expires,
-  });
-}
-
-function nxmUrlFromArgv(argv: string[]): string | undefined {
-  return argv.find((arg) => arg.startsWith('nxm://'));
-}
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -87,26 +60,18 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-// A second launch (including one triggered by an nxm:// link) must hand its
-// URL to the running instance rather than starting a rival copy that would
-// fight over the same config file.
+// A second launch must not start a rival copy that would fight over the same
+// config file; it focuses the running one instead.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv) => {
-    const url = nxmUrlFromArgv(argv);
-    if (url) handleNxmUrl(url);
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
       if (win.isMinimized()) win.restore();
       win.focus();
     }
-  });
-  // macOS delivers protocol URLs through an event instead of argv.
-  app.on('open-url', (event, url) => {
-    event.preventDefault();
-    handleNxmUrl(url);
   });
 }
 
@@ -116,15 +81,31 @@ app.whenReady().then(async () => {
   // The app was renamed from Rigging, which moves userData. Bring an existing
   // library across before anything reads config, or it looks like a fresh
   // install to someone who already had mods set up.
-  const migrated = await migrateLegacyUserData(
-    userDataDir,
-    path.join(path.dirname(userDataDir), 'rigging'),
-  );
-  if (migrated) console.log(`[swapmeet] migrated previous data from ${migrated}`);
+  /*
+   * Every name this app has had, oldest first.
+   *
+   * Electron derives userData from productName, so each rename left a folder
+   * behind. Walking them in order means someone who skipped a version still
+   * ends up with their library, and the newest match wins because it is
+   * applied last.
+   */
+  const LEGACY_APPS: Array<[folder: string, config: string]> = [
+    ['rigging', 'rigging.config.json'],
+    ['Swapmeet', 'swapmeet.config.json'],
+  ];
+  let migrated: string | null = null;
+  for (const [folder, configName] of LEGACY_APPS) {
+    const from = await migrateLegacyUserData(
+      userDataDir,
+      path.join(path.dirname(userDataDir), folder),
+      configName,
+    );
+    if (from) migrated = from;
+  }
+  if (migrated) console.log(`[gtarage] migrated previous data from ${migrated}`);
 
   initConfig(userDataDir);
 
-  app.setAsDefaultProtocolClient('nxm');
 
   const config = await loadConfig(userDataDir);
 
@@ -137,7 +118,7 @@ app.whenReady().then(async () => {
   if (migrated) {
     const repointed = repointPaths(config, migrated, userDataDir);
     if (repointed > 0) {
-      console.log(`[swapmeet] repointed ${repointed} stored path(s) to the new data folder`);
+      console.log(`[gtarage] repointed ${repointed} stored path(s) to the new data folder`);
       await saveConfig(config);
     }
   }
@@ -149,26 +130,42 @@ app.whenReady().then(async () => {
   const repairs = await repairLibrary(config.mods);
   if (repairs.length > 0) {
     for (const { name, change } of repairs) {
-      console.log(`[swapmeet] repaired ${name}: ${change}`);
+      console.log(`[gtarage] repaired ${name}: ${change}`);
     }
     await saveConfig(config);
   }
 
-  // Delete library folders no mod refers to. Only runs once the config has
-  // loaded successfully, so a damaged config can never present an empty mod
-  // list and take the library with it.
-  for (const gameId of GAME_ORDER) {
-    const orphans = await sweepOrphanedModFolders(
-      libraryFor(config, gameId),
-      new Set(config.mods.filter((m) => m.gameId === gameId).map((m) => m.id)),
-      path.join(shelfFor(config, gameId), 'quarantine'),
-    );
-    for (const { id, bytes, quarantined } of orphans) {
-      console.log(
-        quarantined
-          ? `[swapmeet] quarantined unreferenced library folder ${id} (${(bytes / 1048576).toFixed(2)} MB) — recoverable from the shelf`
-          : `[swapmeet] removed empty library folder ${id}`,
+  /*
+   * Move aside library folders no mod refers to.
+   *
+   * Guarded on the mod list being non-empty, and that guard is the whole
+   * safety property. A damaged config was already handled (readJsonStrict
+   * distinguishes "corrupt" from "absent"), but an *absent* one is a first
+   * run, and a first run has an empty mod list by definition. Sweeping on
+   * that basis means: config lost or app freshly installed over an existing
+   * library -> every folder is "unreferenced" -> the entire library is
+   * quarantined. That is precisely how a real user's ChaosMod disappeared.
+   *
+   * Zero known mods can never justify sweeping a non-empty library. There is
+   * no case where the right answer is "the config knows about nothing, so
+   * remove everything".
+   */
+  if (config.mods.length === 0) {
+    console.log('[gtarage] no mods in the config — leaving the library untouched');
+  } else {
+    for (const gameId of GAME_ORDER) {
+      const orphans = await sweepOrphanedModFolders(
+        libraryFor(config, gameId),
+        new Set(config.mods.filter((m) => m.gameId === gameId).map((m) => m.id)),
+        path.join(shelfFor(config, gameId), 'quarantine'),
       );
+      for (const { id, bytes, quarantined } of orphans) {
+        console.log(
+          quarantined
+            ? `[gtarage] quarantined unreferenced library folder ${id} (${(bytes / 1048576).toFixed(2)} MB) — recoverable from the shelf`
+            : `[gtarage] removed empty library folder ${id}`,
+        );
+      }
     }
   }
 
@@ -186,11 +183,7 @@ app.whenReady().then(async () => {
   const win = createWindow();
   initApi(userDataDir, win);
   initModSites(modSiteHooks());
-  void primeNexus();
 
-  // A protocol URL can also be present on the very first launch.
-  const initialNxm = nxmUrlFromArgv(process.argv);
-  if (initialNxm) win.webContents.once('did-finish-load', () => handleNxmUrl(initialNxm));
 
   // One channel, dispatched by method name. Anything not in `handlers` is
   // rejected rather than reflected onto some other object.
@@ -203,7 +196,7 @@ app.whenReady().then(async () => {
       return await fn(...(args ?? []));
     } catch (err) {
       // Surface a clean message; the stack is only useful in the main log.
-      console.error(`[swapmeet] ${String(method)} failed:`, err);
+      console.error(`[gtarage] ${String(method)} failed:`, err);
       throw new Error((err as Error).message);
     }
   });

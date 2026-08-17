@@ -15,13 +15,13 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { findAdoptable } from '../main/adopt';
+import { findAdoptable, isCompanionFolder } from '../main/adopt';
 import { defaultConfig } from '../main/config';
 import type { AppConfig, GameId } from '../shared/types';
 
 /** A fake game folder containing the given relative files. */
 async function gameFolder(files: string[]): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-adopt-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-adopt-'));
   for (const rel of files) {
     const abs = path.join(dir, rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
@@ -31,7 +31,7 @@ async function gameFolder(files: string[]): Promise<string> {
 }
 
 function config(): AppConfig {
-  return defaultConfig(path.join(os.tmpdir(), 'swapmeet-adopt-cfg'));
+  return defaultConfig(path.join(os.tmpdir(), 'gtarage-adopt-cfg'));
 }
 
 /** The vendor DLLs GTA V and Enhanced actually ship at their root. */
@@ -239,4 +239,92 @@ test('an .asi with no data folder is unaffected', async () => {
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }
+});
+
+// --- companion folders, with the names mods actually ship ------------------
+//
+// The test above uses `ChaosMod.asi` + `chaosmod/`, which an exact-name match
+// satisfies — and that is exactly why the first fix passed review and still
+// failed for real users. The distributions are not named that tidily.
+
+test('a versioned plugin still claims its unversioned data folder', async () => {
+  // ChaosModV ships ChaosModV.asi beside a plain `chaosmod` folder. Under
+  // exact matching the folder was left behind, unmanaged, forever.
+  const dir = await gameFolder([
+    'ChaosModV.asi',
+    'chaosmod/config.ini',
+    'chaosmod/scripts/thing.lua',
+    'steam_api64.dll',
+  ]);
+  try {
+    const groups = await findAdoptable(config(), 'gta5' as GameId, dir);
+    const chaos = groups.find((g) => g.name === 'ChaosModV.asi');
+    assert.ok(chaos, `expected ChaosModV, got: ${groups.map((g) => g.name).join(', ')}`);
+    assert.ok(chaos.files.includes('chaosmod/config.ini'), 'must claim the data folder');
+    assert.ok(chaos.files.includes('chaosmod/scripts/thing.lua'));
+    assert.ok(!chaos.files.includes('steam_api64.dll'));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a plugin claims a data folder that carries a suffix', async () => {
+  // Menyoo is the most common example: Menyoo.asi plus menyooStuff/.
+  const dir = await gameFolder([
+    'Menyoo.asi',
+    'menyooStuff/Menyoo.ini',
+    'menyooStuff/Spooner/x.xml',
+  ]);
+  try {
+    const groups = await findAdoptable(config(), 'gta5' as GameId, dir);
+    const menyoo = groups.find((g) => g.name === 'Menyoo.asi');
+    assert.ok(menyoo, 'Menyoo should be offered');
+    assert.ok(menyoo.files.includes('menyooStuff/Menyoo.ini'), 'must claim menyooStuff');
+    assert.ok(menyoo.files.includes('menyooStuff/Spooner/x.xml'));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a plugin never claims a base-game folder', async () => {
+  // The loosened matching must not let a plugin swallow part of the game.
+  const dir = await gameFolder([
+    'update.asi',
+    'update/x64/dlcpacks/patchday/dlc.rpf',
+  ]);
+  try {
+    const groups = await findAdoptable(config(), 'gta5' as GameId, dir);
+    const claimed = groups.flatMap((g) => g.files);
+    assert.ok(
+      !claimed.some((f) => f.startsWith('update/')),
+      `nothing may claim update/, got: ${claimed.join(', ')}`,
+    );
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+// --- the matcher itself ----------------------------------------------------
+
+test('the companion matcher accepts the real naming conventions', () => {
+  assert.ok(isCompanionFolder('NativeTrainer', 'NativeTrainer'), 'exact');
+  assert.ok(isCompanionFolder('ChaosMod', 'chaosmod'), 'casing must not matter');
+  assert.ok(isCompanionFolder('ChaosModV', 'chaosmod'), 'version suffix on the plugin');
+  assert.ok(isCompanionFolder('Menyoo', 'menyooStuff'), 'suffix on the folder');
+});
+
+test('the companion matcher refuses everything else', () => {
+  for (const folder of ['update', 'x64', 'BattlEye', 'Redistributables', 'scripts']) {
+    assert.ok(!isCompanionFolder('ChaosModV', folder), `${folder} must not match`);
+  }
+  // Two plugins must never claim each other's data.
+  assert.ok(!isCompanionFolder('Menyoo', 'chaosmod'));
+  assert.ok(!isCompanionFolder('ChaosModV', 'menyooStuff'));
+});
+
+test('short stems fall back to exact matching', () => {
+  // Without a length floor a stem this short prefix-matches half a game folder.
+  assert.ok(!isCompanionFolder('sh', 'shaders'));
+  assert.ok(!isCompanionFolder('x64', 'x64a'));
+  assert.ok(isCompanionFolder('x64', 'x64'));
 });

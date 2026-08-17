@@ -35,23 +35,24 @@ import {
 } from '../shared/planner';
 import type {
   AppState,
+  BattlEyeView,
+  EssentialsView,
+  EssentialView,
+  SiteEvent,
   ApplyReport,
   BuildAlert,
   DlcReport,
   GameView,
   ImportReport,
-  NexusAccount,
-  SwapmeetApi,
+  GTArageApi,
   HookCandidateView,
   SaveSnapshotView,
   UpdateView,
-  SiteEvent,
   VerifyView,
 } from '../shared/api';
-import { SITE_CHANNEL } from '../shared/api';
+import { PROGRESS_CHANNEL, SITE_CHANNEL } from '../shared/api';
+import type { CatalogFile, CatalogMod } from '../shared/catalog';
 import {
-  browse as runBrowse,
-  catalogFiles as runCatalogFiles,
   clearStaged,
   fetchCatalogFile,
   invalidateCaches,
@@ -61,7 +62,7 @@ import { promises as fs } from 'node:fs';
 
 import { findAdoptable } from './adopt';
 import { detectSpeedrunTools, launchSpeedrunTool } from './speedrun';
-import { checkForUpdate, downloadUpdate, installUpdate } from './updater';
+import { checkForUpdate, downloadUpdate, installUpdate, isNewer } from './updater';
 import { PRACTICE_PROFILE_NAME, SPEEDRUN_RESOURCES } from '../shared/speedrun';
 import {
   SCRIPTHOOKV_URL,
@@ -78,14 +79,9 @@ import {
   graphicsStatus,
   swapGraphics,
 } from './graphics';
-import { listSites, openModSite } from './modsites';
 import { browseEssentials } from './providers/github';
-import {
-  NexusAuthError,
-  decryptKey,
-  encryptKey,
-  validateKey,
-} from './providers/nexus';
+import { listSites, openModSite } from './modsites';
+import { NO_BATTLEYE, isSteamRunning, launchFlagState, setLaunchFlag } from './steam';
 import type { AppConfig, GameId, Mod, Profile, SwapPlan } from '../shared/types';
 import {
   activeProfileFor,
@@ -105,12 +101,13 @@ import { detectGames, identifyFolder } from './detect';
 import {
   deployProfile,
   isGameRunning,
+  manifestPath,
   readManifest,
   runningGameProcesses,
   undeployAll,
   verifyGameFolder,
 } from './deploy';
-import { ensureDir, exists, freeSpace } from './fsutil';
+import { ensureDir, exists, freeSpace, move, safeJoin, writeJson } from './fsutil';
 import {
   classifyFiles,
   findBrokenMods,
@@ -130,22 +127,13 @@ import {
 let userDataDir = '';
 let mainWindow: BrowserWindow | null = null;
 
-/**
- * The validated Nexus account, cached in memory.
- *
- * Revalidating on every state rebuild would mean a network round trip each
- * time the user flips a toggle, so the key is checked when it is set and at
- * startup, and the answer is remembered for the session.
- */
-let nexusAccount: NexusAccount | null = null;
-
 export function initApi(dir: string, win: BrowserWindow): void {
   userDataDir = dir;
   mainWindow = win;
 }
 
 function emitProgress(done: number, total: number, label: string): void {
-  mainWindow?.webContents.send('swapmeet:progress', { done, total, label });
+  mainWindow?.webContents.send(PROGRESS_CHANNEL, { done, total, label });
 }
 
 // --- state ------------------------------------------------------------------
@@ -338,8 +326,6 @@ async function buildState(config: AppConfig): Promise<AppState> {
       : {}),
     dlc: gameId ? await dlcReport(config, gameId, ordered) : null,
     appVersion: app.getVersion(),
-    nexus: nexusAccount,
-    hasNexusKey: Boolean(config.nexusApiKey),
     // Surfaced so the UI can warn rather than silently looking freshly
     // installed to someone who had a library a minute ago.
     ...(getConfigError() ? { configError: getConfigError()! } : {}),
@@ -351,25 +337,11 @@ function emitSite(event: SiteEvent): void {
 }
 
 /**
- * Validate a stored key once at startup, so the browser tab can show the
- * account straight away instead of after the first query.
- */
-export async function primeNexus(): Promise<void> {
-  const config = await loadConfig(userDataDir);
-  const key = decryptKey(config.nexusApiKey);
-  if (!key) return;
-  try {
-    nexusAccount = await validateKey(key);
-  } catch {
-    nexusAccount = null;
-  }
-}
-
-/**
- * Import a file the embedded browser captured.
+ * Import a file that was downloaded into the staging folder.
  *
- * Shared by the site-browser hook and the in-app download path so both end up
- * in the library through exactly one code path.
+ * Shared by the site-browser capture and the Essentials installer, so a mod
+ * caught from a community site ends up in exactly the same state as one that
+ * was fetched from a release page or dragged in by hand.
  */
 async function importStagedFile(
   filePath: string,
@@ -395,44 +367,6 @@ async function importStagedFile(
   };
 }
 
-/** Wire the embedded browser's download capture into the library. */
-export function modSiteHooks() {
-  return {
-    stagingDir(gameId: GameId): string {
-      return stagingDir(peekConfig(), gameId);
-    },
-    onProgress(fileName: string, received: number, total: number): void {
-      emitSite({ kind: 'progress', fileName, message: 'Downloading', received, total });
-    },
-    onComplete(capture: {
-      filePath: string;
-      fileName: string;
-      gameId: GameId;
-      executable: boolean;
-    }): void {
-      if (capture.executable) {
-        // Installers are never imported or run. They are left in the staging
-        // folder for the user to deal with deliberately.
-        emitSite({
-          kind: 'staged',
-          fileName: capture.fileName,
-          message: `${capture.fileName} is an installer, so Swapmeet saved it without importing or running it. Open the downloads folder to use it.`,
-        });
-        return;
-      }
-      void importStagedFile(capture.filePath, capture.gameId).then(async (outcome) => {
-        emitSite({
-          kind: outcome.imported ? 'imported' : 'failed',
-          fileName: capture.fileName,
-          message: outcome.message,
-        });
-      });
-    },
-    onFailed(fileName: string, reason: string): void {
-      emitSite({ kind: 'failed', fileName, message: `${fileName} download ${reason}.` });
-    },
-  };
-}
 
 
 async function state(): Promise<AppState> {
@@ -484,7 +418,172 @@ function requireInstall(config: AppConfig, gameId: GameId): string {
 
 // --- implementation ---------------------------------------------------------
 
-export const handlers: SwapmeetApi = {
+/** Wire the embedded browser's download capture into the library. */
+export function modSiteHooks() {
+  return {
+    stagingDir(gameId: GameId): string {
+      return stagingDir(peekConfig(), gameId);
+    },
+    onProgress(fileName: string, received: number, total: number): void {
+      emitSite({ kind: 'progress', fileName, message: 'Downloading', received, total });
+    },
+    onComplete(capture: {
+      filePath: string;
+      fileName: string;
+      gameId: GameId;
+      executable: boolean;
+    }): void {
+      if (capture.executable) {
+        // Installers are never imported or run. They are left in the staging
+        // folder for the user to deal with deliberately.
+        emitSite({
+          kind: 'staged',
+          fileName: capture.fileName,
+          message: `${capture.fileName} is an installer, so GTArage saved it without importing or running it. Open the downloads folder to use it.`,
+        });
+        return;
+      }
+      void importStagedFile(capture.filePath, capture.gameId).then((outcome) => {
+        emitSite({
+          kind: outcome.imported ? 'imported' : 'failed',
+          fileName: capture.fileName,
+          message: outcome.message,
+        });
+      });
+    },
+    onFailed(fileName: string, reason: string): void {
+      emitSite({ kind: 'failed', fileName, message: `${fileName} download ${reason}.` });
+    },
+  };
+}
+
+/**
+ * Resolve the Essentials for a game into what the Tools screen draws.
+ *
+ * The catalogue says what exists; the library says what is here. Joining them
+ * is the whole job, and `browseEssentials` already marks the overlap, so this
+ * only has to decide the one thing left: whether an installed copy is behind.
+ *
+ * A version the comparator cannot read is treated as current rather than
+ * outdated. Mod version strings are wildly inconsistent, and an Update button
+ * that appears on a perfectly current install -- and re-downloads on every
+ * press -- is worse than never offering one.
+ */
+async function essentialsFor(
+  config: AppConfig,
+  gameId: GameId,
+  refresh: boolean,
+): Promise<EssentialsView> {
+  if (refresh) invalidateCaches();
+
+  let mods;
+  try {
+    mods = await browseEssentials(gameId, '');
+  } catch (err) {
+    return { entries: [], error: (err as Error).message };
+  }
+
+  const library = modsForGame(config, gameId);
+  const byName = new Map(
+    library.map((m) => [m.name.toLowerCase().replace(/[^a-z0-9]/g, ''), m]),
+  );
+
+  const entries: EssentialView[] = mods.map((mod) => {
+    const installed = byName.get(mod.name.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const file = mod.files.find((f) => f.primary) ?? mod.files[0];
+    const entry: EssentialView = {
+      id: mod.id,
+      name: mod.name,
+      category: mod.category,
+      version: mod.version,
+      summary: mod.summary,
+      url: mod.url,
+      sizeBytes: file?.size ?? 0,
+    };
+    if (mod.manualOnly) {
+      entry.manualOnly = true;
+      if (mod.manualReason) entry.manualReason = mod.manualReason;
+    }
+    if (mod.unavailable) entry.unavailable = true;
+    if (installed) {
+      entry.installedVersion = installed.version;
+      entry.installedAt = installed.addedAt;
+      const available = mod.version.replace(/^v/i, '');
+      const have = installed.version.replace(/^v/i, '');
+      if (available && have && isNewer(available, have)) entry.outdated = true;
+    }
+    return entry;
+  });
+
+  // Every fetchable entry failing is not nine broken mods, it is one broken
+  // connection, and the screen should say so once rather than nine times.
+  const fetchable = entries.filter((e) => !e.manualOnly);
+  if (fetchable.length > 0 && fetchable.every((e) => e.unavailable)) {
+    return {
+      entries: [],
+      error: 'GitHub could not be reached, or is rate-limiting this machine.',
+    };
+  }
+
+  return { entries };
+}
+
+/**
+ * Download one catalog file and put it in the library.
+ *
+ * No longer reachable from the renderer -- it backs the prerequisite
+ * installer, which is the only thing that still fetches from the Essentials
+ * catalogue now that Browse is gone.
+ */
+async function installCatalogFile(
+mod: CatalogMod,
+file: CatalogFile,
+gameId: GameId,
+): Promise<{ state: AppState; imported: boolean; message: string }> {
+  const config = await loadConfig(userDataDir);
+
+  if (mod.manualOnly) {
+    throw new Error(
+      mod.manualReason ?? 'This mod has to be downloaded from its own site.',
+    );
+  }
+
+  let fetched;
+  try {
+    fetched = await fetchCatalogFile(config, gameId, mod, file, (received, total) => {
+      emitProgress(received, total || file.size, `Downloading ${file.name}`);
+    });
+  } catch (err) {
+    throw err;
+  }
+
+  if (fetched.executable) {
+    return {
+      state: await state(),
+      imported: false,
+      message: `${fetched.fileName} is an installer. GTArage saved it to the downloads folder but will not run it — install it yourself, then import what it produces.`,
+    };
+  }
+
+  const outcome = await importStagedFile(fetched.filePath, gameId);
+
+  // The provider knows the real name and version; the importer can only
+  // guess them from a filename, which yields things like "1.0" for a
+  // release actually tagged v9.7.3. Prefer the catalog's answer.
+  if (outcome.imported && outcome.modId) {
+    await mutate((cfg) => {
+      const imported = cfg.mods.find((m) => m.id === outcome.modId);
+      if (!imported) return;
+      imported.name = mod.name;
+      imported.version = mod.version.replace(/^v/i, '');
+      imported.source = mod.url;
+    });
+  }
+
+  return { state: await state(), imported: outcome.imported, message: outcome.message };
+}
+
+export const handlers: GTArageApi = {
   async getState() {
     return state();
   },
@@ -701,14 +800,6 @@ export const handlers: SwapmeetApi = {
     });
   },
 
-  async tidyOrder(profileId) {
-    return mutate((config) => {
-      const profile = requireProfile(config, profileId);
-      profile.order = normaliseOrder(profile.order, config.mods);
-      profile.enabled = profile.order.filter((id) => profile.enabled.includes(id));
-    });
-  },
-
   async createProfile(gameId, name, copyFromId) {
     return mutate((config) => {
       const trimmed = name.trim();
@@ -855,6 +946,128 @@ export const handlers: SwapmeetApi = {
     return { clean: report.clean, missing: report.missing, orphans: report.orphans };
   },
 
+  async gameRunning(gameId) {
+    return isGameRunning(gameId);
+  },
+
+  /**
+   * Reconcile the manifest with what is actually on disk.
+   *
+   * People delete mod files out of the game folder by hand, and until now the
+   * app went on insisting they were installed. Anything the manifest claims
+   * and disk does not have is dropped.
+   *
+   * The subtlety is the displaced originals: if a deployed file had covered
+   * one of the game's own and the mod file was then deleted by hand, the
+   * original is sitting on the shelf with nothing pointing at it any more. It
+   * is restored here rather than stranded — the same promise undeploy makes.
+   */
+  async rescan(gameId) {
+    const config = await loadConfig(userDataDir);
+    const gamePath = requireInstall(config, gameId);
+    const manifest = await readManifest(config, gameId);
+    if (!manifest) {
+      const empty = await verifyGameFolder(config, gameId, gamePath);
+      return { dropped: 0, restored: 0, orphans: empty.orphans.length };
+    }
+
+    const kept: typeof manifest.files = [];
+    let dropped = 0;
+    let restored = 0;
+
+    for (const file of manifest.files) {
+      const abs = safeJoin(gamePath, file.target);
+      if (await exists(abs)) {
+        kept.push(file);
+        continue;
+      }
+      if (file.backup && (await exists(file.backup))) {
+        try {
+          await move(file.backup, abs);
+          restored += 1;
+          dropped += 1;
+          continue;
+        } catch {
+          // Could not put it back: keep the entry, so the shelf copy stays
+          // accounted for rather than being orphaned by this very operation.
+          kept.push(file);
+          continue;
+        }
+      }
+      dropped += 1;
+    }
+
+    if (dropped > 0) {
+      if (kept.length === 0) {
+        await fs.rm(manifestPath(config, gameId), { force: true });
+      } else {
+        await writeJson(manifestPath(config, gameId), { ...manifest, files: kept });
+      }
+    }
+
+    const report = await verifyGameFolder(config, gameId, gamePath);
+    return { dropped, restored, orphans: report.orphans.length };
+  },
+
+  async setModInProfile({ profileId, modId, present }) {
+    return mutate((config) => {
+      const profile = requireProfile(config, profileId);
+      if (present) {
+        if (!profile.order.includes(modId)) profile.order.push(modId);
+        if (!profile.enabled.includes(modId)) profile.enabled.push(modId);
+      } else {
+        profile.order = profile.order.filter((id) => id !== modId);
+        profile.enabled = profile.enabled.filter((id) => id !== modId);
+        // Exclusions are keyed by mod id; leaving them behind would silently
+        // re-apply if the mod were ever added back.
+        if (profile.excludedFiles) delete profile.excludedFiles[modId];
+      }
+      profile.order = normaliseOrder(profile.order, config.mods);
+    });
+  },
+
+  /**
+   * Remove everything GTArage has put on this machine, then quit.
+   *
+   * Order matters and is the whole safety story. Every game is undeployed
+   * first, so mod files come back out of the game folders and anything they
+   * displaced is restored from the shelf. Doing it the other way round would
+   * delete the shelf while game folders still held mod files, leaving
+   * displaced originals with nowhere to come back from and installs broken
+   * with no record of how.
+   *
+   * Game folders themselves are never touched beyond that undeploy, and
+   * neither are the archives the user originally installed from.
+   */
+  async purgeEverything() {
+    const config = await loadConfig(userDataDir);
+    const removed: string[] = [];
+    const problems: string[] = [];
+
+    for (const install of config.installs) {
+      try {
+        problems.push(...(await undeployAll(config, install.gameId, install.path)));
+      } catch (err) {
+        problems.push(`${install.gameId}: ${(err as Error).message}`);
+      }
+    }
+
+    // Only once the game folders are clean.
+    for (const target of [config.libraryPath, config.shelfPath, getConfigPath()]) {
+      try {
+        await fs.rm(target, { recursive: true, force: true });
+        removed.push(target);
+      } catch (err) {
+        problems.push(`${target}: ${(err as Error).message}`);
+      }
+    }
+
+    // Quit rather than carry on against state that no longer exists. Delayed
+    // so the reply reaches the renderer and the user sees what happened.
+    setTimeout(() => app.quit(), 1500);
+    return { removed, problems };
+  },
+
   async scanAdoptable(gameId) {
     const config = await loadConfig(userDataDir);
     const install = installFor(config, gameId);
@@ -941,7 +1154,7 @@ export const handlers: SwapmeetApi = {
     const info = await checkForUpdate();
 
     if (!info.newer) {
-      return { started: false, message: 'Swapmeet is already up to date.' };
+      return { started: false, message: 'GTArage is already up to date.' };
     }
     if (info.cannotSelfUpdate) {
       await shell.openExternal(info.url);
@@ -969,13 +1182,13 @@ export const handlers: SwapmeetApi = {
 
     const dir = path.join(config.shelfPath, 'updates');
     const file = await downloadUpdate(info, dir, (received, total) =>
-      emitProgress(received, total, `Downloading Swapmeet ${info.version}`),
+      emitProgress(received, total, `Downloading GTArage ${info.version}`),
     );
 
     installUpdate(file);
     return {
       started: true,
-      message: `Installing Swapmeet ${info.version}. Swapmeet will close.`,
+      message: `Installing GTArage ${info.version}. GTArage will close.`,
     };
   },
 
@@ -1016,35 +1229,6 @@ export const handlers: SwapmeetApi = {
 
   async speedrunResources() {
     return SPEEDRUN_RESOURCES;
-  },
-
-  async hookStatus() {
-    const config = await loadConfig(userDataDir);
-    const found = [
-      ...(await findInstalledHook(config)),
-      ...(await findDownloadedHook()),
-    ];
-
-    const candidates: HookCandidateView[] = [];
-    for (const candidate of found) {
-      const view: HookCandidateView = {
-        path: candidate.path,
-        gameId: candidate.gameId,
-        source: candidate.source,
-        modifiedAt: candidate.modifiedAt,
-        contents: await describeCandidate(candidate),
-      };
-      if (candidate.version) view.version = candidate.version;
-      candidates.push(view);
-    }
-
-    const coverage = hookCoverage(config);
-    return {
-      missingFor: coverage.missing,
-      presentFor: coverage.present,
-      candidates,
-      url: SCRIPTHOOKV_URL,
-    };
   },
 
   async installHook(sourcePath, gameIds) {
@@ -1200,12 +1384,38 @@ export const handlers: SwapmeetApi = {
       }
     }
 
+    /*
+     * Epic is the one storefront the executable fallback cannot rescue.
+     *
+     * Its titles check that the Epic launcher started them and quit
+     * otherwise, so running the exe -- or even PlayGTAV.exe -- fails the same
+     * way every time. The launcher URL wants the manifest's AppName, which is
+     * captured at detection because it exists nowhere else on disk.
+     */
+    if (install?.source === 'epic' && install.launchId) {
+      try {
+        await shell.openExternal(
+          `com.epicgames.launcher://apps/${encodeURIComponent(install.launchId)}?action=launch&silent=true`,
+        );
+        return { ok: true };
+      } catch {
+        // Fall through, though the exes are unlikely to help here.
+      }
+    }
+    if (install?.source === 'epic' && !install.launchId) {
+      return {
+        ok: false,
+        error:
+          'This copy came from the Epic launcher, and GTArage does not have its app id — Epic games will not start from their own executable. Start it from Epic once, then press Search again in Settings so the manifest can be read.',
+      };
+    }
+
     const order = def.launchWith ?? def.executables;
     for (const exe of order) {
       const full = path.join(gamePath, exe);
       if (!(await exists(full))) continue;
       try {
-        // detached + unref so closing Swapmeet does not kill the game.
+        // detached + unref so closing GTArage does not kill the game.
         const child = execFile(full, { cwd: path.dirname(full) });
         child.unref();
         return { ok: true };
@@ -1229,7 +1439,7 @@ export const handlers: SwapmeetApi = {
         break;
       case 'saves': {
         if (!gameId) throw new Error('No game selected.');
-        // The game's own save folder, not Swapmeet's snapshots of it.
+        // The game's own save folder, not GTArage's snapshots of it.
         const folders = await saveFolders(gameId);
         const first = folders[0];
         if (!first) {
@@ -1257,77 +1467,78 @@ export const handlers: SwapmeetApi = {
     });
   },
 
-  // --- mod browser ---------------------------------------------------------
+  // --- tools ----------------------------------------------------------------
 
-  async browse(query) {
+  async listEssentials(gameId, refresh) {
     const config = await loadConfig(userDataDir);
-    return runBrowse(config, query, modsForGame(config, query.gameId));
+    return essentialsFor(config, gameId, refresh === true);
   },
 
-  async catalogFiles(mod, gameId) {
-    const config = await loadConfig(userDataDir);
-    return runCatalogFiles(config, mod, gameId);
-  },
+  async installEssential(id, gameId) {
+    const catalog = await browseEssentials(gameId, '');
+    const mod = catalog.find((m) => m.id === id);
+    if (!mod) throw new Error('GTArage no longer has an entry for that tool.');
 
-  async installCatalogFile(mod, file, gameId) {
-    const config = await loadConfig(userDataDir);
-
+    // Manual-only entries have no file to fetch; the page is the whole
+    // action, and saying so beats a download that cannot happen.
     if (mod.manualOnly) {
-      throw new Error(
-        mod.manualReason ?? 'This mod has to be downloaded from its own site.',
-      );
-    }
-
-    let fetched;
-    try {
-      fetched = await fetchCatalogFile(config, gameId, mod, file, (received, total) => {
-        emitProgress(received, total || file.size, `Downloading ${file.name}`);
-      });
-    } catch (err) {
-      if (err instanceof NexusAuthError) {
-        // Not a failure so much as a different route: send them to the page,
-        // where the site's own download button hands back over nxm://.
-        await shell.openExternal(mod.url);
-        throw new Error(err.message);
-      }
-      throw err;
-    }
-
-    if (fetched.executable) {
+      await shell.openExternal(mod.url);
       return {
         state: await state(),
         imported: false,
-        message: `${fetched.fileName} is an installer. Swapmeet saved it to the downloads folder but will not run it — install it yourself, then import what it produces.`,
+        message: `${mod.name} ${mod.manualReason ?? 'must be downloaded from its own site.'} The page is open in your browser — drop the file back here when you have it.`,
       };
     }
 
-    const outcome = await importStagedFile(fetched.filePath, gameId);
-
-    // The provider knows the real name and version; the importer can only
-    // guess them from a filename, which yields things like "1.0" for a
-    // release actually tagged v9.7.3. Prefer the catalog's answer.
-    if (outcome.imported && outcome.modId) {
-      await mutate((cfg) => {
-        const imported = cfg.mods.find((m) => m.id === outcome.modId);
-        if (!imported) return;
-        imported.name = mod.name;
-        imported.version = mod.version.replace(/^v/i, '');
-        imported.source = mod.url;
-      });
-    }
-
-    return { state: await state(), imported: outcome.imported, message: outcome.message };
+    const file = mod.files.find((f) => f.primary) ?? mod.files[0];
+    if (!file) throw new Error(`${mod.name} has no downloadable file right now.`);
+    return installCatalogFile(mod, file, gameId);
   },
 
-  async refreshCatalog() {
-    invalidateCaches();
+  async dismissSetupPrompt() {
+    return mutate((config) => {
+      config.settings.setupPromptSeen = true;
+    });
   },
+
+  async battlEyeState() {
+    const state_ = await launchFlagState(getGame('gta5e').steamAppIds[0]!, NO_BATTLEYE);
+    return { ...state_, steamRunning: await isSteamRunning() };
+  },
+
+  async setBattlEye(disabled) {
+    const result = await setLaunchFlag(
+      getGame('gta5e').steamAppIds[0]!,
+      NO_BATTLEYE,
+      disabled,
+    );
+    const where =
+      result.written.length > 0
+        ? ` Wrote to ${result.written.length} Steam account file${result.written.length === 1 ? '' : 's'}, with a backup of each alongside.`
+        : ' It was already set that way, so nothing was changed.';
+    return {
+      state: await state(),
+      message: disabled
+        ? `GTA V Enhanced will now start with ${NO_BATTLEYE}.${where} Do not take it online with mods loaded.`
+        : `BattlEye is back on for GTA V Enhanced.${where}`,
+    };
+  },
+
+  async listSites(gameId) {
+    return listSites(gameId);
+  },
+
+  async openSite(siteId, gameId) {
+    openModSite(siteId, gameId);
+  },
+
+  // --- prerequisites --------------------------------------------------------
 
   async installDependency(essentialId, gameId) {
     const catalog = await browseEssentials(gameId, '');
     const mod = catalog.find((m) => m.id === essentialId);
     if (!mod) {
-      throw new Error('Swapmeet does not know how to fetch that prerequisite automatically.');
+      throw new Error('GTArage does not know how to fetch that prerequisite automatically.');
     }
     if (mod.manualOnly) {
       await shell.openExternal(mod.url);
@@ -1339,7 +1550,7 @@ export const handlers: SwapmeetApi = {
     }
     const file = mod.files.find((f) => f.primary) ?? mod.files[0];
     if (!file) throw new Error(`${mod.name} has no downloadable file right now.`);
-    return handlers.installCatalogFile(mod, file, gameId);
+    return installCatalogFile(mod, file, gameId);
   },
 
   async rescanDependencies(gameId) {
@@ -1361,14 +1572,6 @@ export const handlers: SwapmeetApi = {
     return buildState(config);
   },
 
-  async listSites(gameId) {
-    return listSites(gameId);
-  },
-
-  async openSite(siteId, gameId) {
-    openModSite(siteId, gameId);
-  },
-
   async openExternal(url) {
     // Only ever hand the OS an http(s) URL: `shell.openExternal` will happily
     // launch other protocol handlers, which is a way to run things.
@@ -1377,30 +1580,6 @@ export const handlers: SwapmeetApi = {
       throw new Error(`Refusing to open a ${parsed.protocol} link.`);
     }
     await shell.openExternal(parsed.toString());
-  },
-
-  async setNexusKey(apiKey) {
-    const trimmed = apiKey.trim();
-    if (!trimmed) throw new Error('Paste your Nexus personal API key first.');
-
-    try {
-      const account = await validateKey(trimmed);
-      nexusAccount = account;
-      const next = await mutate((config) => {
-        config.nexusApiKey = encryptKey(trimmed);
-      });
-      return { state: next, account };
-    } catch (err) {
-      nexusAccount = null;
-      return { state: await state(), account: null, error: (err as Error).message };
-    }
-  },
-
-  async clearNexusKey() {
-    nexusAccount = null;
-    return mutate((config) => {
-      delete config.nexusApiKey;
-    });
   },
 
   async windowMinimize() {

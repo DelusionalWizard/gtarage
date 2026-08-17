@@ -8,7 +8,7 @@
  *
  * That leaves real gaps: `.rar` and `.7z` are common on the older mod sites,
  * and very large texture packs do exceed the classic ZIP limits. Rather than
- * bundle an extractor (and its licence), Swapmeet looks for 7-Zip or WinRAR --
+ * bundle an extractor (and its licence), GTArage looks for 7-Zip or WinRAR --
  * which anyone downloading `.rar` mods already has -- and shells out to it.
  * If neither is present the user gets a message naming the actual problem.
  */

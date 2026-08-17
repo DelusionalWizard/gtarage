@@ -1,7 +1,7 @@
 /**
  * The universal game registry.
  *
- * Everything Swapmeet knows about a specific Grand Theft Auto title lives in
+ * Everything GTArage knows about a specific Grand Theft Auto title lives in
  * this one table. Adding a new title -- or a re-release with a different
  * folder layout -- should mean adding an entry here and nothing else.
  *

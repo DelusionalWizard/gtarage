@@ -25,7 +25,7 @@ import type { GameId, ModKind } from '../shared/types';
 
 /** Build a temp mod folder containing the given (empty) files. */
 async function modWith(files: string[]): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-cls-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-cls-'));
   for (const rel of files) {
     const abs = path.join(dir, rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
@@ -228,8 +228,8 @@ test('an unreferenced library folder with files is quarantined, not deleted', as
   // between writing a mod's files and saving the config, a perfectly good mod
   // looks like an orphan. Deleting on that basis destroyed a real user's
   // 15 MB ChaosMod, with only a log line to show for it.
-  const lib = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-lib-'));
-  const quarantine = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-q-'));
+  const lib = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-lib-'));
+  const quarantine = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-q-'));
   try {
     // A real mod folder that config has forgotten.
     await fs.mkdir(path.join(lib, 'goodmod', 'content'), { recursive: true });
@@ -256,7 +256,7 @@ test('an unreferenced library folder with files is quarantined, not deleted', as
 });
 
 test('a referenced folder is never swept', async () => {
-  const lib = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-lib-'));
+  const lib = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-lib-'));
   try {
     await fs.mkdir(path.join(lib, 'keepme', 'content'), { recursive: true });
     await fs.writeFile(path.join(lib, 'keepme', 'content', 'a.asi'), 'x');

@@ -1,5 +1,5 @@
 /*
- * Swapmeet - dark control room.
+ * GTArage - dark control room.
  *
  * The palette and density come from the "dark control room" direction: a
  * near-black ground, hairline borders instead of shadows, monospace for
@@ -65,6 +65,67 @@
 }
 
 :root {
+/*
+   * Taken directly from designs 2a and 2b: a warm paper ground, white cards,
+   * hairline borders in the same warm family, and exactly one saturated
+   * colour (the blue) reserved for the single action a screen wants you to
+   * take. The greens and the orange are status only.
+   */
+  --bg: #faf9f6;
+  --chrome: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f7f5f1;
+  --raised: #f3f0ea;
+  --line: #ece8e1;
+  --line-strong: #e0dbd3;
+  --line-dashed: #d8d2c8;
+
+  --text: #1c1a17;
+  --text-2: #3a3630;
+  --muted: #57514a;
+  --dim: #7a736a;
+  --faint: #a8a29a;
+  --ghost: #c9c3ba;
+
+  /* The one accent. 2a puts it on "Play now" and nowhere else. */
+  --blue: oklch(0.62 0.15 250);
+  --green: oklch(0.5 0.13 145);
+  --green-soft: oklch(0.95 0.03 145);
+  --orange: oklch(0.5 0.15 45);
+  --orange-soft: oklch(0.98 0.02 45);
+  --orange-line: oklch(0.9 0.06 45);
+  --amber: oklch(0.58 0.15 78);
+  --red: oklch(0.52 0.2 27);
+
+  /*
+   * The emphatic surface, per theme.
+   *
+   * Design 2a/2b puts near-black on paper for the one button that matters.
+   * Inverting that literally for dark mode gives a white slab that shouts far
+   * louder than anything around it, so dark uses the accent instead — same
+   * job, same weight, without burning a hole in the screen.
+   */
+  --solid-bg: var(--text);
+  --solid-fg: var(--bg);
+
+  --sans: "Space Grotesk", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+
+  --rail: 236px;
+  --inspector: 330px;
+  --titlebar: 38px;
+  --actionbar: 58px;
+}
+
+/*
+ * Dark theme.
+ *
+ * Only the colour tokens are redefined — every rule is written against the
+ * variables, so the whole interface follows without a second stylesheet.
+ * The status hues are lifted rather than reused: the light palette's green
+ * and orange are tuned to sit on paper and go muddy against near-black.
+ */
+:root[data-theme='dark'] {
   --bg: #0d0f11;
   --chrome: #111315;
   --panel: #141719;
@@ -81,95 +142,57 @@
   --faint: #5c646b;
   --ghost: #4f575e;
 
-  --amber: oklch(0.72 0.19 90);
+  --blue: oklch(0.66 0.15 250);
   --green: oklch(0.72 0.19 145);
+  --green-soft: oklch(0.28 0.06 145);
   --orange: oklch(0.72 0.19 45);
-  --blue: oklch(0.62 0.16 250);
+  --orange-soft: oklch(0.24 0.05 45);
+  --orange-line: oklch(0.42 0.1 45);
+  --amber: oklch(0.72 0.19 90);
   --red: oklch(0.62 0.2 25);
 
-  --sans: "Space Grotesk", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --mono: "JetBrains Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
-
-  --rail: 236px;
-  --inspector: 330px;
-  --titlebar: 38px;
-  --actionbar: 58px;
-}
-
-/*
- * Light theme.
- *
- * Only the colour tokens are redefined — every rule below is written against
- * the variables, so the whole interface follows without a second stylesheet
- * to keep in sync.
- *
- * The status colours are darkened rather than reused. The dark palette's
- * amber and green are tuned to glow against near-black; on white they lose
- * almost all contrast, and "ok" in pale green on pale grey is unreadable.
- * Same hues, lower lightness.
- */
-:root[data-theme='light'] {
-  --bg: #f7f8f9;
-  --chrome: #eef0f2;
-  --panel: #ffffff;
-  --panel-2: #f2f4f6;
-  --raised: #e8ebee;
-  --line: #e2e6ea;
-  --line-strong: #d3d9df;
-  --line-dashed: #c2cad2;
-
-  --text: #14181c;
-  --text-2: #2f3843;
-  --muted: #55606c;
-  --dim: #6b7682;
-  --faint: #838d99;
-  --ghost: #9aa4af;
-
-  --amber: oklch(0.58 0.15 78);
-  --green: oklch(0.52 0.15 148);
-  --orange: oklch(0.58 0.17 48);
-  --blue: oklch(0.5 0.16 250);
-  --red: oklch(0.52 0.2 27);
+  --solid-bg: var(--blue);
+  --solid-fg: #ffffff;
 }
 
 /* The amber-on-light chips need dark text to stay legible. */
-:root[data-theme='light'] .seg-btn.is-active,
-:root[data-theme='light'] .chrome-btn.is-active,
-:root[data-theme='light'] .primary-btn,
-:root[data-theme='light'] .badge-live {
+:root[data-theme='dark'] .seg-btn.is-active,
+:root[data-theme='dark'] .chrome-btn.is-active,
+:root[data-theme='dark'] .primary-btn,
+:root[data-theme='dark'] .badge-live {
   color: #fff;
 }
 
 /* The solid button inverts in dark mode; on light it must not go white-on-white. */
-:root[data-theme='light'] .solid-btn {
-  background: var(--text);
-  color: var(--bg);
+:root[data-theme='dark'] .solid-btn {
+  background: var(--solid-bg);
+  color: var(--solid-fg);
 }
 
-:root[data-theme='light'] .solid-btn:hover {
+:root[data-theme='dark'] .solid-btn:hover {
   background: #000;
 }
 
 /* Toast shadows read as smudges on a light ground. */
-:root[data-theme='light'] .toast {
+:root[data-theme='dark'] .toast {
   box-shadow: 0 6px 18px rgba(20, 24, 28, 0.14);
 }
 
 /* The scrims are tuned for a dark page behind them. */
-:root[data-theme='light'] .overlay,
-:root[data-theme='light'] .modal-scrim {
+:root[data-theme='dark'] .overlay,
+:root[data-theme='dark'] .modal-scrim {
   background: rgba(20, 24, 28, 0.34);
 }
 
 /* The drag grip is drawn in a fixed colour that vanishes on white. */
-:root[data-theme='light'] .grip span {
+:root[data-theme='dark'] .grip span {
   background: var(--faint);
 }
 
 /* Row separators are hardcoded near-black elsewhere. */
-:root[data-theme='light'] .row,
-:root[data-theme='light'] .card-row,
-:root[data-theme='light'] .setting {
+:root[data-theme='dark'] .row,
+:root[data-theme='dark'] .card-row,
+:root[data-theme='dark'] .setting {
   border-color: var(--line);
 }
 
@@ -199,14 +222,6 @@ select {
   color: inherit;
 }
 
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
 /* --- title bar ---------------------------------------------------------- */
 
 .titlebar {
@@ -218,95 +233,6 @@ select {
   background: var(--chrome);
   border-bottom: 1px solid var(--line-strong);
   -webkit-app-region: drag;
-}
-
-.titlebar button,
-.titlebar select {
-  -webkit-app-region: no-drag;
-}
-
-.brand-mark {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  background: var(--amber);
-  flex: none;
-}
-
-.brand {
-  font: 500 12px var(--mono);
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-
-.brand-version {
-  font: 400 11px var(--mono);
-  color: var(--ghost);
-}
-
-.titlebar-divider {
-  width: 1px;
-  height: 16px;
-  background: var(--line-strong);
-}
-
-.game-select {
-  -webkit-appearance: none;
-  appearance: none;
-  background: var(--raised);
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  padding: 5px 26px 5px 10px;
-  font: 500 11.5px var(--mono);
-  color: var(--text-2);
-  cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, var(--dim) 50%),
-    linear-gradient(135deg, var(--dim) 50%, transparent 50%);
-  background-position: calc(100% - 14px) 51%, calc(100% - 9px) 51%;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
-}
-
-.game-select:focus-visible {
-  outline: 1px solid var(--amber);
-}
-
-.game-note {
-  font: 400 11px var(--mono);
-  color: var(--ghost);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 40vw;
-}
-
-.titlebar-spacer {
-  flex: 1;
-}
-
-.window-controls {
-  display: flex;
-  height: 100%;
-}
-
-.win-btn {
-  width: 44px;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--dim);
-  font: 400 12px var(--mono);
-  cursor: pointer;
-}
-
-.win-btn:hover {
-  background: var(--raised);
-  color: var(--text);
-}
-
-.win-close:hover {
-  background: var(--red);
-  color: #fff;
 }
 
 /* --- shell -------------------------------------------------------------- */
@@ -324,23 +250,6 @@ select {
   flex-direction: column;
   border-right: 1px solid var(--line);
   padding: 16px 0 0;
-  min-height: 0;
-}
-
-.rail-label {
-  padding: 0 16px 10px;
-  font: 500 10px var(--mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--faint);
-}
-
-.profile-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 8px;
-  overflow-y: auto;
   min-height: 0;
 }
 
@@ -369,11 +278,6 @@ select {
   border-left-color: var(--amber);
 }
 
-.profile-main {
-  flex: 1;
-  min-width: 0;
-}
-
 .profile-name {
   font: 600 13px var(--sans);
   color: var(--text-2);
@@ -386,111 +290,12 @@ select {
   color: var(--text);
 }
 
-.profile-meta {
-  font: 400 10.5px var(--mono);
-  color: var(--faint);
-  margin-top: 3px;
-}
-
 .badge {
   font: 500 9px var(--mono);
   padding: 2px 5px;
   border-radius: 3px;
   letter-spacing: 0.06em;
   flex: none;
-}
-
-.badge-live {
-  background: var(--green);
-  color: var(--bg);
-}
-
-.badge-lock {
-  background: var(--line-strong);
-  color: var(--muted);
-}
-
-.ghost-btn {
-  margin: 12px 8px 0;
-  padding: 9px 10px;
-  border: 1px dashed var(--line-dashed);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--dim);
-  font: 500 11px var(--mono);
-  cursor: pointer;
-}
-
-.ghost-btn:hover {
-  color: var(--text-2);
-  border-color: var(--faint);
-}
-
-.rail-spacer {
-  flex: 1;
-  min-height: 12px;
-}
-
-.rail-foot {
-  padding: 14px 16px;
-  border-top: 1px solid var(--line);
-}
-
-.game-path {
-  font: 400 11px var(--mono);
-  color: var(--muted);
-  word-break: break-all;
-  line-height: 1.5;
-  user-select: text;
-}
-
-.game-status {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font: 400 10.5px var(--mono);
-  color: var(--dim);
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex: none;
-  background: var(--faint);
-}
-
-.dot-ok {
-  background: var(--green);
-}
-.dot-warn {
-  background: var(--orange);
-}
-.dot-off {
-  background: var(--faint);
-}
-
-.rail-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.link-btn {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: 400 10.5px var(--mono);
-  color: var(--dim);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.link-btn:hover {
-  color: var(--amber);
 }
 
 /* --- main column -------------------------------------------------------- */
@@ -500,85 +305,6 @@ select {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-}
-
-.tabs {
-  display: flex;
-  gap: 22px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--line);
-  flex: none;
-}
-
-.tab {
-  padding: 12px 2px;
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  font: 500 13px var(--sans);
-  color: var(--dim);
-  cursor: pointer;
-}
-
-.tab:hover {
-  color: var(--text-2);
-}
-
-.tab.is-active {
-  color: var(--text);
-  border-bottom-color: var(--amber);
-  font-weight: 600;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 18px;
-  border-bottom: 1px solid var(--line);
-  flex: none;
-}
-
-.search {
-  flex: 1;
-  min-width: 120px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 10px;
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-}
-
-.search:focus-within {
-  border-color: var(--faint);
-}
-
-.search-slash {
-  font: 400 11px var(--mono);
-  color: var(--ghost);
-}
-
-.search input {
-  flex: 1;
-  background: none;
-  border: 0;
-  outline: 0;
-  font: 400 12px var(--mono);
-  color: var(--text-2);
-  user-select: text;
-}
-
-.search input::placeholder {
-  color: var(--ghost);
-}
-
-.chips {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
 }
 
 .chip {
@@ -605,27 +331,6 @@ select {
   color: var(--orange);
 }
 
-.solid-btn {
-  padding: 7px 13px;
-  border: 0;
-  border-radius: 5px;
-  background: var(--text);
-  color: var(--bg);
-  font: 600 12px var(--sans);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.solid-btn:hover {
-  background: #fff;
-}
-
-.view {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
 /* --- mod table ---------------------------------------------------------- */
 
 .table-head,
@@ -633,19 +338,6 @@ select {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 92px 110px 130px 56px;
   align-items: center;
-}
-
-.table-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 9px 18px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-  font: 500 9.5px var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--faint);
 }
 
 .row {
@@ -742,74 +434,7 @@ select {
   opacity: 0.55;
 }
 
-/* --- load-order stack --------------------------------------------------- */
-
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px 18px;
-}
-
-.stack-hint {
-  font: 400 10.5px var(--mono);
-  color: var(--faint);
-  padding-bottom: 4px;
-}
-
-.stack-item {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 11px 12px;
-  border-radius: 7px;
-  background: var(--panel-2);
-  border: 1px solid var(--line-strong);
-  cursor: grab;
-}
-
-.stack-item.is-dragging {
-  opacity: 0.4;
-}
-
-.stack-item.is-over {
-  border-color: var(--amber);
-}
-
-.stack-item.is-core {
-  background: var(--panel);
-}
-
-.grip {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: none;
-}
-
-.grip span {
-  width: 11px;
-  height: 1.5px;
-  background: #54504a;
-  display: block;
-}
-
-.stack-index {
-  font: 500 10.5px var(--mono);
-  color: var(--dim);
-  width: 18px;
-  flex: none;
-}
-
-.stack-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.stack-name {
-  font: 500 13px var(--sans);
-  color: var(--text-2);
-}
+/* .stack-meta is still used by the ScriptHookV prompt's candidate rows. */
 
 .stack-meta {
   font: 400 10.5px var(--mono);
@@ -848,78 +473,12 @@ select {
   overflow: hidden;
 }
 
-.card-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.card-title {
-  font: 600 13px var(--sans);
-  color: var(--text);
-}
-
-.card-count {
-  font: 400 11px var(--mono);
-  color: var(--faint);
-}
-
-.card-spacer {
-  flex: 1;
-}
-
-.card-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 16px;
-  border-top: 1px solid #16191b;
-}
-
-.card-row:first-of-type {
-  border-top: 0;
-}
-
-.card-body {
-  padding: 14px 16px;
-  font: 400 12.5px/1.6 var(--sans);
-  color: var(--muted);
-}
-
 .setting {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
   border-top: 1px solid #16191b;
-}
-
-.setting-main {
-  flex: 1;
-}
-
-.setting-name {
-  font: 500 13px var(--sans);
-  color: var(--text-2);
-}
-
-.setting-desc {
-  font: 400 11.5px/1.5 var(--sans);
-  color: var(--faint);
-  margin-top: 3px;
-}
-
-.number-input {
-  width: 64px;
-  background: var(--panel-2);
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  padding: 6px 8px;
-  font: 400 12px var(--mono);
-  color: var(--text-2);
-  user-select: text;
 }
 
 /* --- inspector ---------------------------------------------------------- */
@@ -935,34 +494,11 @@ select {
   min-height: 0;
 }
 
-.insp-label {
-  font: 500 10px var(--mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--faint);
-  margin-bottom: 10px;
-}
-
 .alert {
   padding: 14px;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
   background: var(--panel-2);
-}
-
-.alert-warn {
-  border-color: color-mix(in oklch, var(--orange) 45%, var(--line-strong));
-  background: color-mix(in oklch, var(--orange) 8%, var(--panel-2));
-}
-
-.alert-ok {
-  border-color: color-mix(in oklch, var(--green) 35%, var(--line-strong));
-  background: color-mix(in oklch, var(--green) 7%, var(--panel-2));
-}
-
-.alert-title {
-  font: 600 13px var(--sans);
-  color: var(--text);
 }
 
 .alert-body {
@@ -983,40 +519,12 @@ select {
   flex-wrap: wrap;
 }
 
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font: 400 12.5px var(--sans);
-  color: var(--text-2);
-  padding: 4px 0;
-}
-
-.stat-value {
-  font: 400 11.5px var(--mono);
-  color: var(--muted);
-}
-
 .stat-value.is-good {
   color: var(--green);
 }
 
 .stat-value.is-warn {
   color: var(--orange);
-}
-
-.insp-spacer {
-  flex: 1;
-  min-height: 8px;
-}
-
-.note-box {
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  font: 400 12px/1.55 var(--sans);
-  color: var(--dim);
 }
 
 /* --- buttons ------------------------------------------------------------ */
@@ -1030,38 +538,35 @@ select {
   white-space: nowrap;
 }
 
-.outline-btn {
-  padding: 9px 14px;
-  border: 1px solid var(--line-dashed);
-  background: transparent;
-  color: var(--text-2);
-  font: 500 12px var(--mono);
-}
-
 .outline-btn:hover:not(:disabled) {
   border-color: var(--faint);
   color: var(--text);
-}
-
-.primary-btn {
-  padding: 9px 18px;
-  border: 0;
-  background: var(--amber);
-  color: var(--bg);
-  font: 700 12px var(--mono);
-  letter-spacing: 0.02em;
 }
 
 .primary-btn:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
+/*
+ * Folded into the .btn look rather than restyled at every call site.
+ *
+ * .small-btn predates the 2a/2b rebuild and is still what openModal's action
+ * buttons and a few dialogs use. Giving it the same appearance makes every
+ * button in the app consistent without touching several dozen call sites and
+ * risking a typo in each.
+ */
 .small-btn {
-  padding: 7px 12px;
-  border: 1px solid var(--line-dashed);
-  background: transparent;
+  padding: 8px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
   color: var(--text-2);
-  font: 500 11.5px var(--sans);
+  font: 500 12.5px var(--sans);
+  cursor: pointer;
+}
+
+.small-btn:hover {
+  border-color: var(--dim);
 }
 
 .small-btn:hover:not(:disabled) {
@@ -1069,9 +574,9 @@ select {
 }
 
 .small-btn.is-primary {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
+  background: var(--solid-bg);
+  border-color: var(--solid-bg);
+  color: var(--solid-fg);
   font-weight: 600;
 }
 
@@ -1093,30 +598,6 @@ button:disabled {
 }
 
 /* --- action bar --------------------------------------------------------- */
-
-.actionbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: var(--actionbar);
-  padding: 0 18px;
-  border-top: 1px solid var(--line);
-  background: var(--chrome);
-  flex: none;
-}
-
-.action-status {
-  font: 400 11px var(--mono);
-  color: var(--dim);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.actionbar-spacer {
-  flex: 1;
-}
 
 /* --- empty states ------------------------------------------------------- */
 
@@ -1149,13 +630,18 @@ button:disabled {
  * only thing on screen, and it is carrying the explanation of how the whole
  * app works, so it should not read like an error message.
  */
+/* The first-run panel. Self-contained now that it no longer leans on .card
+   for its surface. */
 .setup-card {
   max-width: 560px;
   margin: 32px auto;
   padding: 24px 26px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 
-.setup-card .card-title {
+.setup-card .ask {
   font: 600 18px var(--sans);
   display: block;
   margin-bottom: 8px;
@@ -1405,20 +891,11 @@ button:disabled {
   color: var(--faint);
 }
 
-.diff-in {
-  border-left-color: var(--green);
-}
-.diff-in .diff-sign {
-  color: var(--green);
-}
 .diff-out {
   border-left-color: var(--orange);
 }
 .diff-out .diff-sign {
   color: var(--orange);
-}
-.diff-keep .diff-sign {
-  color: var(--faint);
 }
 
 .blocker {
@@ -1437,24 +914,6 @@ button:disabled {
   border: 1px solid color-mix(in oklch, var(--orange) 40%, var(--line-strong));
   background: color-mix(in oklch, var(--orange) 8%, var(--panel-2));
   color: var(--text-2);
-}
-
-/* Lead-in above the list of blockers, so a disabled Apply button is explained. */
-.blocker-lead {
-  font: 600 12.5px/1.5 var(--sans);
-  color: var(--text-2);
-  margin-bottom: 2px;
-}
-
-/* Legend for the IN / OUT / KEEP columns in the swap preview. */
-.diff-legend {
-  font: 400 11.5px/1.6 var(--sans);
-  color: var(--dim);
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  margin-bottom: 4px;
 }
 
 .mono-list {
@@ -1512,19 +971,9 @@ button:disabled {
   .shell {
     grid-template-columns: var(--rail) minmax(0, 1fr);
   }
-  .inspector {
-    display: none;
-  }
 }
 
 /* --- mod browser -------------------------------------------------------- */
-
-.browse-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
 
 .seg {
   display: flex;
@@ -1535,55 +984,10 @@ button:disabled {
   gap: 2px;
 }
 
-.seg-btn {
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  font: 500 11.5px var(--mono);
-  color: var(--dim);
-  cursor: pointer;
-}
-
-.seg-btn:hover {
-  color: var(--text-2);
-}
-
 .seg-btn.is-active {
   background: var(--amber);
   color: var(--bg);
   font-weight: 600;
-}
-
-.mini-select {
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  padding: 7px 10px;
-  font: 400 12px var(--sans);
-  color: var(--text-2);
-  cursor: pointer;
-}
-
-.browse-note {
-  padding: 10px 12px;
-  border-radius: 7px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  font: 400 12px/1.55 var(--sans);
-  color: var(--dim);
-}
-
-.inline-tag {
-  margin-left: 8px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--line-strong);
-  font: 500 9.5px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  vertical-align: middle;
 }
 
 /* Dependency rows reuse the diff layout but need room for a button. */
@@ -1598,14 +1002,6 @@ button:disabled {
 
 .diff-name .stack-meta {
   white-space: normal;
-}
-
-/* Inline drop target on the Mods tab: a visible affordance, since "you can
-   drop files on the window" is not discoverable on its own. */
-.dropzone-inline {
-  margin: 14px 18px 4px;
-  padding: 12px;
-  font: 400 11px var(--mono);
 }
 
 /* --- graphics profile panel --------------------------------------------- */
@@ -1638,26 +1034,6 @@ button:disabled {
 
 /* --- header settings button --------------------------------------------- */
 
-.chrome-btn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 26px;
-  padding: 0 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  background: var(--raised);
-  color: var(--muted);
-  font: 500 11.5px var(--mono);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chrome-btn:hover {
-  color: var(--text);
-  border-color: var(--faint);
-}
-
 .chrome-btn.is-active {
   background: var(--amber);
   border-color: var(--amber);
@@ -1665,35 +1041,7 @@ button:disabled {
   font-weight: 600;
 }
 
-.chrome-btn-icon {
-  font-size: 12px;
-  line-height: 1;
-}
-
 /* --- hide-disabled toggle ------------------------------------------------ */
-
-.mini-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 9px;
-  border-radius: 5px;
-  font: 500 11px var(--mono);
-  color: var(--dim);
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.mini-toggle:hover {
-  color: var(--text-2);
-}
-
-.mini-toggle input {
-  accent-color: var(--amber);
-  margin: 0;
-  cursor: pointer;
-}
 
 /*
  * Long values (paths, timestamps) must wrap rather than be clipped: a
@@ -1719,4 +1067,2149 @@ button:disabled {
  */
 [hidden] {
   display: none !important;
+}
+
+/* ===========================================================================
+ * Shell and screens, rebuilt to designs 2a and 2b.
+ *
+ * The previous shell was design 1a: a dark control room with a profile rail,
+ * a tab strip and a permanent action bar. This direction throws all three
+ * away. The screen you are on states what it is in a sentence, and the one
+ * action it wants sits inside the screen rather than in furniture that is
+ * always present whether it applies or not.
+ * ======================================================================== */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 0;
+  background: var(--bg);
+}
+
+/* --- title strip ---------------------------------------------------------- */
+
+.titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 8px 0 18px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+}
+
+.titlebar button,
+.titlebar select,
+.titlebar .crumb {
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-spacer {
+  flex: 1;
+}
+
+/* The breadcrumb is the only navigation state the design shows: where you
+   are, and the one place back. */
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.crumb-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.crumb {
+  font: 500 13px var(--sans);
+  color: var(--dim);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crumb:hover {
+  color: var(--text);
+}
+
+.crumb.is-current {
+  font-weight: 600;
+  color: var(--text);
+  cursor: default;
+}
+
+.crumb-sep {
+  flex: none;
+  font: 400 13px var(--sans);
+  color: var(--ghost);
+}
+
+.topnav {
+  display: flex;
+  gap: 2px;
+}
+
+.topnav button {
+  font: 500 12.5px var(--sans);
+  color: var(--dim);
+  background: none;
+  border: 0;
+  padding: 7px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.topnav button:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.topnav button.is-active {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.game-select {
+  font: 500 12.5px var(--sans);
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 6px 9px;
+  max-width: 230px;
+  cursor: pointer;
+}
+
+.win-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.win-btn {
+  width: 34px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  font: 400 13px var(--sans);
+  cursor: pointer;
+}
+
+.win-btn:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.win-close:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg);
+  container: view / inline-size;
+}
+
+/* --- 2a: which setup do you want to play? --------------------------------- */
+
+.home {
+  padding: 36px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.home-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ask {
+  font: 600 26px/1.15 var(--sans);
+  letter-spacing: -0.015em;
+  color: var(--text);
+  margin: 0;
+}
+
+.lede {
+  font: 400 14.5px/1.6 var(--sans);
+  color: var(--dim);
+  max-width: 640px;
+  margin: 0;
+}
+
+.setups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.setup {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+/* The live setup is the only card with any lift on it. */
+.setup.is-live {
+  border-color: color-mix(in oklab, var(--blue) 40%, var(--line));
+  box-shadow: 0 2px 10px rgba(40, 70, 140, 0.1);
+}
+
+.setup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-chip {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--raised);
+}
+
+.setup-chip.is-live {
+  background: color-mix(in oklab, var(--blue) 24%, var(--panel));
+}
+
+.setup-chip.is-safe {
+  background: var(--green-soft);
+}
+
+.setup-name {
+  flex: 1;
+  min-width: 0;
+  font: 600 15.5px var(--sans);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.setup-tag {
+  flex: none;
+  font: 600 10px var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+
+.setup-tag.is-good {
+  color: var(--green);
+}
+
+.setup-blurb {
+  font: 400 13.5px/1.6 var(--sans);
+  color: var(--dim);
+}
+
+.setup-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: 400 12.5px var(--sans);
+  color: var(--muted);
+}
+
+.setup-fact b {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-grow {
+  flex: 1;
+}
+
+/* --- the two cards under the grid ---------------------------------------- */
+
+.home-foot {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.note-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+  text-align: left;
+}
+
+.note-card.is-dashed {
+  border-style: dashed;
+  border-color: var(--line-dashed);
+  cursor: pointer;
+}
+
+.note-card.is-dashed:hover {
+  border-color: var(--blue);
+}
+
+.note-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--raised);
+  color: var(--faint);
+  font: 400 18px var(--sans);
+}
+
+.note-icon.is-good {
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.note-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-title {
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.note-body {
+  font: 400 12.5px var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+/* --- 2b: inside a setup --------------------------------------------------- */
+
+.inside {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  min-height: 100%;
+}
+
+@container view (max-width: 900px) {
+  .inside {
+    grid-template-columns: 1fr;
+  }
+  .ready {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+.inside-main {
+  min-width: 0;
+  padding: 30px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.inside-title {
+  font: 600 22px var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.inside-lede {
+  font: 400 14px/1.6 var(--sans);
+  color: var(--dim);
+  margin-top: 6px;
+}
+
+/* Filter pills. The labels are plain language, not mod-kind jargon. */
+.pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  font: 500 12.5px var(--sans);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pill:hover {
+  border-color: var(--dim);
+}
+
+.pill.is-active {
+  background: var(--solid-bg);
+  border-color: var(--solid-bg);
+  color: var(--solid-fg);
+  font-weight: 600;
+}
+
+.things {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/*
+ * Load order used to be a separate screen holding a near-identical list.
+ * This hint is what that screen's stack opened with, moved to sit above the
+ * same rows now that dragging them does the same job.
+ */
+.things-hint {
+  font: 400 10.5px var(--mono);
+  color: var(--faint);
+  padding: 0 2px 2px;
+}
+
+.thing {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 16px 18px;
+}
+
+.thing.is-draggable {
+  cursor: grab;
+}
+
+.thing.is-dragging {
+  opacity: 0.4;
+}
+
+.thing.is-over {
+  border-color: var(--amber);
+}
+
+.thing-grip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  cursor: grab;
+  padding: 4px 2px;
+}
+
+.thing-grip span {
+  width: 11px;
+  height: 1.5px;
+  background: var(--faint);
+  display: block;
+}
+
+.thing-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.thing-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.thing-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.thing-name {
+  font: 600 14.5px var(--sans);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.thing-badge {
+  font: 500 10.5px var(--mono);
+  color: var(--muted);
+  background: var(--raised);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.thing-badge.is-warn {
+  color: var(--orange);
+  background: var(--orange-soft);
+}
+
+.thing-blurb {
+  font: 400 13px/1.55 var(--sans);
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+/* The 2b switch: bigger and softer than a control-room toggle. */
+.sw {
+  flex: none;
+  width: 46px;
+  height: 26px;
+  border-radius: 13px;
+  border: 0;
+  background: var(--line-strong);
+  padding: 3px;
+  display: flex;
+  justify-content: flex-start;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.sw-knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+
+.sw.is-on {
+  background: var(--blue);
+  justify-content: flex-end;
+}
+
+.sw:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- the right-hand "ready to play" panel -------------------------------- */
+
+.ready {
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  padding: 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ready-title {
+  font: 600 15px var(--sans);
+  color: var(--text);
+}
+
+.ready-sub {
+  font: 400 13px/1.6 var(--sans);
+  color: var(--dim);
+  margin-top: 6px;
+}
+
+.notice {
+  padding: 16px;
+  border-radius: 11px;
+  background: var(--orange-soft);
+  border: 1px solid var(--orange-line);
+}
+
+.notice-title {
+  font: 600 13.5px var(--sans);
+  color: var(--text-2);
+}
+
+.notice-body {
+  font: 400 12.5px/1.6 var(--sans);
+  color: var(--muted);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.notice-body b {
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.notice-acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.ticks {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.tick {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font: 400 13px/1.5 var(--sans);
+  color: var(--muted);
+}
+
+.tick::before {
+  content: "\2713";
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--green-soft);
+  color: var(--green);
+  font: 700 10px var(--sans);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ready-grow {
+  flex: 1;
+}
+
+/* The one blue button on the screen. */
+.play {
+  flex: none;
+  height: 46px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--blue);
+  color: #fff;
+  font: 600 14.5px var(--sans);
+  cursor: pointer;
+}
+
+.play:hover {
+  filter: brightness(1.06);
+}
+
+.play:disabled {
+  background: var(--line-strong);
+  color: var(--faint);
+  cursor: default;
+  filter: none;
+}
+
+.play-alt {
+  flex: none;
+  text-align: center;
+  font: 400 12.5px var(--sans);
+  color: var(--faint);
+}
+
+.play-alt button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* --- buttons shared by the two screens ------------------------------------ */
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  font: 500 12.5px var(--sans);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--dim);
+}
+
+.btn.is-primary {
+  background: var(--solid-bg);
+  border-color: var(--solid-bg);
+  color: var(--solid-fg);
+  font-weight: 600;
+}
+
+.btn.is-blue {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* A full-width card button, used for the per-setup action in 2a. */
+.btn-wide {
+  height: 40px;
+  width: 100%;
+  border-radius: 8px;
+}
+
+/* Generic page used by the secondary screens (browse, saves, settings) so
+   they sit on the same paper as the two designed ones. */
+.page {
+  padding: 30px 32px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1080px;
+}
+
+/* The whole card opens the setup; only the button plays it. */
+.setup {
+  cursor: pointer;
+}
+
+.setup:hover {
+  border-color: var(--dim);
+}
+
+.setup:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* The game these setups belong to, above the question. */
+.home-game {
+  font: 500 12px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* Rename / duplicate / delete, on both a setup card and a mod row. */
+.more-btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--faint);
+  font: 400 16px var(--sans);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.more-btn:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.thing .more-btn {
+  opacity: 0;
+}
+
+.thing:hover .more-btn,
+.thing .more-btn:focus-visible {
+  opacity: 1;
+}
+
+/*
+ * "Running" is a state, not an action.
+ *
+ * It reads as a status pill rather than a button, because pressing it does
+ * nothing — starting a second copy is the separate, explicitly labelled
+ * button beneath it.
+ */
+.btn.is-running,
+.play.is-running {
+  background: var(--green-soft);
+  border-color: color-mix(in oklab, var(--green) 35%, var(--line));
+  color: var(--green);
+  font-weight: 600;
+  opacity: 1;
+  cursor: default;
+}
+
+/* ===========================================================================
+ * Settings, from the "Settings & Browse" mockups.
+ *
+ * The idea the design is built on, stated in its own panel title: settings
+ * show their weight, so the three that prevent a lost save or a ban do not
+ * look like the cosmetic ones.
+ * ======================================================================== */
+
+.sheet {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 30px;
+  padding: 30px 34px 48px;
+  align-items: start;
+  max-width: 1180px;
+}
+
+@container view (max-width: 820px) {
+  .sheet {
+    grid-template-columns: 1fr;
+  }
+  .onpage {
+    display: none;
+  }
+}
+
+/* The "on this page" rail. */
+.onpage {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.onpage-label {
+  font: 500 9.5px var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--faint);
+  padding: 0 10px 8px;
+}
+
+.onpage button {
+  font: 400 13px var(--sans);
+  color: var(--dim);
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  text-align: left;
+}
+
+.onpage button:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  min-width: 0;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.group-title {
+  font: 600 17px var(--sans);
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.group-note {
+  font: 400 12.5px var(--sans);
+  color: var(--dim);
+}
+
+/* The safety group carries a badge, because "recommended on" is the whole
+   point of separating it from the preferences. */
+.group-badge {
+  font: 600 9.5px var(--mono);
+  letter-spacing: 0.12em;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.group-blurb {
+  font: 400 13px/1.6 var(--sans);
+  color: var(--dim);
+  max-width: 68ch;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.srow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 18px;
+}
+
+.srow + .srow {
+  border-top: 1px solid var(--line);
+}
+
+.srow-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.srow-name {
+  font: 500 13.5px var(--sans);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.srow-desc {
+  font: 400 12.5px/1.55 var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+.srow-tag {
+  font: 400 10.5px var(--mono);
+  color: var(--faint);
+}
+
+/* A stepper, for "keep N snapshots". */
+.stepper {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.stepper button {
+  width: 28px;
+  height: 30px;
+  border: 0;
+  background: var(--panel);
+  color: var(--muted);
+  font: 400 15px var(--sans);
+  cursor: pointer;
+}
+
+.stepper button:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.stepper span {
+  min-width: 30px;
+  text-align: center;
+  font: 500 12.5px var(--mono);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Segmented choice, for updates and appearance. */
+.seg {
+  flex: none;
+  display: flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+  background: var(--panel-2);
+}
+
+.seg button {
+  border: 0;
+  background: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font: 500 12.5px var(--sans);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.seg button:hover {
+  color: var(--text);
+}
+
+.seg button.is-on {
+  background: var(--solid-bg);
+  color: var(--solid-fg);
+  font-weight: 600;
+}
+
+/* A pair of mutually exclusive cards, for how files are placed. */
+.picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.pick {
+  text-align: left;
+  padding: 15px 16px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.pick:hover {
+  border-color: var(--dim);
+}
+
+.pick.is-on {
+  border-color: var(--blue);
+  background: color-mix(in oklab, var(--blue) 7%, var(--panel));
+}
+
+.pick-name {
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.pick-desc {
+  font: 400 12.5px/1.55 var(--sans);
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+/* Game folders. */
+.gamerow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+}
+
+.gamerow + .gamerow {
+  border-top: 1px solid var(--line);
+}
+
+.gamerow-name {
+  flex: none;
+  width: 150px;
+  font: 500 13px var(--sans);
+  color: var(--text);
+}
+
+.gamerow-path {
+  flex: 1;
+  min-width: 0;
+  font: 400 11.5px var(--mono);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.gamerow-path.is-missing {
+  color: var(--faint);
+}
+
+/* --- Drop target ----------------------------------------------------------- */
+
+.drop {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px dashed var(--line-dashed);
+  border-radius: 12px;
+  background: var(--panel);
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.drop:hover,
+.drop.is-over {
+  border-color: var(--blue);
+  background: color-mix(in oklab, var(--blue) 5%, var(--panel));
+}
+
+.drop-plus {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--raised);
+  color: var(--faint);
+  font: 400 22px var(--sans);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===========================================================================
+ * Tools, from the "Settings & Browse" mockup.
+ *
+ * Two routes, two visual languages, and the difference is the point: a solid
+ * list with real install buttons, and a column of doorways with no listing
+ * behind them. Giving both the same card is what made the previous version
+ * read as a catalogue that returns nothing.
+ * ======================================================================== */
+
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 32px 24px;
+  height: 100%;
+  min-height: 0;
+}
+
+.tools-head {
+  flex: none;
+}
+
+.tools-title {
+  font: 600 23px var(--sans);
+  color: var(--text);
+  letter-spacing: -0.015em;
+}
+
+.tools-sub {
+  font: 400 13px var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+.tools-cols {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+}
+
+/* The mockup's 1.6 : 1 split. Essentials is the column with decisions in it. */
+.tools-col.is-essentials {
+  flex: 1.6;
+}
+
+.tools-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tools-colhead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tools-colhead.is-stacked {
+  display: block;
+}
+
+.tools-colhead-title {
+  font: 600 15px var(--sans);
+  color: var(--text);
+}
+
+.tools-colhead-sub {
+  font: 400 12px var(--sans);
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.tools-colhead-note {
+  font: 400 11.5px var(--mono);
+  color: var(--faint);
+}
+
+.tools-spacer {
+  flex: 1;
+}
+
+.tools-gamepill {
+  padding: 4px 9px;
+  border-radius: 14px;
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  font: 600 11.5px var(--sans);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tools-card {
+  flex: 1;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.tools-card.is-centred {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 30px;
+}
+
+.tools-quiet-icon {
+  font: 400 26px var(--sans);
+  color: var(--ghost);
+}
+
+.tools-quiet-title {
+  font: 600 15px var(--sans);
+  color: var(--text);
+}
+
+.tools-quiet {
+  font: 400 12.5px/1.5 var(--sans);
+  color: var(--dim);
+  max-width: 320px;
+}
+
+.tools-foot {
+  flex: none;
+  font: 400 11.5px var(--sans);
+  color: var(--faint);
+}
+
+/* --- an Essentials row, in each of its six states ------------------------- */
+
+.ess-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+}
+
+.ess-row + .ess-row {
+  border-top: 1px solid var(--line);
+}
+
+.ess-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ess-nameline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ess-name {
+  font: 600 14px var(--sans);
+  color: var(--text);
+}
+
+.ess-ver {
+  font: 400 11px var(--mono);
+  color: var(--faint);
+}
+
+.ess-sub {
+  font: 400 12px var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+.ess-pill {
+  font: 500 10.5px var(--mono);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.ess-pill.is-update {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.ess-pill.is-failed {
+  background: color-mix(in oklch, var(--red) 8%, var(--panel));
+  color: var(--red);
+}
+
+.ess-ok {
+  flex: none;
+  font: 600 12.5px var(--sans);
+  color: var(--green);
+  white-space: nowrap;
+}
+
+.ess-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  margin-top: 7px;
+  overflow: hidden;
+}
+
+.ess-bar-fill {
+  height: 100%;
+  background: var(--blue);
+  transition: width 0.15s linear;
+}
+
+.ess-pct {
+  flex: none;
+  font: 500 12.5px var(--mono);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+/* --- community sites ------------------------------------------------------ */
+
+.tools-card.is-sites {
+  justify-content: stretch;
+}
+
+.site-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  min-height: 52px;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.site-row + .site-row {
+  border-top: 1px solid var(--line);
+}
+
+.site-row:hover {
+  background: var(--panel-2);
+}
+
+.site-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ghost);
+}
+
+.site-name {
+  flex: 1;
+  min-width: 0;
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.site-open {
+  flex: none;
+  font: 600 12px var(--sans);
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+/* --- first run ------------------------------------------------------------ */
+
+.tools-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 40px;
+}
+
+.tools-empty-lead {
+  text-align: center;
+  max-width: 560px;
+}
+
+.tools-empty-title {
+  font: 600 22px var(--sans);
+  color: var(--text);
+}
+
+.tools-empty-sub {
+  font: 400 13.5px/1.5 var(--sans);
+  color: var(--dim);
+  margin-top: 6px;
+  max-width: 440px;
+}
+
+.tools-empty-cards {
+  width: 640px;
+  max-width: 100%;
+  display: flex;
+  gap: 14px;
+}
+
+.tools-empty-card {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.tools-empty-card-title {
+  font: 600 13px var(--sans);
+  color: var(--text);
+}
+
+.tools-empty-card-body {
+  font: 400 12px/1.5 var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+/* A link that is really a button, so it keeps keyboard behaviour. */
+.linkish {
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  color: var(--blue);
+}
+
+.linkish:hover {
+  text-decoration: underline;
+}
+
+/* The mockup's rail plus this two-column body needs more width than a laptop
+   window has. Container query, not a media query: the view is a container, so
+   the viewport width is not what decides this. */
+@container view (max-width: 820px) {
+  .tools-cols {
+    flex-direction: column;
+  }
+
+  .tools-col.is-essentials,
+  .tools-col {
+    flex: none;
+  }
+
+  .tools-card {
+    min-height: 220px;
+  }
+}
+
+.tag {
+  font: 600 9.5px var(--mono);
+  letter-spacing: 0.1em;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.tag.is-ok {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.tag.is-warn {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+/* ===========================================================================
+ * Library, from mockup 2a/2b/2c.
+ *
+ * A table of everything owned beside a detail panel for one mod. The panel's
+ * bottom half is a deliberate cliff: "take out of a setup" is a quiet link
+ * beside each setup name, while "delete from the library" is a bordered
+ * warning that names what would break. They must never be confusable —
+ * deleting is the only irreversible action in the app.
+ * ======================================================================== */
+
+.lib {
+  display: grid;
+  grid-template-columns: 1fr 372px;
+  gap: 20px;
+  padding: 24px 32px 26px;
+  height: 100%;
+  min-height: 0;
+}
+
+@container view (max-width: 900px) {
+  .lib {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lib-left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.lib-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.lib-head > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.lib-totals {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.lib-total {
+  font: 500 13px var(--mono);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.lib-total-sub {
+  font: 400 11.5px var(--mono);
+  color: var(--faint);
+  margin-top: 3px;
+}
+
+.lib-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* A search box earns its place here: a library holds hundreds of mods, where
+   the Essentials list holds eight. */
+/*
+ * Sized by its padding, not by a fixed height.
+ *
+ * height:34px plus the `font` shorthand - which resets line-height to normal -
+ * left the text sitting against the bottom of the box and clipping. Letting
+ * the padding set the height means the field always fits whatever the font
+ * does, and a min-width keeps "Search 128 mods" from being squeezed.
+ */
+.lib-search {
+  /*
+   * Grows, and does not shrink below its text.
+   *
+   * It sat next to `.lib-pills { flex: 1 }`, so the pills claimed the spare
+   * width and squeezed the field to its 160px floor — at which point the
+   * placeholder was clipped mid-word. The field takes the spare space now
+   * and the pills size to their content.
+   */
+  flex: 1 1 240px;
+  min-width: 220px;
+  padding: 9px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font: 400 12.5px/1.3 var(--sans);
+  color: var(--text);
+  /* type=search draws a UA field with its own metrics, which reintroduces
+     the clipping the padding above was written to fix. */
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.lib-search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.lib-search::placeholder {
+  color: var(--faint);
+}
+
+.lib-pills {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lib-pills .pill {
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.lib-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lib-thead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  font: 500 10px var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+
+.lib-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.lib-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.lib-row:hover {
+  background: var(--panel-2);
+}
+
+.lib-row.is-selected {
+  background: color-mix(in oklab, var(--blue) 8%, var(--panel));
+}
+
+.lib-col-mod {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * Shrinks before it truncates, and wraps rather than clips.
+ *
+ * A fixed 212px with nowrap+ellipsis looked fine at the width this was built
+ * at and cut real text off at anything narrower - a name like "Chaos" was
+ * clipped mid-word with no ellipsis showing, because overflow:hidden on the
+ * ancestor table clipped it before the ellipsis had room to draw. Letting the
+ * column shrink and wrap means there is never a width where it has nowhere
+ * to put the text.
+ */
+.lib-col-used {
+  flex: 1 1 140px;
+  min-width: 70px;
+  max-width: 220px;
+  font: 400 12.5px/1.4 var(--sans);
+  color: var(--text-2);
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+/* Nothing uses it, which is the one row state worth colouring. */
+.lib-col-used.is-unused {
+  color: var(--orange);
+}
+
+.lib-col-size {
+  flex: none;
+  width: 74px;
+  text-align: right;
+  font: 500 12.5px var(--mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Below this the mod column, used-by and size no longer all fit on one line
+   without squeezing the mod name unreadably thin - stack instead. */
+@container view (max-width: 620px) {
+  .lib-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .lib-col-used {
+    flex: 1 1 auto;
+    max-width: none;
+    order: 3;
+  }
+  .lib-col-size {
+    order: 2;
+    margin-left: auto;
+  }
+}
+
+.lib-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lib-name {
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.lib-row-meta {
+  font: 400 11.5px var(--mono);
+  color: var(--faint);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lib-empty {
+  padding: 20px 18px;
+  font: 400 13px var(--sans);
+  color: var(--dim);
+}
+
+/* --- detail panel --------------------------------------------------------- */
+
+.lib-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.lib-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lib-detail-name {
+  font: 600 18px var(--sans);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.lib-detail-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.lib-detail-ver {
+  font: 400 11.5px var(--mono);
+  color: var(--faint);
+}
+
+.lib-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.lib-fact-label {
+  font: 400 11px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.lib-fact-value {
+  font: 500 13px var(--sans);
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.lib-fact-value.is-good {
+  color: var(--green);
+}
+
+.lib-detail-h {
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.lib-setups {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.lib-setup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.lib-setup:last-child {
+  border-bottom: 0;
+}
+
+.lib-setup-name {
+  flex: 1;
+  min-width: 0;
+  font: 400 13px var(--sans);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+/* Quiet on purpose: this is the reversible one. */
+.lib-take-out {
+  flex: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 500 12px var(--sans);
+  color: var(--dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.lib-take-out:hover {
+  color: var(--text);
+}
+
+.lib-detail-note {
+  font: 400 12px/1.5 var(--sans);
+  color: var(--faint);
+  margin-top: 8px;
+}
+
+.lib-add {
+  flex: none;
+  height: 42px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--blue);
+  color: #fff;
+  font: 600 13.5px var(--sans);
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.lib-grow {
+  flex: 1;
+  min-height: 8px;
+}
+
+/* Deleting moved into the "⋯" menu (see .lib-detail-head), the same one used
+   for a setup and for a mod row inside a setup, so there is one place in the
+   app that means "more actions" rather than a second, standing warning card. */
+
+/* --- empty state (2c) ----------------------------------------------------- */
+
+.lib-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  min-height: 70vh;
+}
+
+.lib-empty-inner {
+  max-width: 620px;
+}
+
+.lib-empty-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.lib-empty-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+/* --- nav in the title strip ----------------------------------------------- */
+
+.topnav button.is-active {
+  background: none;
+  color: var(--text);
+  font-weight: 600;
+  border-radius: 0;
+  border-bottom: 2px solid var(--text);
+  padding-bottom: 5px;
+}
+
+:root[data-theme='dark'] .topnav button.is-active {
+  border-bottom-color: var(--blue);
+}
+
+/*
+ * The live swap summary.
+ *
+ * Deliberately quiet: it is standing information, not an alert. It earns its
+ * permanence by changing as switches move, which is the whole point — the app
+ * could previously only assert that it had not touched anything yet.
+ */
+.swapline {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.swapline-main {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font: 400 13px var(--sans);
+  color: var(--text-2);
+}
+
+.swapline-part b {
+  font: 600 13px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.swapline-part.is-in b {
+  color: var(--green);
+}
+.swapline-part.is-out b {
+  color: var(--orange);
+}
+.swapline-part.is-keep b {
+  color: var(--muted);
+}
+
+.swapline-note {
+  font: 400 11.5px/1.5 var(--sans);
+  color: var(--faint);
+  margin-top: 6px;
+}
+
+.swapline-blocker {
+  font: 500 12px/1.5 var(--sans);
+  color: var(--orange);
+  margin-top: 8px;
+}
+
+/*
+ * Notices.
+ *
+ * The base .notice is the orange "needs a decision" card. An informational one
+ * carries the same shape in the accent instead, because a game update or a
+ * folder full of adoptable mods is worth reading but is not a problem.
+ */
+.notice-info {
+  background: color-mix(in oklab, var(--blue) 7%, var(--panel));
+  border-color: color-mix(in oklab, var(--blue) 32%, var(--line));
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notices:empty {
+  display: none;
+}
+
+/*
+ * Per-file switches inside a mod.
+ *
+ * These styles were written twice and lost twice - to a revert and then to a
+ * rebuild - which is why the feature sat unreachable with its planner, API and
+ * tests all shipping green.
+ */
+.field-help {
+  font: 400 12px/1.55 var(--sans);
+  color: var(--muted);
+  margin: 4px 0 10px;
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.file-row:hover {
+  background: var(--panel-2);
+}
+
+.file-row input[type='checkbox'] {
+  flex: none;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
+.file-path {
+  flex: 1;
+  min-width: 0;
+  font: 400 11.5px var(--mono);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+/* A file switched off keeps its row but stops looking like a live one. */
+.file-row.is-off .file-path {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.file-note {
+  flex: none;
+  font: 400 10.5px var(--mono);
+  color: var(--orange);
+}
+
+/* The one irreversible action in the app. */
+/*
+ * A button whose non-default state is worth seeing at a glance — currently
+ * only the BattlEye toggle, where "already off" is the whole answer.
+ */
+/* --- the first-launch tool checklist -------------------------------------- */
+
+.setup-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+}
+
+.setup-tool {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.setup-tool:hover {
+  background: var(--panel-2);
+}
+
+/* A disabled box still needs to read as "nothing to do here", not broken. */
+.setup-tool:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.setup-tool input {
+  margin: 2px 0 0;
+  accent-color: var(--blue);
+  flex: none;
+}
+
+.setup-tool-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.setup-tool-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font: 600 13px var(--sans);
+  color: var(--text);
+}
+
+.setup-tool-sub {
+  font: 400 12px/1.5 var(--sans);
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.btn.is-on {
+  background: var(--orange-soft);
+  border-color: var(--orange-line);
+  color: var(--orange);
+}
+
+/* A setup name goes in this one, and names can be long. */
+.btn.is-switch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn.is-danger {
+  border-color: var(--red);
+  color: var(--red);
+  background: none;
+}
+
+.btn.is-danger:hover {
+  background: color-mix(in oklab, var(--red) 12%, transparent);
 }

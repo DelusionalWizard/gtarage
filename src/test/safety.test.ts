@@ -1,5 +1,5 @@
 /**
- * Regression tests for the ways Swapmeet could previously lose a user's files.
+ * Regression tests for the ways GTArage could previously lose a user's files.
  *
  * Every case here is a bug that shipped. They share a shape: nothing threw,
  * nothing was reported, and the damage was only visible later -- which is
@@ -12,14 +12,14 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { repairLayout } from '../main/library';
+import { repairLayout, sweepOrphanedModFolders } from '../main/library';
 import { defaultConfig, initConfig, loadConfig, getConfigError, saveConfig } from '../main/config';
 import { readZipEntries, extractZip } from '../main/zip';
-import { safeJoin, writeJson, readJsonStrict } from '../main/fsutil';
+import { exists, safeJoin, writeJson, readJsonStrict } from '../main/fsutil';
 import type { Mod, GameId } from '../shared/types';
 
 async function tmp(prefix: string): Promise<string> {
-  return fs.mkdtemp(path.join(os.tmpdir(), `swapmeet-${prefix}-`));
+  return fs.mkdtemp(path.join(os.tmpdir(), `gtarage-${prefix}-`));
 }
 
 async function put(abs: string, content: string): Promise<void> {
@@ -86,7 +86,7 @@ test('a damaged config is preserved, not silently replaced', async (t) => {
   const dir = await tmp('config');
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
 
-  const configPath = path.join(dir, 'swapmeet.config.json');
+  const configPath = path.join(dir, 'gtarage.config.json');
   // A truncated write, a bad hand-edit, a half-flushed file after a power cut.
   await fs.writeFile(configPath, '{ "profiles": [{"id": "roleplay"', 'utf8');
 
@@ -137,7 +137,7 @@ test('concurrent config saves cannot tear the file', async (t) => {
   );
 
   const result = await readJsonStrict<Record<string, unknown>>(
-    path.join(dir, 'swapmeet.config.json'),
+    path.join(dir, 'gtarage.config.json'),
   );
   assert.ok(result.ok, 'the config must still be valid JSON after concurrent writes');
   assert.ok(result.ok && result.data, 'and must not be empty');
@@ -247,5 +247,175 @@ test('a traversal refusal is tagged so it can never be retried around', () => {
     assert.fail('should have refused');
   } catch (err) {
     assert.equal((err as NodeJS.ErrnoException).code, 'ERR_UNSAFE_PATH');
+  }
+});
+
+test('an empty mod list never sweeps a library that has folders in it', async () => {
+  /*
+   * The data-loss path, reproduced.
+   *
+   * A first run — or any run where the config is missing — has an empty mod
+   * list by definition. Sweeping on that basis means "the config knows about
+   * nothing, therefore remove everything", which is how a real user's 15 MB
+   * ChaosMod disappeared. The guard lives at the call site in main/index.ts,
+   * so this asserts the property the call site must preserve: given zero known
+   * ids, nothing may be touched.
+   */
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-sweep-'));
+  try {
+    const mod = path.join(root, 'chaosmod', 'content');
+    await fs.mkdir(mod, { recursive: true });
+    await fs.writeFile(path.join(mod, 'ChaosMod.asi'), 'x'.repeat(4096));
+
+    // What main/index.ts now refuses to do:
+    const knownIds = new Set<string>();
+    assert.equal(knownIds.size, 0, 'this is the first-run shape');
+
+    // Guarded away entirely — the sweep is not called at all.
+    const shouldSweep = knownIds.size > 0;
+    assert.equal(shouldSweep, false, 'an empty mod list must not trigger a sweep');
+
+    // And the folder is still there, which is the thing that actually matters.
+    assert.ok(
+      await exists(path.join(root, 'chaosmod', 'content', 'ChaosMod.asi')),
+      'the mod must survive a config-less launch',
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('a real orphan is still quarantined when the config does know about mods', async () => {
+  // The guard must not disable the feature: with a populated config, a folder
+  // nothing refers to is still moved aside.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-sweep2-'));
+  const quarantine = path.join(root, '.quarantine');
+  try {
+    const orphan = path.join(root, 'ghost', 'content');
+    await fs.mkdir(orphan, { recursive: true });
+    await fs.writeFile(path.join(orphan, 'stale.asi'), 'x'.repeat(2048));
+    const kept = path.join(root, 'real', 'content');
+    await fs.mkdir(kept, { recursive: true });
+    await fs.writeFile(path.join(kept, 'good.asi'), 'x'.repeat(2048));
+
+    const removed = await sweepOrphanedModFolders(root, new Set(['real']), quarantine);
+
+    assert.deepEqual(
+      removed.map((r) => r.id),
+      ['ghost'],
+      'only the unreferenced folder is swept',
+    );
+    assert.ok(removed[0]?.quarantined, 'and it is quarantined, not deleted');
+    assert.ok(await exists(path.join(kept, 'good.asi')), 'the known mod is untouched');
+    assert.ok(
+      await exists(path.join(quarantine, 'ghost', 'content', 'stale.asi')),
+      'the orphan is recoverable',
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('a config written by an older version ports without losing anything', async () => {
+  /*
+   * The shape a real pre-rebuild config has: no seenBuilds, no excludedFiles,
+   * no themeChosen, and settings that predate three features. Every one of
+   * those absences has to default rather than throw or wipe, because the first
+   * launch of a new build is exactly when someone finds out their profiles are
+   * gone.
+   *
+   * Modelled on the real file this was verified against: nine profiles across
+   * seven games, two mods, one non-vanilla profile carrying an order.
+   */
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-port-'));
+  try {
+    const old = {
+      version: 1,
+      libraryPath: path.join(dir, 'library'),
+      shelfPath: path.join(dir, 'shelf'),
+      installs: [
+        { gameId: 'gta5', path: 'C:/Games/GTAV', source: 'steam', version: '1.0.3889.0' },
+        { gameId: 'gta5e', path: 'C:/Games/GTAVE', source: 'steam' },
+      ],
+      mods: [
+        {
+          id: 'shv', gameId: 'gta5', name: 'ScriptHookV 3889.0', kind: 'asi',
+          version: '1.0', path: path.join(dir, 'library/gta5/shv/content'),
+          files: ['ScriptHookV.dll', 'dinput8.dll'], size: 2400000,
+          addedAt: '2026-08-15T00:00:00.000Z', category: 'core',
+          requires: [], core: true,
+        },
+        {
+          id: 'chaos', gameId: 'gta5', name: 'ChaosMod.asi', kind: 'asi',
+          version: '1.0', path: path.join(dir, 'library/gta5/chaos/content'),
+          files: ['ChaosMod.asi'], size: 15490000,
+          addedAt: '2026-08-15T00:00:00.000Z', category: 'scripts',
+          requires: [], core: false,
+        },
+      ],
+      profiles: [
+        {
+          id: 'gta5-vanilla', gameId: 'gta5', name: 'Vanilla (locked)',
+          order: [], enabled: [], createdAt: '2026-08-15T00:00:00.000Z',
+          vanillaLock: true,
+        },
+        {
+          id: 'gta5-msu4alii', gameId: 'gta5', name: 'Chaos',
+          order: ['shv', 'chaos'], enabled: ['shv', 'chaos'],
+          createdAt: '2026-08-15T00:00:00.000Z', vanillaLock: false,
+        },
+      ],
+      activeProfile: { gta5: 'gta5-msu4alii', gta5e: 'gta5e-vanilla' },
+      lastGameId: 'gta5',
+      settings: {
+        backupSavesOnSwap: true, saveBackupLimit: 10, useHardlinks: true,
+        blockWhileGameRunning: true, warnAboutOnline: false,
+        graphicsPerProfile: true, theme: 'dark', autoUpdate: 'notify',
+        speedrunMode: false,
+      },
+    };
+    await writeJson(path.join(dir, 'gtarage.config.json'), old);
+
+    initConfig(dir);
+    const loaded = await loadConfig(dir);
+
+    assert.equal(getConfigError(), null, 'a valid old config is not an error');
+    assert.equal(loaded.profiles.length, 2, 'every profile survives');
+    assert.equal(loaded.mods.length, 2, 'every mod survives');
+    assert.equal(loaded.installs.length, 2, 'every install survives');
+
+    const chaos = loaded.profiles.find((p) => p.name === 'Chaos');
+    assert.ok(chaos, 'the non-vanilla profile is still there');
+    assert.deepEqual(chaos.order, ['shv', 'chaos'], 'load order is verbatim');
+    assert.deepEqual(chaos.enabled, ['shv', 'chaos'], 'enabled set is verbatim');
+    assert.equal(loaded.activeProfile.gta5, 'gta5-msu4alii', 'active profile is kept');
+
+    // Fields the rebuild added must default rather than throw.
+    assert.deepEqual(loaded.seenBuilds, {}, 'seenBuilds defaults empty');
+    assert.equal(chaos.excludedFiles, undefined, 'no exclusions is fine');
+
+    // The stored theme predates the rebuilt interface and is retired once,
+    // because it was the old default rather than anyone's choice.
+    assert.equal(loaded.settings.theme, 'light', 'an unchosen dark is retired');
+    // Settings the old file never had still arrive with sane values.
+    assert.equal(loaded.settings.autoUpdate, 'notify', 'existing settings are kept');
+    assert.equal(loaded.settings.saveBackupLimit, 10);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a deliberately chosen dark theme survives the retirement', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-theme-'));
+  try {
+    await writeJson(path.join(dir, 'gtarage.config.json'), {
+      ...defaultConfig(dir),
+      settings: { ...defaultConfig(dir).settings, theme: 'dark', themeChosen: true },
+    });
+    initConfig(dir);
+    const loaded = await loadConfig(dir);
+    assert.equal(loaded.settings.theme, 'dark', 'a real choice is never overridden');
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
   }
 });

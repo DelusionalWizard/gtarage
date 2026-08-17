@@ -3,12 +3,12 @@
  *
  * GTA V speedrunning has its own toolchain that has nothing to do with mods:
  * a downgrade launcher, a timer, a frame limiter, a capture program, and a
- * pile of community routing documents. None of it is something Swapmeet
+ * pile of community routing documents. None of it is something GTArage
  * should reimplement — LiveSplit is LiveSplit — but all of it is scattered
  * across a dozen bookmarks and install folders, and a mod manager already
  * knows where the game is.
  *
- * So this is a launcher and a directory, not a wrapper. Swapmeet finds the
+ * So this is a launcher and a directory, not a wrapper. GTArage finds the
  * tools you already have, starts them, and links the resources it cannot
  * install. It downloads nothing here: several of these are installers, and an
  * app that silently fetches and runs executables is exactly what people are
@@ -41,7 +41,7 @@ export interface SpeedrunTool {
  * It is an MIT-licensed open-source launcher (github.com/TwosHusbandS/Project-127)
  * that gets a legitimately owned GTA V to a working 1.27 state, which is the
  * version the Classic category is run on. It ships no game files and requires
- * an up-to-date install to start from. Swapmeet only detects and launches it;
+ * an up-to-date install to start from. GTArage only detects and launches it;
  * it never downgrades anything itself.
  */
 export const SPEEDRUN_TOOLS: SpeedrunTool[] = [
@@ -177,7 +177,7 @@ export const SPEEDRUN_RESOURCES: ResourceGroup[] = [
       {
         name: 'Switching between copies of the game',
         url: 'https://www.youtube.com/watch?v=uGeDOYrW7n0',
-        note: 'Swapmeet profiles cover much of this for mods; this covers whole game versions.',
+        note: 'GTArage profiles cover much of this for mods; this covers whole game versions.',
       },
       {
         name: 'Changing FPS during a run',

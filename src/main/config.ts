@@ -14,6 +14,15 @@ import type { AppConfig, GameId, Mod, Profile } from '../shared/types';
 import { exists, readJsonStrict, writeJson } from './fsutil';
 
 
+/**
+ * The settings filename.
+ *
+ * Renaming the app changes userData, so this and the migration list below are
+ * the two things a rename has to touch. Previous names live in LEGACY_APPS in
+ * main/index.ts.
+ */
+const CONFIG_FILE = 'gtarage.config.json';
+
 let configPath = '';
 let cache: AppConfig | null = null;
 
@@ -44,7 +53,9 @@ export function defaultConfig(userDataDir: string): AppConfig {
       blockWhileGameRunning: true,
       warnAboutOnline: false,
       graphicsPerProfile: true,
-      theme: 'dark',
+      // The interface is design 2a/2b, which is a light, warm-paper direction.
+      // Dark is the alternate rather than the default it used to be.
+      theme: 'light',
       autoUpdate: 'notify',
       speedrunMode: false,
     },
@@ -110,6 +121,7 @@ async function isEmptyDir(p: string): Promise<boolean> {
 export async function migrateLegacyUserData(
   newDir: string,
   legacyDir: string,
+  legacyConfigName: string,
 ): Promise<string | null> {
   try {
     if (!(await exists(legacyDir))) return null;
@@ -117,7 +129,7 @@ export async function migrateLegacyUserData(
 
     // Only the folders that hold real user data. Everything else in there is
     // Chromium's own cache, which is worthless and regenerates itself.
-    const wanted = ['library', 'shelf', 'rigging.config.json'];
+    const wanted = ['library', 'shelf', legacyConfigName];
     let movedAnything = false;
 
     for (const entry of wanted) {
@@ -126,7 +138,7 @@ export async function migrateLegacyUserData(
 
       const to = path.join(
         newDir,
-        entry === 'rigging.config.json' ? 'swapmeet.config.json' : entry,
+        entry === legacyConfigName ? CONFIG_FILE : entry,
       );
 
       // A destination that exists but is empty is what a half-finished
@@ -155,7 +167,7 @@ export async function migrateLegacyUserData(
     // and the caller repoints them.
     return movedAnything || (await exists(legacyDir)) ? legacyDir : null;
   } catch (err) {
-    console.error('[swapmeet] could not migrate previous data:', err);
+    console.error('[gtarage] could not migrate previous data:', err);
     return null;
   }
 }
@@ -195,7 +207,7 @@ export function repointPaths(
 
 /** Point the store at a directory. Called once, at app startup. */
 export function initConfig(userDataDir: string): void {
-  configPath = path.join(userDataDir, 'swapmeet.config.json');
+  configPath = path.join(userDataDir, CONFIG_FILE);
   cache = null;
   loadError = null;
 }
@@ -210,10 +222,24 @@ export function getConfigPath(): string {
  */
 function hydrate(loaded: Partial<AppConfig>, userDataDir: string): AppConfig {
   const base = defaultConfig(userDataDir);
+
+  /*
+   * Retire the old theme default once.
+   *
+   * Every config written before the interface was rebuilt carries
+   * `theme: 'dark'`, because that was the default — not because anyone chose
+   * it. The interface it belonged to no longer exists, so honouring the
+   * stored value would show almost every existing user a dark version of a
+   * design that is light by construction. `themeChosen` records a real
+   * decision, so anyone who actually picks dark keeps it from here on.
+   */
+  const settings = { ...base.settings, ...(loaded.settings ?? {}) };
+  if (!settings.themeChosen) settings.theme = base.settings.theme;
+
   return {
     ...base,
     ...loaded,
-    settings: { ...base.settings, ...(loaded.settings ?? {}) },
+    settings,
     activeProfile: { ...(loaded.activeProfile ?? {}) },
     seenBuilds: { ...(loaded.seenBuilds ?? {}) },
     installs: loaded.installs ?? [],
@@ -240,7 +266,7 @@ export async function loadConfig(userDataDir: string): Promise<AppConfig> {
       // If even the copy fails, still refuse to run destructively.
     }
     loadError = {
-      message: `Your settings file could not be read (${result.error.message}). Swapmeet has started with default settings and kept a copy of the damaged file.`,
+      message: `Your settings file could not be read (${result.error.message}). GTArage has started with default settings and kept a copy of the damaged file.`,
       backupPath,
     };
     cache = defaultConfig(userDataDir);

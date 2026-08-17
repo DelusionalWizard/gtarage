@@ -52,7 +52,7 @@ function makeChunks(count: number, size: number): Buffer[] {
 }
 
 test('streaming to disk preserves byte order exactly', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dl-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dl-'));
   const dest = path.join(dir, 'out.bin');
 
   // 64 x 16 KB = 1 MB, spanning the 128 KB boundary where the bug first bit.
@@ -73,7 +73,7 @@ test('streaming to disk preserves byte order exactly', async () => {
 });
 
 test('a real HTTP body round-trips unchanged', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dl-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dl-'));
   const dest = path.join(dir, 'out.bin');
 
   // Pseudo-random, incompressible payload: shuffled chunks cannot coincidentally match.

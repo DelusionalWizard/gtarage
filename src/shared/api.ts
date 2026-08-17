@@ -8,12 +8,6 @@
  * files -- from becoming a remote-code-execution hazard.
  */
 
-import type {
-  BrowseQuery,
-  BrowseResult,
-  CatalogFile,
-  CatalogMod,
-} from './catalog';
 import type { HookVerdict } from './buildwatch';
 import type { ModSite } from './sites';
 import type {
@@ -28,25 +22,11 @@ import type {
 } from './types';
 
 /** One channel carries every call, dispatched by method name. */
-export const CALL_CHANNEL = 'swapmeet:call';
+export const CALL_CHANNEL = 'gtarage:call';
 /** Main -> renderer progress during a long deploy. */
-export const PROGRESS_CHANNEL = 'swapmeet:progress';
+export const PROGRESS_CHANNEL = 'gtarage:progress';
 /** Main -> renderer notifications from the embedded mod-site browser. */
-export const SITE_CHANNEL = 'swapmeet:site';
-
-/** Nexus account state, so the UI can say what the key can actually do. */
-export interface NexusAccount {
-  name: string;
-  premium: boolean;
-  supporter: boolean;
-}
-
-/** A library mod together with the prerequisites it is still missing. */
-export interface MissingDeps {
-  modId: string;
-  modName: string;
-  deps: ModDependency[];
-}
+export const SITE_CHANNEL = 'gtarage:site';
 
 /** Pushed to the renderer when the embedded browser captures a download. */
 export interface SiteEvent {
@@ -55,6 +35,76 @@ export interface SiteEvent {
   message: string;
   received?: number;
   total?: number;
+}
+
+/**
+ * One Essentials entry, flattened into what the Tools screen draws.
+ *
+ * The renderer gets a decided state rather than raw catalogue data: whether
+ * something is installed, and whether it is behind, are both judgements that
+ * need the library and a version comparison, and doing them in the renderer
+ * would mean shipping that logic across the bridge for no reason.
+ *
+ * Downloading and failed are deliberately absent. They are transient facts
+ * about this session, not about the entry, so the renderer owns them.
+ */
+export interface EssentialView {
+  id: string;
+  name: string;
+  /** The catalogue's grouping. 'core' means other mods need it to load. */
+  category: string;
+  /** The catalogue's version string, as published. */
+  version: string;
+  summary: string;
+  /** The project's own page. */
+  url: string;
+  /** Bytes of the file that would be fetched; 0 when unknown. */
+  sizeBytes: number;
+  /** Set when the author publishes no downloadable release. */
+  manualOnly?: boolean;
+  manualReason?: string;
+  /**
+   * Set when this entry could not be checked just now. A property of the
+   * attempt, never of the mod — the row offers a retry rather than claiming
+   * the tool has to be fetched by hand.
+   */
+  unavailable?: boolean;
+  /** The version in the library, when a mod there matches this entry. */
+  installedVersion?: string;
+  /** When the installed copy was added, ISO. */
+  installedAt?: string;
+  /** Installed, and the catalogue has something newer. */
+  outdated?: boolean;
+}
+
+/**
+ * Whether GTA V Enhanced is set to start without BattlEye.
+ *
+ * `known` is false when there is no Steam account file to read, which is the
+ * normal case for a copy bought elsewhere — the UI must then say it cannot
+ * tell rather than showing the flag as off.
+ */
+export interface BattlEyeView {
+  enabled: boolean;
+  known: boolean;
+  steamRunning: boolean;
+}
+
+export interface EssentialsView {
+  entries: EssentialView[];
+  /**
+   * Set when the catalogue could not be reached. The Tools screen stays
+   * useful without it -- dropping a file and the community sites do not
+   * depend on GitHub -- so this is a panel-level state, never a page error.
+   */
+  error?: string;
+}
+
+/** A library mod together with the prerequisites it is still missing. */
+export interface MissingDeps {
+  modId: string;
+  modName: string;
+  deps: ModDependency[];
 }
 
 export interface GameView {
@@ -159,10 +209,6 @@ export interface AppState {
    */
   dlc: DlcReport | null;
 
-  /** Nexus account, when a working API key is configured. */
-  nexus: NexusAccount | null;
-  /** Whether a Nexus key is stored at all (it is never sent to the UI). */
-  hasNexusKey: boolean;
   /**
    * Set when the settings file on disk could not be read and the app fell back
    * to defaults. The damaged file is preserved rather than overwritten, and the
@@ -294,9 +340,9 @@ export interface ProgressEvent {
 
 /**
  * Every operation the UI can perform. Implemented in the main process,
- * mirrored onto `window.swapmeet` by the preload script.
+ * mirrored onto `window.gtarage` by the preload script.
  */
-export interface SwapmeetApi {
+export interface GTArageApi {
   getState(): Promise<AppState>;
 
   /**
@@ -342,6 +388,20 @@ export interface SwapmeetApi {
   importPaths(gameId: GameId, paths: string[]): Promise<{ state: AppState; report: ImportReport }>;
   /** Delete a mod from the library. Undeploys it first if it is live. */
   removeMod(modId: string): Promise<AppState>;
+
+  /**
+   * Put a mod into a setup, or take it out again.
+   *
+   * Distinct from removeMod, and the distinction is the point: taking a mod
+   * out of a setup leaves it in the library for every other setup to use,
+   * while removeMod deletes it from disk. Conflating them is how someone
+   * loses a 6 GB download they meant to keep.
+   */
+  setModInProfile(args: {
+    profileId: string;
+    modId: string;
+    present: boolean;
+  }): Promise<AppState>;
   /** Update editable mod fields (name, category, requires, core). */
   updateMod(modId: string, patch: Partial<Pick<Mod, 'name' | 'category' | 'requires' | 'core' | 'notes'>>): Promise<AppState>;
 
@@ -349,8 +409,6 @@ export interface SwapmeetApi {
   toggleMod(profileId: string, modId: string, enabled: boolean): Promise<AppState>;
   /** Move a mod to a new index in the load order. */
   moveMod(profileId: string, modId: string, toIndex: number): Promise<AppState>;
-  /** Push core mods to the top of the load order. */
-  tidyOrder(profileId: string): Promise<AppState>;
 
   createProfile(gameId: GameId, name: string, copyFromId?: string): Promise<AppState>;
   renameProfile(profileId: string, name: string): Promise<AppState>;
@@ -367,12 +425,35 @@ export interface SwapmeetApi {
   /** Check the game folder against the manifest. */
   verify(gameId: GameId): Promise<VerifyView>;
 
-  /** Mod files already sitting in the game folder that Swapmeet did not install. */
+  /**
+   * Delete everything GTArage has put on this PC and quit.
+   *
+   * Undeploys every game first, so mod files are taken back out of the game
+   * folders and anything they displaced is restored, and only then removes the
+   * library, the shelf and the settings file. Irreversible by design - the
+   * shelf is what makes everything else undoable, and this removes the shelf.
+   */
+  purgeEverything(): Promise<{ removed: string[]; problems: string[] }>;
+
+  /** Is the game running right now? Used to avoid starting a second copy. */
+  gameRunning(gameId: GameId): Promise<boolean>;
+
+  /**
+   * Re-check the game folder against what we think is installed.
+   *
+   * Files the user deleted by hand are dropped from the manifest, so the app
+   * stops claiming they are installed. Where such a file had displaced one of
+   * the game's own, the original is put back — deleting the mod file by hand
+   * should not strand the file it was covering.
+   */
+  rescan(gameId: GameId): Promise<{ dropped: number; restored: number; orphans: number }>;
+
+  /** Mod files already sitting in the game folder that GTArage did not install. */
   scanAdoptable(gameId: GameId): Promise<AdoptGroupView[]>;
-  /** Copy such files into the library so Swapmeet can manage them. */
+  /** Copy such files into the library so GTArage can manage them. */
   adopt(gameId: GameId, groupId: string): Promise<{ state: AppState; message: string }>;
 
-  /** Ask GitHub whether a newer Swapmeet exists. */
+  /** Ask GitHub whether a newer GTArage exists. */
   checkForUpdate(): Promise<UpdateView>;
   /**
    * Download the update, verify it against its published checksum, then run
@@ -382,7 +463,7 @@ export interface SwapmeetApi {
 
   /** Speedrunning tools relevant to this game, and whether each is installed. */
   speedrunTools(gameId: GameId): Promise<SpeedrunToolView[]>;
-  /** Point Swapmeet at a portable tool it could not find, and remember it. */
+  /** Point GTArage at a portable tool it could not find, and remember it. */
   locateSpeedrunTool(toolId: string, gameId: GameId): Promise<SpeedrunToolView[]>;
   /** Start an installed speedrunning tool. */
   launchSpeedrunTool(toolId: string, gameId: GameId): Promise<void>;
@@ -394,8 +475,6 @@ export interface SwapmeetApi {
    */
   speedrunResources(): Promise<SpeedrunResourceGroup[]>;
 
-  /** Is ScriptHookV missing, and is there a copy already on this machine? */
-  hookStatus(): Promise<HookStatus>;
   /**
    * Install a found ScriptHookV copy into the given games. Used by the
    * first-run prompt and by the watcher when a download appears.
@@ -426,23 +505,34 @@ export interface SwapmeetApi {
 
   updateSettings(patch: Partial<AppConfig['settings']>): Promise<AppState>;
 
-  // --- mod browser ---------------------------------------------------------
+  // --- tools ----------------------------------------------------------------
 
-  /** List mods from a provider. */
-  browse(query: BrowseQuery): Promise<BrowseResult>;
-  /** Fetch a mod's downloadable files (Nexus needs a second call). */
-  catalogFiles(mod: CatalogMod, gameId: GameId): Promise<CatalogFile[]>;
   /**
-   * Download a catalog file and import it into the library. Executables are
-   * staged but never imported, and say so in the result.
+   * The Essentials for a game, with install state resolved.
+   * `refresh` bypasses the cached release metadata.
    */
-  installCatalogFile(
-    mod: CatalogMod,
-    file: CatalogFile,
+  listEssentials(gameId: GameId, refresh?: boolean): Promise<EssentialsView>;
+  /** Download an Essentials entry and import it. */
+  installEssential(
+    id: string,
     gameId: GameId,
   ): Promise<{ state: AppState; imported: boolean; message: string }>;
-  /** Discard cached provider metadata and re-query. */
-  refreshCatalog(): Promise<void>;
+  /** Record that the first-launch prompt has been answered. */
+  dismissSetupPrompt(): Promise<AppState>;
+  /** Whether Enhanced is set to launch without BattlEye. */
+  battlEyeState(): Promise<BattlEyeView>;
+  /**
+   * Add or remove `-nobattleye` from Enhanced's Steam launch options.
+   * Rejects while Steam is running, because Steam would undo it.
+   */
+  setBattlEye(disabled: boolean): Promise<{ state: AppState; message: string }>;
+  /** Mod sites available for a game. */
+  listSites(gameId: GameId): Promise<ModSite[]>;
+  /** Open the embedded browser at a site. Downloads there are captured. */
+  openSite(siteId: string, gameId: GameId): Promise<void>;
+
+  // --- prerequisites --------------------------------------------------------
+
   /**
    * Install the Essentials entry that provides a detected dependency.
    * Returns a message when the tool has to be fetched by hand instead.
@@ -454,17 +544,9 @@ export interface SwapmeetApi {
   /** Re-run dependency detection over the whole library for a game. */
   rescanDependencies(gameId: GameId): Promise<AppState>;
 
-  /** Mod sites available for a game. */
-  listSites(gameId: GameId): Promise<ModSite[]>;
-  /** Open the embedded browser at a site. Downloads there are captured. */
-  openSite(siteId: string, gameId: GameId): Promise<void>;
   /** Open a URL in the user's real browser. http/https only. */
   openExternal(url: string): Promise<void>;
 
-  /** Store and validate a Nexus personal API key. */
-  setNexusKey(apiKey: string): Promise<{ state: AppState; account: NexusAccount | null; error?: string }>;
-  /** Forget the stored Nexus key. */
-  clearNexusKey(): Promise<AppState>;
 
   /** Window chrome, since the app draws its own title bar. */
   windowMinimize(): Promise<void>;
@@ -472,4 +554,4 @@ export interface SwapmeetApi {
   windowClose(): Promise<void>;
 }
 
-export type ApiMethod = keyof SwapmeetApi;
+export type ApiMethod = keyof GTArageApi;

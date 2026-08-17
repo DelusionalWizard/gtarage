@@ -23,13 +23,6 @@ import type { AppConfig, GameId, Mod } from '../shared/types';
 import { shelfFor } from './config';
 import { downloadFile, safeFileName } from './net';
 import { browseEssentials, clearEssentialsCache } from './providers/github';
-import {
-  NexusAuthError,
-  browseNexus,
-  decryptKey,
-  nexusDownloadLink,
-  nexusFiles,
-} from './providers/nexus';
 
 /** Where a game's in-flight downloads are staged. */
 export function stagingDir(config: AppConfig, gameId: GameId): string {
@@ -39,7 +32,7 @@ export function stagingDir(config: AppConfig, gameId: GameId): string {
 /**
  * Mark catalog entries that are already in the library.
  *
- * Matching is by normalised name: providers have no notion of Swapmeet's mod
+ * Matching is by normalised name: providers have no notion of GTArage's mod
  * ids, and names are what a user recognises. Imperfect, but it only drives a
  * badge and an "update available" hint, never a destructive action.
  */
@@ -62,41 +55,26 @@ export async function browse(
   library: Mod[],
 ): Promise<BrowseResult> {
   try {
-    if (query.providerId === 'essentials') {
-      const mods = await browseEssentials(query.gameId, query.search);
-      return { mods: markInstalled(mods, library) };
-    }
-
-    const apiKey = decryptKey(config.nexusApiKey);
-    if (!apiKey) {
-      return {
-        mods: [],
-        needsSetup: true,
-        error:
-          'Nexus needs a personal API key. Add one in Settings, or use the built-in browser to visit Nexus and log in normally.',
-      };
-    }
-
-    const mods = await browseNexus(query.gameId, query.sort, query.search, apiKey);
+    const mods = await browseEssentials(query.gameId, query.search);
     return { mods: markInstalled(mods, library) };
   } catch (err) {
-    if (err instanceof NexusAuthError) {
-      return { mods: [], needsSetup: true, error: err.message };
-    }
     return { mods: [], error: (err as Error).message };
   }
 }
 
-/** Files for a mod, fetched lazily because Nexus needs a second call. */
+/**
+ * The files an Essentials entry offers.
+ *
+ * Kept as a call rather than a property read because it used to resolve a
+ * second request per mod; Essentials carries its files with it, so this is now
+ * a straight return that the callers do not need to know changed.
+ */
 export async function catalogFiles(
-  config: AppConfig,
+  _config: AppConfig,
   mod: CatalogMod,
-  gameId: GameId,
+  _gameId: GameId,
 ): Promise<CatalogFile[]> {
-  if (mod.providerId === 'essentials') return mod.files;
-  const apiKey = decryptKey(config.nexusApiKey);
-  if (!apiKey) throw new NexusAuthError('No Nexus API key set.');
-  return nexusFiles(gameId, mod.id, apiKey);
+  return mod.files;
 }
 
 export interface FetchResult {
@@ -110,9 +88,8 @@ export interface FetchResult {
 /**
  * Download one catalog file into staging.
  *
- * Essentials files carry a direct URL from the GitHub release. Nexus files
- * need a link resolved first, which only succeeds for Premium accounts; the
- * caller turns the resulting error into "open the mod page instead".
+ * Essentials files carry a direct URL from the GitHub release. Anything
+ * without one is a link-out the catalog deliberately refuses to guess at.
  */
 export async function fetchCatalogFile(
   config: AppConfig,
@@ -124,12 +101,7 @@ export async function fetchCatalogFile(
   let url = file.url;
 
   if (!url) {
-    if (mod.providerId !== 'nexus') {
-      throw new Error(`${file.name} has no download URL.`);
-    }
-    const apiKey = decryptKey(config.nexusApiKey);
-    if (!apiKey) throw new NexusAuthError('No Nexus API key set.');
-    url = await nexusDownloadLink(gameId, mod.id, file.id, apiKey);
+    throw new Error(`${file.name} has no download URL.`);
   }
 
   const dir = stagingDir(config, gameId);

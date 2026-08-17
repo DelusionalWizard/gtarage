@@ -2,7 +2,7 @@
  * Save-game snapshots.
  *
  * Swapping mods should never be the reason a save is lost. Before every
- * profile swap Swapmeet copies the game's save folder into the shelf, keeps a
+ * profile swap GTArage copies the game's save folder into the shelf, keeps a
  * bounded number of snapshots and prunes the oldest. Saves are small next to
  * a modded install, so this is cheap insurance.
  */
@@ -19,7 +19,7 @@ import { shelfFor } from './config';
 export interface SaveSnapshot {
   id: string;
   gameId: GameId;
-  /** When Swapmeet took the snapshot. */
+  /** When GTArage took the snapshot. */
   createdAt: string;
   label: string;
   path: string;
@@ -39,7 +39,7 @@ export interface SaveSnapshot {
 
 /**
  * The newest modification time among a snapshot's files, and how many there
- * are. That timestamp is the game's own, since Swapmeet copies files without
+ * are. That timestamp is the game's own, since GTArage copies files without
  * rewriting their contents.
  */
 async function newestSaveTime(

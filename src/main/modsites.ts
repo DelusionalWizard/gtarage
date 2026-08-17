@@ -2,17 +2,17 @@
  * The in-app mod-site browser.
  *
  * This is a genuine browser window pointed at a real mod site. The user logs
- * in themselves, on the site's own login form, and browses normally. Swapmeet
+ * in themselves, on the site's own login form, and browses normally. GTArage
  * does not read the page, does not automate clicks and never sees a password.
  *
  * Its single point of involvement is `will-download`: when the site starts
- * sending a file, Swapmeet redirects it into a staging folder and hands it to
+ * sending a file, GTArage redirects it into a staging folder and hands it to
  * the library importer, instead of letting it land in Downloads for the user
  * to find and drag over by hand.
  *
  * Two deliberate constraints on that window:
  *
- *  - **No preload, no bridge.** It gets none of Swapmeet's API surface. It is
+ *  - **No preload, no bridge.** It gets none of GTArage's API surface. It is
  *    a sandboxed browser tab that happens to live in our process tree, and an
  *    XSS on a mod site must not reach the filesystem.
  *  - **Popups are restricted to the same site.** Mod sites are heavily
@@ -196,7 +196,7 @@ export function openModSite(siteId: string, gameId: GameId): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // Deliberately no preload: this window gets none of Swapmeet's API.
+      // Deliberately no preload: this window gets none of GTArage's API.
       webviewTag: false,
     },
   });

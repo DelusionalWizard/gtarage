@@ -81,7 +81,7 @@ function makeZip(files: Array<{ name: string; data: string }>, stored = false): 
 }
 
 async function tmpDir(): Promise<string> {
-  return fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-zip-'));
+  return fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-zip-'));
 }
 
 test('reads the central directory of a deflated archive', () => {

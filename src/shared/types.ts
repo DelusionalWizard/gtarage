@@ -4,7 +4,7 @@
  * only, no class instances, no functions.
  */
 
-/** Every title Swapmeet knows how to manage. */
+/** Every title GTArage knows how to manage. */
 export type GameId =
   // 3D era, original releases
   | 'gta3'
@@ -103,7 +103,7 @@ export interface GameDef {
   /** Kinds this game can actually take. */
   supportedKinds: ModKind[];
   /**
-   * Paths Swapmeet will never write into or clean up, relative to the game
+   * Paths GTArage will never write into or clean up, relative to the game
    * root. Protects the base install from a bad mod archive.
    */
   protectedPaths: string[];
@@ -134,6 +134,15 @@ export interface GameInstall {
   source: 'steam' | 'epic' | 'rockstar' | 'registry' | 'scan' | 'manual';
   /** Executable version string when we can read one. */
   version?: string;
+  /**
+   * The storefront's own id for this copy, when it has one.
+   *
+   * Epic is the case that needs it: its games cannot be started by running
+   * the executable, and the launcher URL wants the manifest's `AppName`
+   * rather than anything derivable from the folder. Captured at detection
+   * time because the manifest is the only place it exists.
+   */
+  launchId?: string;
 }
 
 /**
@@ -147,7 +156,7 @@ export interface ModDependency {
   label: string;
   /** The evidence that produced this, shown so the user can judge it. */
   reason: string;
-  /** Essentials catalog id that provides it, when Swapmeet can install it. */
+  /** Essentials catalog id that provides it, when GTArage can install it. */
   essentialId?: string;
   /** True when the mod works without it, just with less. */
   optional?: boolean;
@@ -243,6 +252,20 @@ export interface DeployManifest {
   gamePath: string;
   deployedAt: string;
   files: DeployedFile[];
+  /**
+   * Game-relative directories this deploy had to create, deepest last.
+   *
+   * A mod's companion folder - ChaosMod's `chaosmod/`, Menyoo's
+   * `menyooStuff/` - does not exist until we make it, and the game or the mod
+   * then writes into it at runtime. Without this record, undeploy could only
+   * delete the files it placed and prune directories that happened to end up
+   * empty, so any runtime file left the whole folder stranded in the game
+   * folder. Knowing which directories are ours means they can be moved to the
+   * shelf whole, leftovers included.
+   *
+   * Optional because manifests written before this existed do not have it.
+   */
+  createdDirs?: string[];
 }
 
 /** Two or more mods claiming the same game-relative path. */
@@ -310,11 +333,6 @@ export interface AppConfig {
   seenBuilds?: SeenBuilds;
   /** Last game the user had selected. */
   lastGameId?: GameId;
-  /**
-   * Nexus Mods personal API key, encrypted with the OS keychain where one is
-   * available. Never store or log the decrypted value.
-   */
-  nexusApiKey?: string;
   settings: {
     /** Snapshot saves before every swap. */
     backupSavesOnSwap: boolean;
@@ -334,7 +352,23 @@ export interface AppConfig {
     /** Interface theme. */
     theme: 'dark' | 'light';
     /**
-     * What to do when a newer Swapmeet is published.
+     * Set once the user picks a theme themselves.
+     *
+     * Distinguishes a real choice from the old default, so rebuilding the
+     * interface can retire the stale value without overriding anyone who
+     * genuinely wants dark. See hydrate() in main/config.ts.
+     */
+    themeChosen?: boolean;
+    /**
+     * Set once the first-launch setup prompt has been answered either way.
+     *
+     * Separate from themeChosen because it is answered once per install, not
+     * once per preference — reappearing after someone declined it would be a
+     * nag, and it offers to download things.
+     */
+    setupPromptSeen?: boolean;
+    /**
+     * What to do when a newer GTArage is published.
      *
      * `notify` is the default rather than `auto`: this app writes to game
      * folders, and replacing itself without asking — potentially mid-session,

@@ -6,7 +6,7 @@
  * the rules:
  *
  *  - a host allowlist, so a compromised or merely wrong provider response
- *    cannot make Swapmeet fetch from somewhere unexpected;
+ *    cannot make GTArage fetch from somewhere unexpected;
  *  - a redirect chain that is re-checked at every hop, because the allowlist
  *    is worthless if the first response can bounce us anywhere;
  *  - hard timeouts and a size cap, so a hostile server cannot hang the app or
@@ -21,9 +21,9 @@ import { pipeline } from 'node:stream/promises';
 
 import { ensureDir } from './fsutil';
 
-export const USER_AGENT = 'Swapmeet/0.2.0 (+https://github.com/swapmeet-app/swapmeet)';
+export const USER_AGENT = 'GTArage/0.2.0 (+https://github.com/gtarage-app/gtarage)';
 
-/** Hosts Swapmeet will talk to. Everything else is refused. */
+/** Hosts GTArage will talk to. Everything else is refused. */
 const ALLOWED_HOSTS = new Set([
   // GitHub API and release assets (assets redirect to the *.githubusercontent hosts)
   'api.github.com',
@@ -31,8 +31,8 @@ const ALLOWED_HOSTS = new Set([
   'objects.githubusercontent.com',
   'release-assets.githubusercontent.com',
   'raw.githubusercontent.com',
-  // Nexus Mods API and its CDN
-  'api.nexusmods.com',
+  // Nexus Mods: the site and its download CDNs, for the embedded-browser
+  // handoff. The API host is gone with the API integration.
   'www.nexusmods.com',
   'nexusmods.com',
   'file-cdn.nexusmods.com',

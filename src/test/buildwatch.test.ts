@@ -65,7 +65,7 @@ test('an unreadable game version is unknown, not a mismatch', () => {
 });
 
 test('a first sighting is not an update', () => {
-  // Pointing Swapmeet at an install for the first time must not announce that
+  // Pointing GTArage at an install for the first time must not announce that
   // the game just updated.
   const changes = changedBuilds({}, [{ gameId: 'gta5', version: '1.0.3889.0' }]);
   assert.deepEqual(changes, []);

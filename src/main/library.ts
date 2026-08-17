@@ -2,7 +2,7 @@
  * The mod library: importing mods and working out how they want to be laid
  * down.
  *
- * Swapmeet never installs a mod into the game folder at import time. Files are
+ * GTArage never installs a mod into the game folder at import time. Files are
  * copied into a per-game library folder and indexed; deployment happens later
  * and is fully reversible. That separation is the whole reason profiles can
  * be swapped safely.
@@ -26,6 +26,7 @@ import {
   toPosix,
   walk,
 } from './fsutil';
+import { describeOiv, oivVerdict, parseOiv } from '../shared/oiv';
 import { scanDependencies } from './depscan';
 import { extractArchive, isArchive } from './extract';
 
@@ -341,6 +342,28 @@ export async function importMod(
   } else {
     const root = deployRootFor(GAMES[gameId], kind);
     notes.push(`Detected as a "${kind}" mod; deploys into ${root || 'the game root'}.`);
+  }
+
+  /*
+   * An OpenIV package is a script, not a file tree.
+   *
+   * Copying its contents in is not installing it: most of them write inside
+   * RPF archives, which GTArage cannot open. Left unsaid, the mod imports
+   * cleanly, deploys cleanly and changes nothing in the game — the worst
+   * failure this app has, because there is no error anywhere to follow.
+   */
+  if (kind === 'oiv') {
+    const assembly = files.find((f) => /^assembly.xml$/i.test(toPosix(f)));
+    if (assembly) {
+      try {
+        const xml = await fs.readFile(path.join(contentDir, assembly), 'utf8');
+        notes.push(describeOiv(oivVerdict(parseOiv(xml))));
+      } catch {
+        notes.push(
+          'This is an OpenIV package and its assembly.xml could not be read, so what it changes is unknown. Install it with OpenIV if the game does not change.',
+        );
+      }
+    }
   }
 
   // Work out what this mod needs before it is ever enabled, so the user finds

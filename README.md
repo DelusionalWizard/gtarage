@@ -1,8 +1,8 @@
-# Swapmeet
+# GTArage
 
 **An open-source universal mod manager for the Grand Theft Auto games.**
 
-Swapmeet manages mods for every mainline GTA title from one app: the 3D era, the
+GTArage manages mods for every mainline GTA title from one app: the 3D era, the
 Definitive Edition remasters, and the HD era. It keeps your mods in a library
 outside the game folder and *deploys* them on demand, so switching between a
 heavily modded roleplay setup and a clean install is a few seconds of file
@@ -10,7 +10,7 @@ moves rather than a reinstall.
 
 MIT licensed.
 
-**[Download the latest release →](https://github.com/DelusionalWizard/swapmeet/releases/latest)**
+**[Download the latest release →](https://github.com/DelusionalWizard/gtarage/releases/latest)**
 
 ---
 
@@ -20,10 +20,10 @@ MIT licensed.
 > tested, but it has not been through many hands yet, and you are the person
 > who finds out if something is wrong.
 >
-> - **Back up your game folder and saves before first use.** Swapmeet takes
+> - **Back up your game folder and saves before first use.** GTArage takes
 >   save snapshots automatically and never deletes a displaced file, but a
 >   backup you made yourself is the one you can rely on.
-> - **Modding GTA Online is a ban.** Swapmeet gives every game a
+> - **Modding GTA Online is a ban.** GTArage gives every game a
 >   vanilla-locked profile and a folder check, but nothing can make online
 >   modding safe. Apply the vanilla profile before you go online.
 > - **The Windows builds are unsigned.** SmartScreen will warn you, and you
@@ -67,7 +67,7 @@ load out of a `~mods` folder.
 
 ## Finding mods
 
-Swapmeet has a **Browse** tab with two halves, because mods come from two very
+GTArage has a **Browse** tab with two halves, because mods come from two very
 different kinds of place.
 
 **Sources with a real API** are listed in-app:
@@ -75,26 +75,26 @@ different kinds of place.
 - **Essentials** — a curated catalogue of the load-bearing tools everything
   else depends on (ASI loaders, ScriptHookV .NET, CLEO Redux, modloader,
   SilentPatch, Widescreen Fixes, UE4SS), resolved live from their official
-  GitHub releases. No account, no configuration, one click to install. Swapmeet
+  GitHub releases. No account, no configuration, one click to install. GTArage
   picks the right build for the game: the 32-bit ASI loader for San Andreas,
   the 64-bit one for GTA V, `SilentPatchSA` rather than `SilentPatchVC`.
 - **Nexus Mods** — via the official API and your own personal key, stored
   encrypted with the Windows credential store. Two honest limits, both stated
   in the UI: the v1 API has no full-text search (so the box filters the feed),
-  and direct API downloads are a Premium feature — for everyone else Swapmeet
+  and direct API downloads are a Premium feature — for everyone else GTArage
   registers the `nxm://` handler so the site's own "Mod Manager Download"
   button works.
 
 **Sources without an API** — GTA5-Mods, GTAinside, LibertyCity, ModDB — open
 in a real browser window inside the app. You log in yourself, on the real site,
-and browse normally. Swapmeet's only involvement is catching the download at the
+and browse normally. GTArage's only involvement is catching the download at the
 end and importing it into the library. No scraping, no automated clicking, no
-ToS problem, and your password is never seen by Swapmeet. The embedded window
-gets no preload and none of Swapmeet's API, so a compromised mod site cannot
+ToS problem, and your password is never seen by GTArage. The embedded window
+gets no preload and none of GTArage's API, so a compromised mod site cannot
 reach your filesystem.
 
 A few tools (ScriptHookV, OpenIV) are distributed only from their authors' own
-sites. Swapmeet lists them, explains why, and opens the page — it never invents
+sites. GTArage lists them, explains why, and opens the page — it never invents
 a download URL.
 
 The catalogue is scoped per game rather than offering everything everywhere.
@@ -111,12 +111,12 @@ and ScriptHookV claim `dinput8.dll`, so it would manufacture a file conflict
 the user then has to resolve for no benefit.
 
 `gtamods.com` appears too, but only as documentation: it is a wiki and hosts no
-mod files. Swapmeet deep-links it to explain what a `handling.meta` or an `.img`
+mod files. GTArage deep-links it to explain what a `handling.meta` or an `.img`
 archive actually is.
 
 ## Dependency detection
 
-When a mod is imported, Swapmeet works out what it needs by reading the files
+When a mod is imported, GTArage works out what it needs by reading the files
 rather than trusting a description:
 
 - **PE import tables.** An `.asi` or `.dll` is a Windows binary whose import
@@ -142,7 +142,7 @@ back byte-for-byte.
 
 **Profiles cost almost no disk space.** Deployed files are hard links to the
 library copy — a second directory entry for bytes that already exist. A dozen
-profiles of a 100 GB game do not need a dozen copies. (Swapmeet falls back to
+profiles of a 100 GB game do not need a dozen copies. (GTArage falls back to
 copying when the library and the game are on different drives, and tells you
 so.)
 
@@ -152,12 +152,12 @@ shared and stay put — plus any blockers (game running, missing dependency, not
 enough disk space) and warnings.
 
 **Conflicts are explained, not hidden.** When two mods write the same file,
-Swapmeet names both, names the winner, and tells you the rule: whichever sits
+GTArage names both, names the winner, and tells you the rule: whichever sits
 lower in the load order wins. Drag the stack to change the answer.
 
 **An online safety valve.** Every game gets a vanilla-locked profile that
 deploys nothing. "Verify folder" scans the places mods actually land and
-reports stray `.asi`/`.dll`/`.pak` files that Swapmeet did *not* put there — the
+reports stray `.asi`/`.dll`/`.pak` files that GTArage did *not* put there — the
 ones left behind by manual installs. The online *warning* is off by default,
 since GTA V asks story-or-online on every launch and warning on every swap is
 noise; turn it on in Settings if you play online.
@@ -168,9 +168,9 @@ noise; turn it on in Settings if you play online.
 
 Grab a build from `release/`:
 
-- `Swapmeet-Setup-0.3.0-beta.1.exe` — normal installer (per-user, no admin required,
+- `GTArage-Setup-1.0.0.exe` — normal installer (per-user, no admin required,
   choose your own install directory).
-- `Swapmeet-0.3.0-beta.1-portable.exe` — single-file portable build, no installation.
+- `GTArage-1.0.0-portable.exe` — single-file portable build, no installation.
 
 ### Build from source
 
@@ -220,7 +220,7 @@ Adding a new title means adding one entry to `src/shared/games.ts`.
 
 ### Import
 
-Swapmeet reads `.zip` and `.oiv` archives itself (both are ZIP containers) with
+GTArage reads `.zip` and `.oiv` archives itself (both are ZIP containers) with
 a small dependency-free reader, strips redundant wrapper folders, and
 classifies what is inside. If an archive already uses game-relative folders
 (`scripts/`, `mods/`, `CLEO/`), it is deployed verbatim; otherwise the kind is
@@ -289,7 +289,7 @@ What is **not** verified: no real `.pak`, `.ucas`/`.utoc` or UE4SS Lua mod has
 ever been deployed to a Definitive Edition install and confirmed to load
 in-game. The paths come from how the UE4 `~mods` convention works, not from
 watching a mod actually run. If the layout is wrong in some way, the failure
-is a quiet one — Swapmeet will report a clean install and the game will simply
+is a quiet one — GTArage will report a clean install and the game will simply
 ignore the files.
 
 So: on the DE trilogy, treat this as untested. Use "Check the game folder"
@@ -307,7 +307,7 @@ that have seen real use.
 - The Nexus provider is written against the documented API but has not been
   exercised against a live key — that needs your own account. It is the
   largest untested surface after the DE trilogy.
-- Modding GTA Online is a ban. Swapmeet warns and gives you a locked vanilla
+- Modding GTA Online is a ban. GTArage warns and gives you a locked vanilla
   profile, but it cannot make online modding safe — nothing can.
 - Definitive Edition Steam app ids in the registry are best-effort; detection
   confirms every folder by signature file, so a wrong id costs nothing.
