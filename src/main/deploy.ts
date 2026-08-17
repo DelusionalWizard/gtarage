@@ -36,6 +36,7 @@ import type {
 } from '../shared/types';
 import {
   ensureDir,
+  isInside,
   exists,
   linkOrCopy,
   move,
@@ -227,6 +228,80 @@ function describeFileError(err: unknown, target: string): string {
   return (err as Error).message;
 }
 
+/**
+ * Which ancestors of `dir` do not exist yet, outermost first.
+ *
+ * Called before the directory is created, so the answer is exactly the set
+ * this deploy is about to bring into being.
+ */
+async function missingDirs(gamePath: string, dir: string): Promise<string[]> {
+  const out: string[] = [];
+  let current = path.resolve(dir);
+  const stop = path.resolve(gamePath);
+  while (current !== stop && isInside(stop, current)) {
+    if (await exists(current)) break;
+    out.unshift(toPosix(path.relative(stop, current)));
+    current = path.dirname(current);
+  }
+  return out;
+}
+
+/**
+ * Move directories this deploy created into the shelf, leftovers and all.
+ *
+ * Anything still inside was written after we made the folder - a log, a
+ * config, a preset the user saved - and is not ours to delete. It is also not
+ * the game's, because the folder did not exist before we made it. So the whole
+ * thing goes to the shelf, where it can be recovered, and the game folder is
+ * genuinely left as it was found.
+ */
+async function shelveCreatedDirs(
+  config: AppConfig,
+  gameId: GameId,
+  gamePath: string,
+  dirs: string[],
+): Promise<string[]> {
+  const problems: string[] = [];
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const root = path.join(shelfFor(config, gameId), 'leftovers', stamp);
+
+  /*
+   * Shallowest first, so a parent is moved whole and takes its children with
+   * it.
+   *
+   * Deepest-first is the intuitive order and is wrong: shelving
+   * "chaosmod/twitch" creates "leftovers/<stamp>/chaosmod/" on the way, and
+   * the subsequent move of "chaosmod" itself then collides with a directory
+   * that did not exist when the pass started. Going outermost-in means the
+   * inner entries are simply gone by the time they come up, and are skipped.
+   */
+  for (const rel of [...dirs].sort((a, b) => a.split('/').length - b.split('/').length)) {
+    // Never touch part of the base game, however the record got there.
+    if (isProtected(gameId, rel)) continue;
+    let abs: string;
+    try {
+      abs = safeJoin(gamePath, rel);
+    } catch {
+      continue;
+    }
+    if (!(await exists(abs))) continue;
+
+    try {
+      const entries = await fs.readdir(abs);
+      if (entries.length === 0) {
+        await fs.rmdir(abs);
+        continue;
+      }
+      const dest = path.join(root, rel);
+      await ensureDir(path.dirname(dest));
+      await move(abs, dest);
+    } catch (err) {
+      problems.push(`${rel}: ${describeFileError(err, rel)}`);
+    }
+  }
+  return problems;
+}
+
 async function removeDeployed(
   gamePath: string,
   files: DeployedFile[],
@@ -274,6 +349,14 @@ export async function undeployAll(
   const manifest = await readManifest(config, gameId);
   if (!manifest) return [];
   const { problems, remaining } = await removeDeployed(gamePath, manifest.files, onProgress);
+
+  // Only once every file is out: a directory still holding one of our own
+  // files is not a leftover, it is a failed removal.
+  if (remaining.length === 0) {
+    problems.push(
+      ...(await shelveCreatedDirs(config, gameId, gamePath, manifest.createdDirs ?? [])),
+    );
+  }
 
   if (remaining.length > 0) {
     await writeJson(manifestPath(config, gameId), { ...manifest, files: remaining });
@@ -364,6 +447,25 @@ export async function deployProfile(
   problems.push(...removal.problems);
   for (const f of stale) previousByTarget.delete(f.target);
 
+  /*
+   * Directories the previous profile created that this one does not want.
+   *
+   * A swap has to shelve these for the same reason a full undeploy does: a
+   * companion folder the mod wrote into at runtime is neither ours to delete
+   * nor the game's to keep. Only the ones nothing incoming still needs are
+   * considered, or switching between two profiles that share a mod would
+   * shelve a folder out from under the profile arriving.
+   */
+  const stillWanted = new Set<string>();
+  for (const target of desired.keys()) {
+    const parts = target.split('/');
+    for (let i = 1; i < parts.length; i++) stillWanted.add(parts.slice(0, i).join('/'));
+  }
+  const abandoned = (previous?.createdDirs ?? []).filter((dir) => !stillWanted.has(dir));
+  if (abandoned.length > 0 && removal.remaining.length === 0) {
+    problems.push(...(await shelveCreatedDirs(config, gameId, gamePath, abandoned)));
+  }
+
   // Files we failed to remove are still on disk and may still hold a backup
   // reference. Carry them into the new manifest so undeploy can try again.
   const stranded = removal.remaining;
@@ -378,6 +480,8 @@ export async function deployProfile(
 
   const backups = backupRoot(config, gameId);
   const files: DeployedFile[] = [];
+  // Directories this deploy had to make, so undeploy knows which are ours.
+  const createdDirs = new Set<string>(previous?.createdDirs ?? []);
   let added = 0;
   let kept = 0;
   let done = 0;
@@ -404,6 +508,9 @@ export async function deployProfile(
         await move(abs, backup);
       }
 
+      for (const made of await missingDirs(gamePath, path.dirname(abs))) {
+        createdDirs.add(made);
+      }
       const method = await linkOrCopy(want.source, abs, preferHardlink);
       const entry: DeployedFile = { target: want.target, modId: want.modId, method };
       if (backup) entry.backup = backup;
@@ -441,6 +548,9 @@ export async function deployProfile(
     gamePath,
     deployedAt: new Date().toISOString(),
     files,
+    // Deepest last, so undeploy can walk them in reverse and clear children
+    // before their parents.
+    createdDirs: [...createdDirs].sort((a, b) => a.split('/').length - b.split('/').length),
   };
   await writeJson(manifestPath(config, gameId), manifest);
 

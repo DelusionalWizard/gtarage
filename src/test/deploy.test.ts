@@ -503,3 +503,103 @@ test('a companion folder comes back when the profile is applied again', async (t
     assert.equal(await read(path.join(h.gamePath, rel)), content, `${rel} intact`);
   }
 });
+
+// --- companion folders with runtime leftovers ------------------------------
+//
+// The reported failure, and the one the earlier round-trip tests missed. Those
+// only ever put back exactly the files the deploy placed, so pruneEmptyDirs
+// always found an empty directory and tidied it. Real mods do not behave that
+// way: ChaosMod writes a log, Menyoo saves a spooner preset, and the moment
+// anything lands in the companion folder that Swapmeet did not place there,
+// pruning stops and the whole folder is stranded in the game folder forever.
+
+test('a companion folder is shelved whole when the mod wrote into it', async (t) => {
+  const h = await makeHarness();
+  t.after(() => cleanup(h));
+
+  const before = await snapshot(h.gamePath);
+
+  const mod = await makeMod(h, 'chaos', CHAOS, { kind: 'asi' });
+  h.config.mods = [mod];
+  const p = profile({ order: ['chaos'], enabled: ['chaos'] });
+  const vanilla = profile({ id: 'v', name: 'Vanilla', vanillaLock: true });
+  h.config.profiles = [p, vanilla];
+
+  await deployProfile(h.config, 'gta5', h.gamePath, p, [mod]);
+
+  // The game runs and the mod writes into its own folder.
+  await put(path.join(h.gamePath, 'chaosmod', 'chaosmod.log'), 'ran at 12:04');
+  await put(path.join(h.gamePath, 'chaosmod', 'twitch', 'token.txt'), 'secret');
+
+  await deployProfile(h.config, 'gta5', h.gamePath, vanilla, [mod]);
+
+  assert.ok(
+    !(await present(path.join(h.gamePath, 'chaosmod'))),
+    'the companion folder must not be left in the game folder',
+  );
+  assert.deepEqual(
+    await snapshot(h.gamePath),
+    before,
+    'the game folder is exactly as it was found',
+  );
+
+  // The runtime files were not ours to delete, so they must be recoverable.
+  const shelf = path.join(h.config.shelfPath, 'gta5', 'leftovers');
+  const found: string[] = [];
+  const walkShelf = async (dir: string): Promise<void> => {
+    for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walkShelf(abs);
+      else found.push(entry.name);
+    }
+  };
+  await walkShelf(shelf);
+  assert.ok(found.includes('chaosmod.log'), `log should be on the shelf, got ${found}`);
+  assert.ok(found.includes('token.txt'), 'nested runtime file should be on the shelf too');
+});
+
+test('a companion folder with nothing extra in it is simply removed', async (t) => {
+  // No leftovers means nothing to preserve; shelving an empty directory would
+  // just litter the shelf.
+  const h = await makeHarness();
+  t.after(() => cleanup(h));
+
+  const mod = await makeMod(h, 'chaos', CHAOS, { kind: 'asi' });
+  h.config.mods = [mod];
+  const p = profile({ order: ['chaos'], enabled: ['chaos'] });
+  const vanilla = profile({ id: 'v', name: 'Vanilla', vanillaLock: true });
+  h.config.profiles = [p, vanilla];
+
+  await deployProfile(h.config, 'gta5', h.gamePath, p, [mod]);
+  await deployProfile(h.config, 'gta5', h.gamePath, vanilla, [mod]);
+
+  assert.ok(!(await present(path.join(h.gamePath, 'chaosmod'))));
+  const shelf = path.join(h.config.shelfPath, 'gta5', 'leftovers');
+  assert.ok(!(await present(shelf)), 'nothing to preserve means nothing shelved');
+});
+
+test('a directory the game already had is never shelved', async (t) => {
+  // The whole mechanism turns on "we made this folder". A mod deploying into
+  // a directory that was already there must leave it alone, or the first
+  // texture replacement would carry off part of the game.
+  const h = await makeHarness();
+  t.after(() => cleanup(h));
+
+  await put(path.join(h.gamePath, 'mods', 'common', 'data', 'stock.meta'), 'game file');
+
+  const mod = await makeMod(h, 'tweak', { 'common/data/handling.meta': 'mod' }, {
+    kind: 'replace',
+  });
+  h.config.mods = [mod];
+  const p = profile({ order: ['tweak'], enabled: ['tweak'] });
+  const vanilla = profile({ id: 'v', name: 'Vanilla', vanillaLock: true });
+  h.config.profiles = [p, vanilla];
+
+  await deployProfile(h.config, 'gta5', h.gamePath, p, [mod]);
+  await deployProfile(h.config, 'gta5', h.gamePath, vanilla, [mod]);
+
+  assert.ok(
+    await present(path.join(h.gamePath, 'mods', 'common', 'data', 'stock.meta')),
+    "the game's own file survives",
+  );
+});

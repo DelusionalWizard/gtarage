@@ -243,6 +243,20 @@ export interface DeployManifest {
   gamePath: string;
   deployedAt: string;
   files: DeployedFile[];
+  /**
+   * Game-relative directories this deploy had to create, deepest last.
+   *
+   * A mod's companion folder - ChaosMod's `chaosmod/`, Menyoo's
+   * `menyooStuff/` - does not exist until we make it, and the game or the mod
+   * then writes into it at runtime. Without this record, undeploy could only
+   * delete the files it placed and prune directories that happened to end up
+   * empty, so any runtime file left the whole folder stranded in the game
+   * folder. Knowing which directories are ours means they can be moved to the
+   * shelf whole, leftovers included.
+   *
+   * Optional because manifests written before this existed do not have it.
+   */
+  createdDirs?: string[];
 }
 
 /** Two or more mods claiming the same game-relative path. */
