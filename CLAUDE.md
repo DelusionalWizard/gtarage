@@ -9,11 +9,12 @@ an Electron + TypeScript desktop app. It manages nine titles: GTA III, Vice
 City and San Andreas (original 3D era), the three Definitive Edition
 remasters, GTA IV/EFLC, and GTA V Legacy and Enhanced.
 
-Primarily a *file manager for mods*. It also has a mod browser: it downloads
-from two sanctioned APIs (GitHub Releases for the curated Essentials
-catalogue, and the official Nexus API with the user's own key), and opens the
-API-less community sites in an embedded browser where the user logs in and
-GTArage only captures the resulting download. It never scrapes.
+Primarily a *file manager for mods*. The **Tools** tab is where mods arrive,
+by three deliberately different routes: dropping a file you already have,
+the curated Essentials catalogue (resolved from GitHub Releases, the one
+sanctioned API), and community sites opened in an embedded browser where the
+user logs in and GTArage only captures the resulting download. It never
+scrapes, and there is no search — there is no catalogue to search.
 
 Distinct from the sibling project `../GTAV-ProfileManager`, which switches a
 whole GTA V install between hard-linked folder copies. GTArage works at
@@ -30,7 +31,7 @@ per-mod granularity and covers every title.
 
 ```
 src/shared/   types.ts, games.ts (the registry), api.ts (IPC contract),
-              catalog.ts (Essentials + Nexus domains), sites.ts (mod sites
+              catalog.ts (the Essentials catalogue), sites.ts (mod sites
               and the gtamods wiki links), planner.ts (pure
               load-order/conflict/swap logic)
 src/main/     index.ts (entry), api.ts (handlers), config.ts, detect.ts,
@@ -38,7 +39,7 @@ src/main/     index.ts (entry), api.ts (handlers), config.ts, detect.ts,
               depscan.ts (PE/layout dependency detection), saves.ts,
               fsutil.ts, zip.ts, extract.ts (7-Zip/WinRAR fallback),
               net.ts (ALL network access), browse.ts, modsites.ts
-src/main/providers/  github.ts (Essentials), nexus.ts
+src/main/providers/  github.ts (Essentials)
 src/preload/  index.ts - the contextBridge, the ONLY UI->fs path
 src/renderer/ index.ts + assets/{index.html,styles.css}
 src/test/     planner, zip, depscan, catalog, download, classify,
@@ -262,6 +263,14 @@ every kind in `supportedKinds`, plus `signatureFiles` for detection.
     theme and *then* triggers a render measures the other one. Several
     dark-mode checks silently reported light this way and passed.
 
+38. **The contextBridge object is frozen.** `window.gtarage.someMethod = ...`
+    from devtools or a CDP harness silently does nothing in non-strict mode,
+    so a stub meant to force an error path never takes and the test appears
+    to prove the error path is unreachable. Force failures from the main
+    process side, or render the view function directly with a fake state —
+    top-level `function` declarations in the renderer are global, though
+    `let`/`const` module state is not reachable that way.
+
 ## Verification
 
 ```bash
@@ -301,21 +310,24 @@ Produces `release/GTArage-Setup-<version>.exe` (NSIS, per-user, no admin) and
 `build/icon.png`. `dist/test/**` and source maps are excluded from the
 package.
 
-## Mod browser
+## Tools (how mods arrive)
 
-Two providers plus an embedded browser (`src/shared/catalog.ts`,
-`src/shared/sites.ts`, `src/main/providers/`, `src/main/modsites.ts`).
+One provider plus an embedded browser (`src/shared/catalog.ts`,
+`src/shared/sites.ts`, `src/main/providers/github.ts`,
+`src/main/modsites.ts`). The Nexus API integration was removed; Nexus remains
+only as a site you can open and download from by hand.
 
+- **Drop a file** — the primary route, and the only one that needs no network
+  and no account. It must stay the most prominent thing on the screen.
 - **Essentials** — curated list resolved from the GitHub Releases API. No
   auth. Verified live: every repo in `ESSENTIALS` was checked against the API.
-- **Nexus** — official v1 API, key encrypted via `safeStorage`. No full-text
-  search exists in v1, so search filters the feed; direct download links are
-  Premium-only and the fallback is the `nxm://` handshake (registered in
-  `main/index.ts`, requires the single-instance lock to work).
+  `listEssentials` joins it with the library so each row arrives already
+  decided: installed, outdated, manual-only, or not installed.
 - **Sites** — GTA5-Mods, GTAinside, LibertyCity, ModDB, Nexus open in a real
   `BrowserWindow` on `persist:modsites`. `will-download` on that session
   redirects the file into staging and through the normal importer. Executables
-  are staged but **never** imported or run.
+  are staged but **never** imported or run. Sites flagged `docsOnly` (the
+  GTAMods wiki) are filtered out of that column — it promises downloads.
 
 All network access goes through `src/main/net.ts`, which enforces an HTTPS
 host allowlist re-checked at every redirect hop, plus timeouts and a size cap.
@@ -344,11 +356,11 @@ on its first run (gotchas 21 and 22). A subsequent audit of the import, config
 and archive layers found several more file-loss paths, all fixed and pinned by
 `src/test/safety.test.ts` (gotchas 23-27).
 
-Not yet exercised: the Nexus provider against a live API key.
+Not yet exercised live: the Tools screen's offline panel, which needs the
+GitHub call to actually fail (see gotcha 38 for why stubbing it does not work).
 
 ## Suggested next steps
 
-- Nexus provider against a real key, including the `nxm://` round trip.
 - Mod dependency *editing* in the UI (`requires` is enforced by the planner;
   `dependencies` is now detected automatically, but neither is user-editable).
 - Per-profile graphics settings (`settings.xml`/`commandline.txt`) carried

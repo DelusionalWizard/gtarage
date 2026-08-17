@@ -8,7 +8,7 @@ import path from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import { CALL_CHANNEL, type ApiMethod } from '../shared/api';
-import { handlers, initApi } from './api';
+import { handlers, initApi, modSiteHooks } from './api';
 import {
   initConfig,
   libraryFor,
@@ -18,6 +18,7 @@ import {
   repointPaths,
   saveConfig,
 } from './config';
+import { initModSites } from './modsites';
 import { GAME_ORDER } from '../shared/games';
 import { detectGames } from './detect';
 import { ensureVanillaProfile } from './config';
@@ -181,6 +182,7 @@ app.whenReady().then(async () => {
 
   const win = createWindow();
   initApi(userDataDir, win);
+  initModSites(modSiteHooks());
 
 
   // One channel, dispatched by method name. Anything not in `handlers` is

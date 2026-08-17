@@ -25,6 +25,7 @@ type TabId =
   | 'home'
   | 'profile'
   | 'library'
+  | 'tools'
   | 'settings'
   | 'speedrun'
   | 'saves';
@@ -183,6 +184,33 @@ window.gtarageEvents.onProgress(({ done, total, label }) => {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   byId('overlay-fill').style.width = `${pct}%`;
   byId('overlay-detail').textContent = `${done}/${total} · ${label}`;
+
+  // An Essentials download reports through the same channel. Update that row
+  // in place rather than re-rendering the page on every chunk.
+  if (toolInstalling && /^Downloading/.test(label)) {
+    toolBusy.set(toolInstalling, { received: done, total });
+    const fill = document.getElementById(`essbar-${toolInstalling}`);
+    if (fill) fill.style.width = `${pct}%`;
+    const text = document.getElementById(`esspct-${toolInstalling}`);
+    if (text) text.textContent = `${pct}%`;
+  }
+});
+
+/**
+ * Downloads captured by the embedded mod-site browser arrive here, not
+ * through a call the UI made, so they get their own listener.
+ */
+window.gtarageEvents.onSiteEvent((event) => {
+  if (event.kind === 'progress') {
+    // Deliberately silent: a toast per chunk would be a stream of noise, and
+    // the completion event already reports the outcome.
+    return;
+  }
+  toast(
+    event.message,
+    event.kind === 'imported' ? 'ok' : event.kind === 'staged' ? 'warn' : 'error',
+  );
+  if (event.kind === 'imported') void refresh();
 });
 
 // --- modal ------------------------------------------------------------------
@@ -781,6 +809,7 @@ function renderCrumbs(s: AppState): void {
 const TAB_LABELS: Record<string, string> = {
   home: 'Setups',
   library: 'Library',
+  tools: 'Tools',
   settings: 'Settings',
   profile: 'Setup',
   saves: 'Backups',
@@ -792,7 +821,7 @@ function renderTopnav(s: AppState): void {
   const host = byId('topnav');
   clear(host);
 
-  const items: TabId[] = ['home', 'library'];
+  const items: TabId[] = ['home', 'tools', 'library'];
   if (s.settings.speedrunMode) items.push('speedrun');
   items.push('saves');
   items.push('settings');
@@ -2138,6 +2167,404 @@ function renderSettings(s: AppState, view: HTMLElement): void {
 
   sheet.append(rail, groups);
   view.appendChild(sheet);
+}
+
+// --- Tools --------------------------------------------------------------------
+
+/**
+ * Tools: the three ways a mod gets into GTArage.
+ *
+ * Built from the "Settings & Browse" mockup, which argues that the three
+ * routes should look as different as they behave. They are not variations on
+ * a listing: dropping a file is a target, Essentials is a short fixed list
+ * with real install buttons, and a community site is a doorway where all the
+ * app can do is catch what you download.
+ *
+ * There is deliberately no search. The previous version had one, over a
+ * catalogue that does not exist, and people reasonably concluded the app was
+ * broken when it returned nothing.
+ */
+
+/** Essentials for the game currently on screen. Null until first fetched. */
+let essentials: EssentialsView | null = null;
+let essentialsFor_: GameId | null = null;
+let essentialsLoading = false;
+
+/**
+ * In-flight and failed downloads, keyed by entry id.
+ *
+ * Session state, not app state: it belongs to this window and this attempt,
+ * so it lives here rather than being round-tripped through AppState.
+ */
+const toolBusy = new Map<string, { received: number; total: number }>();
+let toolInstalling: string | null = null;
+const toolFailed = new Map<string, string>();
+
+/** Community sites for the current game. */
+let sites: ModSite[] = [];
+
+async function loadEssentials(gameId: GameId, refresh = false): Promise<void> {
+  if (essentialsLoading) return;
+  essentialsLoading = true;
+  if (refresh) essentials = null;
+  try {
+    essentials = await api.listEssentials(gameId, refresh);
+    essentialsFor_ = gameId;
+  } catch (err) {
+    essentials = { entries: [], error: (err as Error).message };
+    essentialsFor_ = gameId;
+  } finally {
+    essentialsLoading = false;
+    if (tab === 'tools') render();
+  }
+}
+
+async function loadSites(gameId: GameId): Promise<void> {
+  try {
+    sites = await api.listSites(gameId);
+    if (tab === 'tools') render();
+  } catch {
+    // Site list is static data; a failure here is not worth a toast.
+  }
+}
+
+async function installEssential(entry: EssentialView, gameId: GameId): Promise<void> {
+  toolFailed.delete(entry.id);
+  toolBusy.set(entry.id, { received: 0, total: entry.sizeBytes });
+  toolInstalling = entry.id;
+  render();
+  try {
+    const result = await api.installEssential(entry.id, gameId);
+    state = result.state;
+    toast(result.message, result.imported ? 'ok' : 'warn');
+    await loadEssentials(gameId, true);
+  } catch (err) {
+    toolFailed.set(entry.id, (err as Error).message);
+    toast((err as Error).message, 'error');
+  } finally {
+    toolBusy.delete(entry.id);
+    toolInstalling = null;
+    render();
+  }
+}
+
+/** The drop band: route one, and the only one that works with no network. */
+function dropBand(): HTMLElement {
+  const band = el('div', 'drop-band');
+  band.appendChild(el('div', 'drop-band-icon', '⬇'));
+  const main = el('div', 'drop-band-main');
+  main.appendChild(el('div', 'drop-band-title', 'Drop a file you already have'));
+  main.appendChild(
+    el(
+      'div',
+      'drop-band-sub',
+      '.zip, .rar, .oiv, a folder, or a loose .asi — anywhere in this window. Works offline, no account.',
+    ),
+  );
+  band.appendChild(main);
+  const pick = el('button', 'btn', 'Choose a file instead');
+  pick.addEventListener('click', () => void installMod('files'));
+  band.appendChild(pick);
+  return band;
+}
+
+/** One Essentials row, in whichever of its six states applies. */
+function essentialRow(entry: EssentialView, gameId: GameId): HTMLElement {
+  const row = el('div', 'ess-row');
+  const main = el('div', 'ess-main');
+
+  const nameLine = el('div', 'ess-nameline');
+  nameLine.appendChild(el('div', 'ess-name', entry.name));
+
+  const busy = toolBusy.get(entry.id);
+  const failed = toolFailed.get(entry.id);
+
+  if (busy) {
+    const total = busy.total || entry.sizeBytes;
+    nameLine.appendChild(
+      el(
+        'div',
+        'ess-ver',
+        total > 0
+          ? `${formatBytes(busy.received)} of ${formatBytes(total)}`
+          : 'downloading',
+      ),
+    );
+  } else if (failed) {
+    nameLine.appendChild(el('div', 'ess-pill is-failed', 'FAILED'));
+  } else if (entry.outdated) {
+    nameLine.appendChild(
+      el(
+        'div',
+        'ess-pill is-update',
+        `${entry.installedVersion} → ${entry.version} AVAILABLE`,
+      ),
+    );
+  } else if (entry.manualOnly) {
+    nameLine.appendChild(el('div', 'ess-pill is-manual', 'MANUAL ONLY'));
+  } else {
+    nameLine.appendChild(el('div', 'ess-ver', entry.version));
+  }
+  main.appendChild(nameLine);
+
+  if (busy) {
+    const bar = el('div', 'ess-bar');
+    const total = busy.total || entry.sizeBytes;
+    const pct = total > 0 ? Math.min(100, Math.round((busy.received / total) * 100)) : 0;
+    const fill = el('div', 'ess-bar-fill');
+    fill.id = `essbar-${entry.id}`;
+    fill.style.width = `${pct}%`;
+    bar.appendChild(fill);
+    main.appendChild(bar);
+  } else {
+    // The second line answers "what is this and where do I stand with it",
+    // which differs by state: a size and an install date once it is here, the
+    // reason it cannot be fetched when it is manual, the summary otherwise.
+    let sub: string;
+    if (failed) {
+      sub = `${failed} Try again, or open the page yourself.`;
+    } else if (entry.manualOnly) {
+      sub =
+        entry.manualReason ??
+        'No downloadable release — GTArage opens the project page, you bring the file back.';
+    } else if (entry.installedAt) {
+      const size = entry.sizeBytes > 0 ? `${formatBytes(entry.sizeBytes)} · ` : '';
+      sub = `${size}installed ${formatDate(entry.installedAt)}`;
+    } else {
+      const size = entry.sizeBytes > 0 ? `${formatBytes(entry.sizeBytes)} · ` : '';
+      sub = `${size}${entry.summary}`;
+    }
+    main.appendChild(el('div', 'ess-sub', sub));
+  }
+
+  row.appendChild(main);
+
+  // The right-hand affordance. Exactly one per row, and only the plain
+  // not-installed case gets the blue: an update and a manual link-out are
+  // both things the user may reasonably ignore.
+  if (busy) {
+    const total = busy.total || entry.sizeBytes;
+    const pct = total > 0 ? Math.min(100, Math.round((busy.received / total) * 100)) : 0;
+    const pctText = el('div', 'ess-pct', `${pct}%`);
+    pctText.id = `esspct-${entry.id}`;
+    row.appendChild(pctText);
+  } else if (failed) {
+    const retry = el('button', 'btn btn-sm', 'Retry');
+    retry.addEventListener('click', () => void installEssential(entry, gameId));
+    row.appendChild(retry);
+  } else if (entry.manualOnly) {
+    const open = el('button', 'btn btn-sm', 'Open page');
+    open.addEventListener('click', () => {
+      void api.openExternal(entry.url).catch((err: Error) => toast(err.message, 'error'));
+    });
+    row.appendChild(open);
+  } else if (entry.outdated) {
+    const update = el('button', 'btn btn-sm', 'Update');
+    update.addEventListener('click', () => void installEssential(entry, gameId));
+    row.appendChild(update);
+  } else if (entry.installedVersion) {
+    row.appendChild(el('div', 'ess-ok', '✓ Up to date'));
+  } else {
+    const install = el('button', 'btn btn-sm is-blue', 'Install');
+    install.addEventListener('click', () => void installEssential(entry, gameId));
+    row.appendChild(install);
+  }
+
+  return row;
+}
+
+/** The Essentials column, including its offline and loading states. */
+function essentialsPanel(s: AppState, gameId: GameId): HTMLElement {
+  const col = el('div', 'tools-col is-essentials');
+
+  const head = el('div', 'tools-colhead');
+  head.appendChild(el('div', 'tools-colhead-title', 'Essentials'));
+  const game = s.games.find((g) => g.id === gameId);
+  head.appendChild(el('div', 'tools-gamepill', game ? game.shortName : 'this game'));
+  head.appendChild(el('div', 'tools-spacer'));
+  head.appendChild(el('div', 'tools-colhead-note', 'from official GitHub releases'));
+  col.appendChild(head);
+
+  const card = el('div', 'tools-card');
+
+  if (essentialsLoading && !essentials) {
+    card.classList.add('is-centred');
+    card.appendChild(el('div', 'tools-quiet', 'Checking the release pages…'));
+  } else if (essentials?.error) {
+    // Panel-level, never page-level: dropping a file and the community sites
+    // do not go through GitHub and still work perfectly.
+    card.classList.add('is-centred');
+    card.appendChild(el('div', 'tools-quiet-icon', '⚠'));
+    card.appendChild(el('div', 'tools-quiet-title', 'Can’t reach GitHub right now'));
+    card.appendChild(
+      el(
+        'div',
+        'tools-quiet',
+        'Essentials will load again once you’re back online. Dropping a file and community sites still work fine.',
+      ),
+    );
+    const again = el('button', 'btn btn-sm', 'Try again');
+    again.addEventListener('click', () => void loadEssentials(gameId, true));
+    card.appendChild(again);
+  } else if (essentials && essentials.entries.length === 0) {
+    card.classList.add('is-centred');
+    card.appendChild(el('div', 'tools-quiet', 'No essentials are listed for this game.'));
+  } else if (essentials) {
+    for (const entry of essentials.entries) card.appendChild(essentialRow(entry, gameId));
+  }
+
+  col.appendChild(card);
+  return col;
+}
+
+/** The community-site column: a doorway, with nothing to rank. */
+function sitesPanel(gameId: GameId): HTMLElement {
+  const col = el('div', 'tools-col is-sites');
+
+  const head = el('div', 'tools-colhead is-stacked');
+  head.appendChild(el('div', 'tools-colhead-title', 'Community sites'));
+  head.appendChild(
+    el(
+      'div',
+      'tools-colhead-sub',
+      'No listing here. Log in and download like normal — GTArage catches the file when it lands.',
+    ),
+  );
+  col.appendChild(head);
+
+  const card = el('div', 'tools-card is-sites');
+  // docsOnly sites are reference material, not places you download from.
+  // Listing the GTAMods wiki under "log in and download" would be a lie about
+  // what pressing it does.
+  for (const site of sites.filter((site) => !site.docsOnly)) {
+    const row = el('button', 'site-row');
+    row.appendChild(el('div', 'site-dot'));
+    row.appendChild(el('div', 'site-name', site.name));
+    row.appendChild(el('div', 'site-open', 'Open ↗'));
+    row.addEventListener('click', () => {
+      void api.openSite(site.id, gameId).catch((err: Error) => toast(err.message, 'error'));
+    });
+    card.appendChild(row);
+  }
+  col.appendChild(card);
+
+  col.appendChild(
+    el('div', 'tools-foot', 'Nothing to search or rank — this is a doorway, not a catalogue.'),
+  );
+  return col;
+}
+
+/**
+ * First run: nothing in the library at all.
+ *
+ * The drop zone becomes the whole screen, because it is the one route that
+ * works with no network, no account and nothing else set up.
+ */
+function toolsFirstRun(s: AppState, gameId: GameId): HTMLElement {
+  const wrap = el('div', 'tools-empty');
+
+  const zone = el('div', 'tools-empty-zone');
+  zone.appendChild(el('div', 'tools-empty-icon', '⬇'));
+  zone.appendChild(el('div', 'tools-empty-title', 'Drop a mod file to get started'));
+  zone.appendChild(
+    el(
+      'div',
+      'tools-empty-sub',
+      '.zip, .rar, .oiv, a folder, or a loose .asi. This works right now, offline, with nothing else set up.',
+    ),
+  );
+  const pick = el('button', 'btn', 'Choose a file instead');
+  pick.addEventListener('click', () => void installMod('files'));
+  zone.appendChild(pick);
+  wrap.appendChild(zone);
+
+  const cards = el('div', 'tools-empty-cards');
+
+  const count = essentials?.entries.length ?? 0;
+  const game = s.games.find((g) => g.id === gameId);
+  const first = el('div', 'tools-empty-card');
+  first.appendChild(el('div', 'tools-empty-card-title', 'Nothing installed yet'));
+  first.appendChild(
+    el(
+      'div',
+      'tools-empty-card-body',
+      count > 0
+        ? `${count} essential${count === 1 ? '' : 's'} for ${game ? game.shortName : 'this game'}, fetched from ${count === 1 ? 'its' : 'their'} official page${count === 1 ? '' : 's'}.`
+        : 'The essential tools are fetched from their official pages.',
+    ),
+  );
+  const viewEss = el('button', 'linkish', 'View essentials →');
+  viewEss.addEventListener('click', () => {
+    toolsShowAll = true;
+    render();
+  });
+  first.appendChild(viewEss);
+  cards.appendChild(first);
+
+  const second = el('div', 'tools-empty-card');
+  second.appendChild(el('div', 'tools-empty-card-title', 'Or find one on a community site'));
+  second.appendChild(
+    el(
+      'div',
+      'tools-empty-card-body',
+      sites
+        .filter((site) => !site.docsOnly)
+        .map((site) => site.name)
+        .join(', '),
+    ),
+  );
+  const viewSites = el('button', 'linkish', 'Open a site →');
+  viewSites.addEventListener('click', () => {
+    toolsShowAll = true;
+    render();
+  });
+  second.appendChild(viewSites);
+  cards.appendChild(second);
+
+  wrap.appendChild(cards);
+  return wrap;
+}
+
+/** Set once the user asks past the first-run screen, for this session. */
+let toolsShowAll = false;
+
+function renderTools(s: AppState, view: HTMLElement): void {
+  const page = el('div', 'tools');
+  const gameId = s.currentGameId;
+
+  if (!gameId) {
+    page.appendChild(
+      el('div', 'tools-quiet', 'Choose a game first — the tools differ between them.'),
+    );
+    view.appendChild(page);
+    return;
+  }
+
+  if (essentialsFor_ !== gameId && !essentialsLoading) void loadEssentials(gameId);
+  if (sites.length === 0) void loadSites(gameId);
+
+  const head = el('div', 'tools-head');
+  head.appendChild(el('div', 'tools-title', 'Get mods into GTArage'));
+  head.appendChild(
+    el('div', 'tools-sub', 'There’s no catalogue here — mods arrive one of three ways.'),
+  );
+  page.appendChild(head);
+
+  const empty = s.mods.filter((m) => m.gameId === gameId).length === 0;
+  if (empty && !toolsShowAll) {
+    page.appendChild(toolsFirstRun(s, gameId));
+    view.appendChild(page);
+    return;
+  }
+
+  page.appendChild(dropBand());
+
+  const cols = el('div', 'tools-cols');
+  cols.appendChild(essentialsPanel(s, gameId));
+  cols.appendChild(sitesPanel(gameId));
+  page.appendChild(cols);
+
+  view.appendChild(page);
 }
 
 // --- Library ------------------------------------------------------------------
@@ -3615,6 +4042,9 @@ function render(): void {
       break;
     case 'library':
       renderLibrary(s, view);
+      break;
+    case 'tools':
+      renderTools(s, view);
       break;
     case 'settings':
       renderSettings(s, view);

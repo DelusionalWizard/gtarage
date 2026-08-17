@@ -9,6 +9,7 @@
  */
 
 import type { HookVerdict } from './buildwatch';
+import type { ModSite } from './sites';
 import type {
   AppConfig,
   Conflict,
@@ -24,6 +25,59 @@ import type {
 export const CALL_CHANNEL = 'gtarage:call';
 /** Main -> renderer progress during a long deploy. */
 export const PROGRESS_CHANNEL = 'gtarage:progress';
+/** Main -> renderer notifications from the embedded mod-site browser. */
+export const SITE_CHANNEL = 'gtarage:site';
+
+/** Pushed to the renderer when the embedded browser captures a download. */
+export interface SiteEvent {
+  kind: 'progress' | 'imported' | 'staged' | 'failed';
+  fileName: string;
+  message: string;
+  received?: number;
+  total?: number;
+}
+
+/**
+ * One Essentials entry, flattened into what the Tools screen draws.
+ *
+ * The renderer gets a decided state rather than raw catalogue data: whether
+ * something is installed, and whether it is behind, are both judgements that
+ * need the library and a version comparison, and doing them in the renderer
+ * would mean shipping that logic across the bridge for no reason.
+ *
+ * Downloading and failed are deliberately absent. They are transient facts
+ * about this session, not about the entry, so the renderer owns them.
+ */
+export interface EssentialView {
+  id: string;
+  name: string;
+  /** The catalogue's version string, as published. */
+  version: string;
+  summary: string;
+  /** The project's own page. */
+  url: string;
+  /** Bytes of the file that would be fetched; 0 when unknown. */
+  sizeBytes: number;
+  /** Set when the author publishes no downloadable release. */
+  manualOnly?: boolean;
+  manualReason?: string;
+  /** The version in the library, when a mod there matches this entry. */
+  installedVersion?: string;
+  /** When the installed copy was added, ISO. */
+  installedAt?: string;
+  /** Installed, and the catalogue has something newer. */
+  outdated?: boolean;
+}
+
+export interface EssentialsView {
+  entries: EssentialView[];
+  /**
+   * Set when the catalogue could not be reached. The Tools screen stays
+   * useful without it -- dropping a file and the community sites do not
+   * depend on GitHub -- so this is a panel-level state, never a page error.
+   */
+  error?: string;
+}
 
 /** A library mod together with the prerequisites it is still missing. */
 export interface MissingDeps {
@@ -429,6 +483,23 @@ export interface GTArageApi {
   ): Promise<void>;
 
   updateSettings(patch: Partial<AppConfig['settings']>): Promise<AppState>;
+
+  // --- tools ----------------------------------------------------------------
+
+  /**
+   * The Essentials for a game, with install state resolved.
+   * `refresh` bypasses the cached release metadata.
+   */
+  listEssentials(gameId: GameId, refresh?: boolean): Promise<EssentialsView>;
+  /** Download an Essentials entry and import it. */
+  installEssential(
+    id: string,
+    gameId: GameId,
+  ): Promise<{ state: AppState; imported: boolean; message: string }>;
+  /** Mod sites available for a game. */
+  listSites(gameId: GameId): Promise<ModSite[]>;
+  /** Open the embedded browser at a site. Downloads there are captured. */
+  openSite(siteId: string, gameId: GameId): Promise<void>;
 
   // --- prerequisites --------------------------------------------------------
 

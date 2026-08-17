@@ -22,6 +22,10 @@ type AdoptGroupView = import('../shared/api').AdoptGroupView;
 type HookStatus = import('../shared/api').HookStatus;
 type SpeedrunToolView = import('../shared/api').SpeedrunToolView;
 type HookCandidateView = import('../shared/api').HookCandidateView;
+type SiteEvent = import('../shared/api').SiteEvent;
+type EssentialView = import('../shared/api').EssentialView;
+type EssentialsView = import('../shared/api').EssentialsView;
+type ModSite = import('../shared/sites').ModSite;
 
 type Conflict = import('../shared/types').Conflict;
 type GameId = import('../shared/types').GameId;
@@ -41,6 +45,7 @@ interface Window {
   gtarageFiles: { getPathForFile(file: File): string };
   gtarageEvents: {
     onProgress(handler: (event: ProgressEvent_) => void): () => void;
+    onSiteEvent(handler: (event: SiteEvent) => void): () => void;
   };
 }
 

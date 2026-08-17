@@ -12,9 +12,11 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import {
   CALL_CHANNEL,
   PROGRESS_CHANNEL,
+  SITE_CHANNEL,
   type ApiMethod,
   type ProgressEvent,
   type GTArageApi,
+  type SiteEvent,
 } from '../shared/api';
 
 /** Every method name the bridge will forward. Anything else is ignored. */
@@ -62,6 +64,10 @@ const METHODS: ApiMethod[] = [
   'launchGame',
   'openPath',
   'updateSettings',
+  'listEssentials',
+  'installEssential',
+  'listSites',
+  'openSite',
   'installDependency',
   'rescanDependencies',
   'openExternal',
@@ -102,5 +108,11 @@ contextBridge.exposeInMainWorld('gtarageEvents', {
     const listener = (_e: unknown, payload: ProgressEvent) => handler(payload);
     ipcRenderer.on(PROGRESS_CHANNEL, listener);
     return () => ipcRenderer.removeListener(PROGRESS_CHANNEL, listener);
+  },
+  /** Downloads captured by the embedded mod-site browser. */
+  onSiteEvent(handler: (event: SiteEvent) => void): () => void {
+    const listener = (_e: unknown, payload: SiteEvent) => handler(payload);
+    ipcRenderer.on(SITE_CHANNEL, listener);
+    return () => ipcRenderer.removeListener(SITE_CHANNEL, listener);
   },
 });

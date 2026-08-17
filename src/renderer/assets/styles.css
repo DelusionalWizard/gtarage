@@ -2177,20 +2177,185 @@ button:disabled {
   justify-content: center;
 }
 
-.ess {
+/* ===========================================================================
+ * Tools, from the "Settings & Browse" mockup.
+ *
+ * Three routes, three visual languages, and the difference is the point: a
+ * dashed band you can drop onto, a solid list with real install buttons, and
+ * a column of doorways with no listing behind them. Giving all three the same
+ * card is what made the previous version read as a catalogue that returns
+ * nothing.
+ * ======================================================================== */
+
+.tools {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  overflow: hidden;
+  gap: 16px;
+  padding: 22px 32px 24px;
+  height: 100%;
+  min-height: 0;
 }
 
-.ess-row {
+.tools-head {
+  flex: none;
+}
+
+.tools-title {
+  font: 600 23px var(--sans);
+  color: var(--text);
+  letter-spacing: -0.015em;
+}
+
+.tools-sub {
+  font: 400 13px var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+/* Route one. Dashed because it is a target, not a button. */
+.drop-band {
+  flex: none;
   display: flex;
   align-items: center;
+  gap: 20px;
+  min-height: 104px;
+  padding: 0 28px;
+  border: 1.5px dashed color-mix(in oklch, var(--blue) 40%, transparent);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.drop-band-icon {
+  flex: none;
+  font: 400 34px var(--sans);
+  color: var(--blue);
+}
+
+.drop-band-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.drop-band-title {
+  font: 600 17px var(--sans);
+  color: var(--text);
+}
+
+.drop-band-sub {
+  font: 400 12.5px var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+.tools-cols {
+  flex: 1;
+  min-height: 0;
+  display: flex;
   gap: 16px;
-  padding: 16px 18px;
+}
+
+/* The mockup's 1.6 : 1 split. Essentials is the column with decisions in it. */
+.tools-col.is-essentials {
+  flex: 1.6;
+}
+
+.tools-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tools-colhead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tools-colhead.is-stacked {
+  display: block;
+}
+
+.tools-colhead-title {
+  font: 600 15px var(--sans);
+  color: var(--text);
+}
+
+.tools-colhead-sub {
+  font: 400 12px var(--sans);
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.tools-colhead-note {
+  font: 400 11.5px var(--mono);
+  color: var(--faint);
+}
+
+.tools-spacer {
+  flex: 1;
+}
+
+.tools-gamepill {
+  padding: 4px 9px;
+  border-radius: 14px;
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  font: 600 11.5px var(--sans);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tools-card {
+  flex: 1;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.tools-card.is-centred {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 30px;
+}
+
+.tools-quiet-icon {
+  font: 400 26px var(--sans);
+  color: var(--ghost);
+}
+
+.tools-quiet-title {
+  font: 600 15px var(--sans);
+  color: var(--text);
+}
+
+.tools-quiet {
+  font: 400 12.5px/1.5 var(--sans);
+  color: var(--dim);
+  max-width: 320px;
+}
+
+.tools-foot {
+  flex: none;
+  font: 400 11.5px var(--sans);
+  color: var(--faint);
+}
+
+/* --- an Essentials row, in each of its six states ------------------------- */
+
+.ess-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
 }
 
 .ess-row + .ess-row {
@@ -2202,25 +2367,229 @@ button:disabled {
   min-width: 0;
 }
 
-.ess-name {
+.ess-nameline {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.ess-name {
   font: 600 14px var(--sans);
   color: var(--text);
 }
 
-.ess-blurb {
-  font: 400 12.5px/1.55 var(--sans);
-  color: var(--dim);
-  margin-top: 4px;
-}
-
-.ess-meta {
+.ess-ver {
   font: 400 11px var(--mono);
   color: var(--faint);
-  margin-top: 5px;
+}
+
+.ess-sub {
+  font: 400 12px var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+.ess-pill {
+  font: 500 10.5px var(--mono);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.ess-pill.is-update {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.ess-pill.is-failed {
+  background: color-mix(in oklch, var(--red) 8%, var(--panel));
+  color: var(--red);
+}
+
+.ess-ok {
+  flex: none;
+  font: 600 12.5px var(--sans);
+  color: var(--green);
+  white-space: nowrap;
+}
+
+.ess-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  margin-top: 7px;
+  overflow: hidden;
+}
+
+.ess-bar-fill {
+  height: 100%;
+  background: var(--blue);
+  transition: width 0.15s linear;
+}
+
+.ess-pct {
+  flex: none;
+  font: 500 12.5px var(--mono);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+/* --- community sites ------------------------------------------------------ */
+
+.tools-card.is-sites {
+  justify-content: stretch;
+}
+
+.site-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  min-height: 52px;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.site-row + .site-row {
+  border-top: 1px solid var(--line);
+}
+
+.site-row:hover {
+  background: var(--panel-2);
+}
+
+.site-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ghost);
+}
+
+.site-name {
+  flex: 1;
+  min-width: 0;
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.site-open {
+  flex: none;
+  font: 600 12px var(--sans);
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+/* --- first run ------------------------------------------------------------ */
+
+.tools-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 40px;
+}
+
+.tools-empty-zone {
+  width: 640px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 56px 40px;
+  border: 1.5px dashed color-mix(in oklch, var(--blue) 40%, transparent);
+  border-radius: 16px;
+  background: var(--panel);
+  text-align: center;
+}
+
+.tools-empty-icon {
+  font: 400 44px var(--sans);
+  color: var(--blue);
+}
+
+.tools-empty-title {
+  font: 600 22px var(--sans);
+  color: var(--text);
+}
+
+.tools-empty-sub {
+  font: 400 13.5px/1.5 var(--sans);
+  color: var(--dim);
+  margin-top: 6px;
+  max-width: 440px;
+}
+
+.tools-empty-cards {
+  width: 640px;
+  max-width: 100%;
+  display: flex;
+  gap: 14px;
+}
+
+.tools-empty-card {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.tools-empty-card-title {
+  font: 600 13px var(--sans);
+  color: var(--text);
+}
+
+.tools-empty-card-body {
+  font: 400 12px/1.5 var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+/* A link that is really a button, so it keeps keyboard behaviour. */
+.linkish {
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  color: var(--blue);
+}
+
+.linkish:hover {
+  text-decoration: underline;
+}
+
+/* The mockup's rail plus this two-column body needs more width than a laptop
+   window has. Container query, not a media query: the view is a container, so
+   the viewport width is not what decides this. */
+@container view (max-width: 820px) {
+  .tools-cols {
+    flex-direction: column;
+  }
+
+  .tools-col.is-essentials,
+  .tools-col {
+    flex: none;
+  }
+
+  .tools-card {
+    min-height: 220px;
+  }
 }
 
 .tag {

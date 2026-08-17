@@ -35,6 +35,9 @@ import {
 } from '../shared/planner';
 import type {
   AppState,
+  EssentialsView,
+  EssentialView,
+  SiteEvent,
   ApplyReport,
   BuildAlert,
   DlcReport,
@@ -46,7 +49,7 @@ import type {
   UpdateView,
   VerifyView,
 } from '../shared/api';
-import { PROGRESS_CHANNEL } from '../shared/api';
+import { PROGRESS_CHANNEL, SITE_CHANNEL } from '../shared/api';
 import type { CatalogFile, CatalogMod } from '../shared/catalog';
 import {
   clearStaged,
@@ -58,7 +61,7 @@ import { promises as fs } from 'node:fs';
 
 import { findAdoptable } from './adopt';
 import { detectSpeedrunTools, launchSpeedrunTool } from './speedrun';
-import { checkForUpdate, downloadUpdate, installUpdate } from './updater';
+import { checkForUpdate, downloadUpdate, installUpdate, isNewer } from './updater';
 import { PRACTICE_PROFILE_NAME, SPEEDRUN_RESOURCES } from '../shared/speedrun';
 import {
   SCRIPTHOOKV_URL,
@@ -76,6 +79,7 @@ import {
   swapGraphics,
 } from './graphics';
 import { browseEssentials } from './providers/github';
+import { listSites, openModSite } from './modsites';
 import type { AppConfig, GameId, Mod, Profile, SwapPlan } from '../shared/types';
 import {
   activeProfileFor,
@@ -326,12 +330,16 @@ async function buildState(config: AppConfig): Promise<AppState> {
   };
 }
 
+function emitSite(event: SiteEvent): void {
+  mainWindow?.webContents.send(SITE_CHANNEL, event);
+}
+
 /**
  * Import a file that was downloaded into the staging folder.
  *
- * The only remaining caller is the prerequisite installer, but it stays a
- * separate function because a rebuilt Browse will want exactly this: take a
- * file that has landed on disk and put it through the normal import.
+ * Shared by the site-browser capture and the Essentials installer, so a mod
+ * caught from a community site ends up in exactly the same state as one that
+ * was fetched from a release page or dragged in by hand.
  */
 async function importStagedFile(
   filePath: string,
@@ -407,6 +415,104 @@ function requireInstall(config: AppConfig, gameId: GameId): string {
 }
 
 // --- implementation ---------------------------------------------------------
+
+/** Wire the embedded browser's download capture into the library. */
+export function modSiteHooks() {
+  return {
+    stagingDir(gameId: GameId): string {
+      return stagingDir(peekConfig(), gameId);
+    },
+    onProgress(fileName: string, received: number, total: number): void {
+      emitSite({ kind: 'progress', fileName, message: 'Downloading', received, total });
+    },
+    onComplete(capture: {
+      filePath: string;
+      fileName: string;
+      gameId: GameId;
+      executable: boolean;
+    }): void {
+      if (capture.executable) {
+        // Installers are never imported or run. They are left in the staging
+        // folder for the user to deal with deliberately.
+        emitSite({
+          kind: 'staged',
+          fileName: capture.fileName,
+          message: `${capture.fileName} is an installer, so GTArage saved it without importing or running it. Open the downloads folder to use it.`,
+        });
+        return;
+      }
+      void importStagedFile(capture.filePath, capture.gameId).then((outcome) => {
+        emitSite({
+          kind: outcome.imported ? 'imported' : 'failed',
+          fileName: capture.fileName,
+          message: outcome.message,
+        });
+      });
+    },
+    onFailed(fileName: string, reason: string): void {
+      emitSite({ kind: 'failed', fileName, message: `${fileName} download ${reason}.` });
+    },
+  };
+}
+
+/**
+ * Resolve the Essentials for a game into what the Tools screen draws.
+ *
+ * The catalogue says what exists; the library says what is here. Joining them
+ * is the whole job, and `browseEssentials` already marks the overlap, so this
+ * only has to decide the one thing left: whether an installed copy is behind.
+ *
+ * A version the comparator cannot read is treated as current rather than
+ * outdated. Mod version strings are wildly inconsistent, and an Update button
+ * that appears on a perfectly current install -- and re-downloads on every
+ * press -- is worse than never offering one.
+ */
+async function essentialsFor(
+  config: AppConfig,
+  gameId: GameId,
+  refresh: boolean,
+): Promise<EssentialsView> {
+  if (refresh) invalidateCaches();
+
+  let mods;
+  try {
+    mods = await browseEssentials(gameId, '');
+  } catch (err) {
+    return { entries: [], error: (err as Error).message };
+  }
+
+  const library = modsForGame(config, gameId);
+  const byName = new Map(
+    library.map((m) => [m.name.toLowerCase().replace(/[^a-z0-9]/g, ''), m]),
+  );
+
+  const entries: EssentialView[] = mods.map((mod) => {
+    const installed = byName.get(mod.name.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const file = mod.files.find((f) => f.primary) ?? mod.files[0];
+    const entry: EssentialView = {
+      id: mod.id,
+      name: mod.name,
+      version: mod.version,
+      summary: mod.summary,
+      url: mod.url,
+      sizeBytes: file?.size ?? 0,
+    };
+    if (mod.manualOnly) {
+      entry.manualOnly = true;
+      if (mod.manualReason) entry.manualReason = mod.manualReason;
+    }
+    if (installed) {
+      entry.installedVersion = installed.version;
+      entry.installedAt = installed.addedAt;
+      const available = mod.version.replace(/^v/i, '');
+      const have = installed.version.replace(/^v/i, '');
+      if (available && have && isNewer(available, have)) entry.outdated = true;
+    }
+    return entry;
+  });
+
+  return { entries };
+}
 
 /**
  * Download one catalog file and put it in the library.
@@ -1319,6 +1425,42 @@ export const handlers: GTArageApi = {
     return mutate((config) => {
       config.settings = { ...config.settings, ...patch };
     });
+  },
+
+  // --- tools ----------------------------------------------------------------
+
+  async listEssentials(gameId, refresh) {
+    const config = await loadConfig(userDataDir);
+    return essentialsFor(config, gameId, refresh === true);
+  },
+
+  async installEssential(id, gameId) {
+    const catalog = await browseEssentials(gameId, '');
+    const mod = catalog.find((m) => m.id === id);
+    if (!mod) throw new Error('GTArage no longer has an entry for that tool.');
+
+    // Manual-only entries have no file to fetch; the page is the whole
+    // action, and saying so beats a download that cannot happen.
+    if (mod.manualOnly) {
+      await shell.openExternal(mod.url);
+      return {
+        state: await state(),
+        imported: false,
+        message: `${mod.name} ${mod.manualReason ?? 'must be downloaded from its own site.'} The page is open in your browser — drop the file back here when you have it.`,
+      };
+    }
+
+    const file = mod.files.find((f) => f.primary) ?? mod.files[0];
+    if (!file) throw new Error(`${mod.name} has no downloadable file right now.`);
+    return installCatalogFile(mod, file, gameId);
+  },
+
+  async listSites(gameId) {
+    return listSites(gameId);
+  },
+
+  async openSite(siteId, gameId) {
+    openModSite(siteId, gameId);
   },
 
   // --- prerequisites --------------------------------------------------------
