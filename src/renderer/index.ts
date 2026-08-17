@@ -2584,42 +2584,56 @@ function emptyLibrary(): HTMLElement {
 /**
  * The speedrunning tab.
  *
- * A launcher and a directory, not a wrapper. Swapmeet does not reimplement
- * LiveSplit or download installers on your behalf — it finds what you already
+ * A launcher and a directory, not a wrapper: Swapmeet does not reimplement
+ * LiveSplit or install anything on your behalf - it finds what you already
  * have, starts it, and links what it cannot install.
+ *
+ * Rebuilt in the 2a/2b language. The content is unchanged; it was written in
+ * the dark control room's card vocabulary and never translated.
  */
 function renderSpeedrun(s: AppState, view: HTMLElement): void {
-  const cards = el('div', 'cards');
+  const page = el('div', 'page');
+
+  const head = el('div', 'home-head');
+  head.appendChild(el('h1', 'ask', 'Speedrunning'));
+  head.appendChild(
+    el(
+      'p',
+      'lede',
+      'The timers, launchers and routing resources runners use. Swapmeet starts what you already have and links the rest — it does not install these for you.',
+    ),
+  );
+  page.appendChild(head);
 
   // --- tools ----------------------------------------------------------------
-  const toolCard = el('div', 'card');
-  const head = el('div', 'card-head');
-  head.appendChild(el('div', 'card-title', 'Tools'));
-  head.appendChild(
-    el('div', 'card-count', `${speedrunTools.filter((t) => t.installed).length} installed`),
+  const tools = el('div', 'group');
+  const toolHead = el('div', 'group-head');
+  toolHead.appendChild(el('div', 'group-title', 'Tools'));
+  toolHead.appendChild(
+    el(
+      'div',
+      'group-note',
+      speedrunTools.length === 0
+        ? 'Looking…'
+        : `${speedrunTools.filter((t) => t.installed).length} of ${speedrunTools.length} found on this PC`,
+    ),
   );
-  toolCard.appendChild(head);
+  tools.appendChild(toolHead);
 
-  if (speedrunTools.length === 0) {
-    toolCard.appendChild(el('div', 'card-body', 'Looking…'));
-  }
-
+  const toolRows = el('div', 'rows');
   for (const tool of speedrunTools) {
-    const row = el('div', 'setting');
-    const main = el('div', 'setting-main');
-
-    const title = el('div', 'setting-name', tool.name);
-    if (tool.core) {
-      const tag = el('span', 'inline-tag', 'essential');
-      title.appendChild(tag);
-    }
+    const row = el('div', 'srow');
+    const main = el('div', 'srow-main');
+    const title = el('div', 'srow-name');
+    title.appendChild(document.createTextNode(tool.name));
+    if (tool.core) title.appendChild(el('span', 'tag', 'essential'));
     main.appendChild(title);
-    main.appendChild(el('div', 'setting-desc', tool.summary));
-    if (tool.path) main.appendChild(el('div', 'gfx-path', tool.path));
+    main.appendChild(el('div', 'srow-desc', tool.summary));
+    if (tool.path) main.appendChild(el('div', 'srow-desc', tool.path));
     row.appendChild(main);
 
     if (tool.installed) {
-      const start = el('button', 'small-btn is-primary', 'Start');
+      const start = el('button', 'btn is-primary', 'Start');
       start.addEventListener('click', async () => {
         if (!s.currentGameId) return;
         try {
@@ -2631,62 +2645,64 @@ function renderSpeedrun(s: AppState, view: HTMLElement): void {
       });
       row.appendChild(start);
     } else {
-      // Portable tools (LiveSplit especially) live wherever the user put
-      // them, so probing will never find them.
-      const locate = el('button', 'small-btn', 'Locate…');
+      // Portable tools - LiveSplit especially - live wherever the user
+      // extracted them, so probing install directories finds them for almost
+      // nobody.
+      const locate = el('button', 'btn', 'Locate…');
       locate.title = 'Point Swapmeet at it if you already have it';
       locate.addEventListener('click', async () => {
         if (!s.currentGameId) return;
-        const tools = await guard('Looking…', () =>
+        const list = await guard('Looking…', () =>
           api.locateSpeedrunTool(tool.id, s.currentGameId!),
         );
-        if (tools) {
-          speedrunTools = tools;
+        if (list) {
+          speedrunTools = list;
           render();
         }
       });
       row.appendChild(locate);
 
-      const get = el('button', 'small-btn', 'Get it');
+      const get = el('button', 'btn', 'Get it');
       get.addEventListener('click', () => {
         void api.openExternal(tool.url).catch((err: Error) => toast(err.message, 'error'));
       });
       row.appendChild(get);
     }
-
-    toolCard.appendChild(row);
+    toolRows.appendChild(row);
   }
-  cards.appendChild(toolCard);
+  if (speedrunTools.length > 0) tools.appendChild(toolRows);
+  page.appendChild(tools);
 
-  // --- practice profile -----------------------------------------------------
-  const practice = el('div', 'card');
-  const phead = el('div', 'card-head');
-  phead.appendChild(el('div', 'card-title', 'Practice mods'));
-  practice.appendChild(phead);
+  // --- practice setup -------------------------------------------------------
+  const practice = el('div', 'group');
+  const pHead = el('div', 'group-head');
+  pHead.appendChild(el('div', 'group-title', 'Practice mods'));
+  practice.appendChild(pHead);
   practice.appendChild(
     el(
       'div',
-      'card-body',
-      'Practice mods must never be in a submitted run. Keep them in their own profile, and switching back to a clean game is one click — which is the whole reason a profile manager is useful here.',
+      'group-blurb',
+      'Practice mods must never be in a submitted run. Keeping them in their own setup means switching back to a clean game is one click — which is the whole reason a setup manager is useful here.',
     ),
   );
 
   const hasPractice = s.profiles.some((p) => p.name === PRACTICE_PROFILE);
-  const prow = el('div', 'setting');
-  const pmain = el('div', 'setting-main');
-  pmain.appendChild(el('div', 'setting-name', `"${PRACTICE_PROFILE}" profile`));
-  pmain.appendChild(
+  const pRows = el('div', 'rows');
+  const pRow = el('div', 'srow');
+  const pMain = el('div', 'srow-main');
+  pMain.appendChild(el('div', 'srow-name', `"${PRACTICE_PROFILE}" setup`));
+  pMain.appendChild(
     el(
       'div',
-      'setting-desc',
+      'srow-desc',
       hasPractice
-        ? 'Ready. Install practice mods into it, and apply the vanilla profile before a real attempt.'
-        : 'Not created yet. Swapmeet can make an empty one to keep practice mods separate.',
+        ? 'Ready. Install practice mods into it, and switch to the vanilla setup before a real attempt.'
+        : 'Not made yet. Swapmeet can create an empty one to keep practice mods separate.',
     ),
   );
-  prow.appendChild(pmain);
+  pRow.appendChild(pMain);
   if (!hasPractice) {
-    const make = el('button', 'small-btn is-primary', 'Create it');
+    const make = el('button', 'btn is-primary', 'Create it');
     make.addEventListener('click', async () => {
       if (!s.currentGameId) return;
       const next = await guard('Creating…', () =>
@@ -2694,133 +2710,155 @@ function renderSpeedrun(s: AppState, view: HTMLElement): void {
       );
       if (next) {
         apply(next);
-        toast(`"${PRACTICE_PROFILE}" profile created.`, 'ok');
+        toast(`"${PRACTICE_PROFILE}" setup created.`, 'ok');
       }
     });
-    prow.appendChild(make);
+    pRow.appendChild(make);
   }
-  practice.appendChild(prow);
-  cards.appendChild(practice);
+  pRows.appendChild(pRow);
+  practice.appendChild(pRows);
+  page.appendChild(practice);
 
   // --- resources ------------------------------------------------------------
   for (const group of speedrunGroups) {
-    const card = el('div', 'card');
-    const gh = el('div', 'card-head');
-    gh.appendChild(el('div', 'card-title', group.title));
-    card.appendChild(gh);
-    card.appendChild(el('div', 'card-body', group.blurb));
+    const section = el('div', 'group');
+    const gHead = el('div', 'group-head');
+    gHead.appendChild(el('div', 'group-title', group.title));
+    section.appendChild(gHead);
+    section.appendChild(el('div', 'group-blurb', group.blurb));
 
+    const rows = el('div', 'rows');
     for (const item of group.items) {
-      const row = el('div', 'setting');
-      const main = el('div', 'setting-main');
-      const name = el('div', 'setting-name', item.name);
-      if (item.discord) name.appendChild(el('span', 'inline-tag', 'discord'));
+      const row = el('div', 'srow');
+      const main = el('div', 'srow-main');
+      const name = el('div', 'srow-name');
+      name.appendChild(document.createTextNode(item.name));
+      if (item.discord) name.appendChild(el('span', 'tag', 'discord'));
       main.appendChild(name);
-      if (item.note) main.appendChild(el('div', 'setting-desc', item.note));
+      if (item.note) main.appendChild(el('div', 'srow-desc', item.note));
       row.appendChild(main);
 
-      const open = el('button', 'small-btn', 'Open');
+      const open = el('button', 'btn', 'Open');
       open.addEventListener('click', () => {
         void api.openExternal(item.url).catch((err: Error) => toast(err.message, 'error'));
       });
       row.appendChild(open);
-      card.appendChild(row);
+      rows.appendChild(row);
     }
-    cards.appendChild(card);
+    section.appendChild(rows);
+    page.appendChild(section);
   }
 
-  view.appendChild(cards);
+  view.appendChild(page);
 }
 
 // --- rendering: saves -------------------------------------------------------
 
+/**
+ * Save snapshots.
+ *
+ * Rebuilt in the 2a/2b language rather than the dark control room's card
+ * vocabulary it was written in. The content is unchanged - this screen was
+ * never wrong, it was just speaking the previous design's dialect.
+ */
 function renderSaves(s: AppState, view: HTMLElement): void {
-  const cards = el('div', 'cards');
+  const page = el('div', 'page');
 
-  const card = el('div', 'card');
-  const head = el('div', 'card-head');
-  head.appendChild(el('div', 'card-title', 'Save snapshots'));
-  head.appendChild(el('div', 'card-count', `${saves.length} kept`));
-  head.appendChild(el('div', 'card-spacer'));
+  const head = el('div', 'home-head');
+  head.appendChild(el('h1', 'ask', 'Your save backups'));
+  head.appendChild(
+    el(
+      'p',
+      'lede',
+      s.settings.backupSavesOnSwap
+        ? 'A snapshot is taken automatically before every switch, so this list fills itself in as you use the app. Restoring is itself undoable — your current saves are snapshotted first.'
+        : 'Automatic snapshots are switched off, so nothing is copied before a switch. You can still take one by hand, and turn the automatic ones back on in Settings.',
+    ),
+  );
+  page.appendChild(head);
 
-  const openSaves = el('button', 'small-btn', 'Open saves folder');
+  const acts = el('div', 'notice-acts');
+  const snapshot = el('button', 'btn is-primary', 'Take a snapshot now');
+  snapshot.addEventListener('click', () => backupSaves());
+  acts.appendChild(snapshot);
+  const openSaves = el('button', 'btn', 'Open my saves folder');
   openSaves.title = "Open the game's own save folder in Explorer";
   openSaves.addEventListener('click', () => {
     if (s.currentGameId) {
       void api.openPath('saves', s.currentGameId).catch((err: Error) => toast(err.message, 'error'));
     }
   });
-  head.appendChild(openSaves);
-
-  // Backing up lives here, next to the snapshots it produces, rather than in
-  // the action bar where it sat between the two buttons people actually use.
-  const backupBtn = el('button', 'small-btn is-primary', 'Snapshot now');
-  backupBtn.addEventListener('click', () => backupSaves());
-  head.appendChild(backupBtn);
-  card.appendChild(head);
+  acts.appendChild(openSaves);
+  page.appendChild(acts);
 
   if (saves.length === 0) {
-    card.appendChild(
-      el(
-        'div',
-        'card-body',
-        'No snapshots yet. Swapmeet takes one automatically before every profile swap, so this fills itself in as you use the app.',
+    page.appendChild(
+      emptyState(
+        'No snapshots yet',
+        'Swapmeet takes one before every switch. Until then there is nothing here to restore.',
       ),
     );
-  } else {
-    for (const snap of saves) {
-      const row = el('div', 'card-row');
-      const main = el('div', 'setting-main');
-      main.appendChild(el('div', 'setting-name', snap.label));
-      // Two different times, and the difference matters: the snapshot time is
-      // when you swapped profiles, the save time is how far along the save
-      // itself actually is.
-      main.appendChild(
-        el('div', 'setting-desc', `Snapshot taken ${formatExact(snap.createdAt)}`),
-      );
-      main.appendChild(
-        el(
-          'div',
-          'setting-desc',
-          snap.savedAt
-            ? `Game last saved ${formatExact(snap.savedAt)}`
-            : 'Game save time unknown',
-        ),
-      );
-      main.appendChild(
-        el(
-          'div',
-          'setting-desc',
-          `${snap.fileCount} file${snap.fileCount === 1 ? '' : 's'} · ${formatBytes(snap.size)}`,
-        ),
-      );
-      row.appendChild(main);
-
-      const restore = el('button', 'small-btn', 'Restore');
-      restore.addEventListener('click', async () => {
-        if (!s.currentGameId) return;
-        const ok = await confirmModal(
-          'Restore this snapshot?',
-          'Your current saves are snapshotted first, so this is itself undoable.',
-          'Restore saves',
-        );
-        if (!ok) return;
-        const list = await guard('Restoring saves…', () =>
-          api.restoreSave(s.currentGameId!, snap.id),
-        );
-        if (list) {
-          saves = list;
-          toast('Saves restored.', 'ok');
-          render();
-        }
-      });
-      row.appendChild(restore);
-      card.appendChild(row);
-    }
+    view.appendChild(page);
+    return;
   }
 
-  cards.appendChild(card);
-  view.appendChild(cards);
+  const group = el('div', 'group');
+  const groupHead = el('div', 'group-head');
+  groupHead.appendChild(el('div', 'group-title', 'Snapshots'));
+  groupHead.appendChild(
+    el('div', 'group-note', `${saves.length} kept · oldest ${formatDate(saves[saves.length - 1]!.createdAt)}`),
+  );
+  group.appendChild(groupHead);
+
+  const rows = el('div', 'rows');
+  for (const snap of saves) {
+    const row = el('div', 'srow');
+    const main = el('div', 'srow-main');
+    main.appendChild(el('div', 'srow-name', snap.label));
+    // Two different times, and the difference matters: the snapshot time is
+    // when you swapped setups, the save time is how far along the save itself
+    // actually is.
+    main.appendChild(el('div', 'srow-desc', `Snapshot taken ${formatExact(snap.createdAt)}`));
+    main.appendChild(
+      el(
+        'div',
+        'srow-desc',
+        snap.savedAt ? `Game last saved ${formatExact(snap.savedAt)}` : 'Game save time unknown',
+      ),
+    );
+    main.appendChild(
+      el(
+        'div',
+        'srow-desc',
+        `${snap.fileCount} file${snap.fileCount === 1 ? '' : 's'} · ${formatBytes(snap.size)}`,
+      ),
+    );
+    row.appendChild(main);
+
+    const restore = el('button', 'btn', 'Restore');
+    restore.addEventListener('click', async () => {
+      if (!s.currentGameId) return;
+      const ok = await confirmModal(
+        'Restore this snapshot?',
+        'Your current saves are snapshotted first, so this is itself undoable.',
+        'Restore saves',
+      );
+      if (!ok) return;
+      const list = await guard('Restoring saves…', () =>
+        api.restoreSave(s.currentGameId!, snap.id),
+      );
+      if (list) {
+        saves = list;
+        toast('Saves restored.', 'ok');
+        render();
+      }
+    });
+    row.appendChild(restore);
+    rows.appendChild(row);
+  }
+  group.appendChild(rows);
+  page.appendChild(group);
+  view.appendChild(page);
 }
 
 // --- rendering: settings ----------------------------------------------------
@@ -3131,10 +3169,10 @@ function renderSetup(s: AppState, view: HTMLElement): void {
   const name = current?.name ?? 'your game';
   const anyInstalled = s.games.some((g) => g.installed);
 
-  const card = el('div', 'card setup-card');
+  const card = el('div', 'setup-card');
 
   card.appendChild(
-    el('div', 'card-title', anyInstalled ? `Set up ${name}` : 'Welcome to Swapmeet'),
+    el('div', 'ask', anyInstalled ? `Set up ${name}` : 'Welcome to Swapmeet'),
   );
   card.appendChild(
     el(

@@ -787,12 +787,26 @@ select {
   filter: brightness(1.08);
 }
 
+/*
+ * Folded into the .btn look rather than restyled at every call site.
+ *
+ * .small-btn predates the 2a/2b rebuild and is still what openModal's action
+ * buttons and a few dialogs use. Giving it the same appearance makes every
+ * button in the app consistent without touching several dozen call sites and
+ * risking a typo in each.
+ */
 .small-btn {
-  padding: 7px 12px;
-  border: 1px solid var(--line-dashed);
-  background: transparent;
+  padding: 8px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
   color: var(--text-2);
-  font: 500 11.5px var(--sans);
+  font: 500 12.5px var(--sans);
+  cursor: pointer;
+}
+
+.small-btn:hover {
+  border-color: var(--dim);
 }
 
 .small-btn:hover:not(:disabled) {
@@ -876,13 +890,18 @@ button:disabled {
  * only thing on screen, and it is carrying the explanation of how the whole
  * app works, so it should not read like an error message.
  */
+/* The first-run panel. Self-contained now that it no longer leans on .card
+   for its surface. */
 .setup-card {
   max-width: 560px;
   margin: 32px auto;
   padding: 24px 26px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 
-.setup-card .card-title {
+.setup-card .ask {
   font: 600 18px var(--sans);
   display: block;
   margin-bottom: 8px;
