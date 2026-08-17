@@ -2196,3 +2196,39 @@ button:disabled {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
+
+/* The game these setups belong to, above the question. */
+.home-game {
+  font: 500 12px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* Rename / duplicate / delete, on both a setup card and a mod row. */
+.more-btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--faint);
+  font: 400 16px var(--sans);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.more-btn:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.thing .more-btn {
+  opacity: 0;
+}
+
+.thing:hover .more-btn,
+.thing .more-btn:focus-visible {
+  opacity: 1;
+}

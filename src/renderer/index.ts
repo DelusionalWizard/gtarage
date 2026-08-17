@@ -754,6 +754,9 @@ function renderHome(s: AppState, view: HTMLElement): void {
   const home = el('div', 'home');
 
   const head = el('div', 'home-head');
+  // Which game these setups belong to. Without it the question is ambiguous
+  // the moment someone has both Legacy and Enhanced installed.
+  head.appendChild(el('div', 'home-game', current.name));
   head.appendChild(el('h1', 'ask', 'Which setup do you want to play?'));
   head.appendChild(
     el(
@@ -795,7 +798,21 @@ function setupCard(s: AppState, profile: Profile): HTMLElement {
   head.appendChild(el('div', 'setup-name', profile.name));
   if (live) head.appendChild(el('div', 'setup-tag is-good', 'IN USE'));
   else if (profile.vanillaLock) head.appendChild(el('div', 'setup-tag is-good', 'SAFE'));
+
+  // Rename, duplicate and delete live here. The rebuild dropped the profile
+  // rail that used to hold them, which left no way to remove a setup at all.
+  const more = el('button', 'more-btn', '⋯');
+  more.title = `More actions for ${profile.name}`;
+  more.addEventListener('click', (event) => {
+    event.stopPropagation();
+    profileMenu(profile);
+  });
+  head.appendChild(more);
   card.appendChild(head);
+  card.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    profileMenu(profile);
+  });
 
   card.appendChild(el('div', 'setup-blurb', blurbFor(s, profile)));
 
@@ -958,11 +975,12 @@ function renderProfile(s: AppState, view: HTMLElement): void {
  * engine sorts by. "Needed to run mods" is a real thing someone can reason
  * about; "asi" is not.
  */
-const PLAIN_GROUPS: Array<{ id: string; label: string; kinds: string[] }> = [
-  { id: 'all', label: 'Everything', kinds: [] },
-  { id: 'plays', label: 'How the game plays', kinds: ['asi', 'script', 'cleo', 'oiv', 'replace'] },
-  { id: 'looks', label: 'How it looks', kinds: ['graphics'] },
-  { id: 'core', label: 'Needed to run mods', kinds: [] },
+const PLAIN_GROUPS: Array<{ id: string; label: string }> = [
+  { id: 'all', label: 'Everything' },
+  // The split people actually care about is 'things I chose' versus 'things
+  // that have to be there', not which deploy root a file lands in.
+  { id: 'installed', label: 'Installed' },
+  { id: 'core', label: 'Required' },
 ];
 
 function renderPills(s: AppState, profile: Profile): HTMLElement {
@@ -984,11 +1002,9 @@ function thingsFor(s: AppState, profile: Profile, which = filter): Mod[] {
   const inProfile = profile.order
     .map((id) => s.mods.find((m) => m.id === id))
     .filter((m): m is Mod => m !== undefined);
-  if (which === 'all') return inProfile;
   if (which === 'core') return inProfile.filter((m) => m.core);
-  const group = PLAIN_GROUPS.find((g) => g.id === which);
-  if (!group) return inProfile;
-  return inProfile.filter((m) => !m.core && group.kinds.includes(m.kind));
+  if (which === 'installed') return inProfile.filter((m) => !m.core);
+  return inProfile;
 }
 
 function thingRow(s: AppState, profile: Profile, mod: Mod): HTMLElement {
@@ -1014,6 +1030,15 @@ function thingRow(s: AppState, profile: Profile, mod: Mod): HTMLElement {
   main.appendChild(head);
   main.appendChild(el('div', 'thing-blurb', plainBlurb(s, profile, mod, on, conflicts)));
   row.appendChild(main);
+
+  const more = el('button', 'more-btn', '⋯');
+  more.title = `More actions for ${mod.name}`;
+  more.addEventListener('click', () => modMenu(mod));
+  row.appendChild(more);
+  row.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    modMenu(mod);
+  });
 
   const sw = el('button', `sw${on ? ' is-on' : ''}`);
   sw.appendChild(el('div', 'sw-knob'));
@@ -1234,45 +1259,6 @@ function renderBrowse(s: AppState, view: HTMLElement): void {
   }
   bar.appendChild(switcher);
 
-  const searchBox = el('div', 'search');
-  searchBox.appendChild(el('span', 'search-slash', '/'));
-  const input = el('input');
-  input.type = 'search';
-  input.placeholder = provider === 'nexus' ? 'filter this feed…' : 'filter essentials…';
-  input.value = browseSearch;
-  input.addEventListener('input', () => {
-    browseSearch = input.value;
-    void loadBrowse();
-  });
-  searchBox.appendChild(input);
-  bar.appendChild(searchBox);
-
-  if (provider === 'nexus') {
-    const sortSel = el('select', 'mini-select');
-    for (const [value, label] of [
-      ['trending', 'Trending'],
-      ['latest', 'Latest added'],
-      ['updated', 'Recently updated'],
-    ] as Array<[BrowseSort, string]>) {
-      const option = el('option');
-      option.value = value;
-      option.textContent = label;
-      option.selected = browseSort === value;
-      sortSel.appendChild(option);
-    }
-    sortSel.addEventListener('change', () => {
-      browseSort = sortSel.value as BrowseSort;
-      void loadBrowse();
-    });
-    bar.appendChild(sortSel);
-  }
-
-  const refresh = el('button', 'small-btn', 'Refresh');
-  refresh.addEventListener('click', async () => {
-    await api.refreshCatalog();
-    void loadBrowse();
-  });
-  bar.appendChild(refresh);
   cards.appendChild(bar);
 
   // --- listing --------------------------------------------------------------
