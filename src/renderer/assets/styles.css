@@ -97,6 +97,17 @@
   --amber: oklch(0.58 0.15 78);
   --red: oklch(0.52 0.2 27);
 
+  /*
+   * The emphatic surface, per theme.
+   *
+   * Design 2a/2b puts near-black on paper for the one button that matters.
+   * Inverting that literally for dark mode gives a white slab that shouts far
+   * louder than anything around it, so dark uses the accent instead — same
+   * job, same weight, without burning a hole in the screen.
+   */
+  --solid-bg: var(--text);
+  --solid-fg: var(--bg);
+
   --sans: "Space Grotesk", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
 
@@ -139,6 +150,9 @@
   --orange-line: oklch(0.42 0.1 45);
   --amber: oklch(0.72 0.19 90);
   --red: oklch(0.62 0.2 25);
+
+  --solid-bg: var(--blue);
+  --solid-fg: #ffffff;
 }
 
 /* The amber-on-light chips need dark text to stay legible. */
@@ -151,8 +165,8 @@
 
 /* The solid button inverts in dark mode; on light it must not go white-on-white. */
 :root[data-theme='dark'] .solid-btn {
-  background: var(--text);
-  color: var(--bg);
+  background: var(--solid-bg);
+  color: var(--solid-fg);
 }
 
 :root[data-theme='dark'] .solid-btn:hover {
@@ -430,8 +444,8 @@ select {
   padding: 7px 13px;
   border: 0;
   border-radius: 5px;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--solid-bg);
+  color: var(--solid-fg);
   font: 600 12px var(--sans);
   cursor: pointer;
   white-space: nowrap;
@@ -871,9 +885,9 @@ select {
 }
 
 .small-btn.is-primary {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
+  background: var(--solid-bg);
+  border-color: var(--solid-bg);
+  color: var(--solid-fg);
   font-weight: 600;
 }
 
@@ -1902,9 +1916,9 @@ button:disabled {
 }
 
 .pill.is-active {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
+  background: var(--solid-bg);
+  border-color: var(--solid-bg);
+  color: var(--solid-fg);
   font-weight: 600;
 }
 
@@ -2148,9 +2162,9 @@ button:disabled {
 }
 
 .btn.is-primary {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
+  background: var(--solid-bg);
+  border-color: var(--solid-bg);
+  color: var(--solid-fg);
   font-weight: 600;
 }
 

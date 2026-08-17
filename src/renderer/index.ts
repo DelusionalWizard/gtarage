@@ -837,23 +837,29 @@ function setupCard(s: AppState, profile: Profile): HTMLElement {
 
   // The card body is a second way in, alongside the explicit button. The
   // handler ignores clicks that land on a button so the two never fight.
-  card.tabIndex = 0;
-  card.title = `Open ${profile.name}`;
+  if (!profile.vanillaLock) {
+    card.tabIndex = 0;
+    card.title = `Open ${profile.name}`;
+  }
   const enter = (event: Event) => {
+    if (profile.vanillaLock) return;
     if (event.target instanceof HTMLElement && event.target.closest('button')) return;
     void openProfile(profile);
   };
   card.addEventListener('click', enter);
   card.addEventListener('keydown', (event) => {
+    if (profile.vanillaLock) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       void openProfile(profile);
     }
   });
 
-  const open = el('button', 'btn btn-wide', 'Open this setup');
-  open.addEventListener('click', () => void openProfile(profile));
-  card.appendChild(open);
+  if (!profile.vanillaLock) {
+    const open = el('button', 'btn btn-wide', 'Open this setup');
+    open.addEventListener('click', () => void openProfile(profile));
+    card.appendChild(open);
+  }
 
   /*
    * Three states, not two.
@@ -1692,74 +1698,6 @@ async function loadSpeedrun(): Promise<void> {
   if (changed || groups.length !== speedrunGroups.length) render();
 }
 
-/**
- * Offer speedrunning mode once, and only to someone who looks like a runner.
- *
- * Asking everybody would be noise. Project 127 being installed is a strong
- * signal: it exists solely to put GTA V on the version the Classic category
- * is run on, so nobody has it by accident.
- */
-async function maybePromptForSpeedrun(): Promise<void> {
-  const s = state;
-  if (!s || s.settings.speedrunMode || s.settings.speedrunAsked) return;
-
-  const tools = await api.speedrunTools(s.currentGameId ?? 'gta5').catch(() => []);
-  const p127 = tools.find((t) => t.id === 'project127' && t.installed);
-  if (!p127) return;
-
-  openModal({
-    title: 'Set up for speedrunning?',
-    subtitle:
-      'Project 127 is installed, which is the launcher the Classic category runs on — so this looks like a speedrunning setup.',
-    build: (body) => {
-      body.appendChild(
-        el(
-          'div',
-          'alert-body',
-          'Speedrunning mode adds a Speedrun tab: start LiveSplit, RivaTuner, OBS and Project 127 from here, and reach the community routing guides, split files and practice mods without hunting through bookmarks.',
-        ),
-      );
-      body.appendChild(
-        el(
-          'div',
-          'alert-body',
-          'It also makes the point that practice mods belong in their own profile, so switching back to a clean game before a real attempt is one click.',
-        ),
-      );
-      const found = tools.filter((t) => t.installed).map((t) => t.name);
-      if (found.length > 0) {
-        body.appendChild(el('div', 'field-label', 'Already installed'));
-        body.appendChild(el('div', 'mono-list', found.join('\n')));
-      }
-    },
-    actions: [
-      {
-        label: 'No thanks',
-        onClick: async () => {
-          const next = await api.updateSettings({ speedrunAsked: true });
-          apply(next);
-          return true;
-        },
-      },
-      {
-        label: 'Turn it on',
-        kind: 'primary',
-        onClick: async () => {
-          const next = await guard('Enabling…', () =>
-            api.updateSettings({ speedrunMode: true, speedrunAsked: true }),
-          );
-          if (next) {
-            apply(next);
-            tab = 'speedrun';
-            render();
-            void loadSpeedrun();
-          }
-          return true;
-        },
-      },
-    ],
-  });
-}
 
 // --- ScriptHookV setup ------------------------------------------------------
 
@@ -1768,83 +1706,7 @@ const GAME_LABEL: Record<string, string> = {
   gta5e: 'GTA V Enhanced',
 };
 
-/**
- * Offer to set up ScriptHookV when a game that needs it does not have it.
- *
- * Shown once per session. If a copy is already on the machine this is a
- * single click; otherwise it opens the official page and then watches for the
- * download to land, so the user never has to come back and find the file.
- */
-async function maybePromptForHook(): Promise<void> {
-  if (hookPromptSettled) return;
-  const status = await api.hookStatus().catch(() => null);
-  if (!status || status.missingFor.length === 0) {
-    hookPromptSettled = true;
-    return;
-  }
-  hookPromptSettled = true;
-  showHookPrompt(status);
-}
 
-function showHookPrompt(status: HookStatus): void {
-  const missing = status.missingFor;
-  const names = missing.map((g) => GAME_LABEL[g] ?? g).join(' and ');
-  const verb = missing.length > 1 ? 'need' : 'needs';
-
-  // One download covers every game, so every candidate is usable everywhere.
-  const usable = status.candidates;
-
-  openModal({
-    title: `${names} ${verb} ScriptHookV`,
-    subtitle:
-      'Almost every GTA V script mod depends on it, and the same download works for both Legacy and Enhanced. Its author publishes it from his own site rather than through an API, so Swapmeet cannot fetch it for you — but it can take it from here once you have it.',
-    build: (body) => {
-      if (usable.length > 0) {
-        body.appendChild(el('div', 'field-label', 'Found on this machine'));
-        for (const candidate of usable) {
-          body.appendChild(hookCandidateRow(candidate, missing));
-        }
-        body.appendChild(
-          el(
-            'div',
-            'alert-body',
-            'Check the version is recent enough for your game build — a ScriptHookV from before your last game update will not load.',
-          ),
-        );
-      } else {
-        body.appendChild(
-          el(
-            'div',
-            'alert-body',
-            missing.length > 1
-              ? 'Download it once, then come back — Swapmeet watches your Downloads folder and will offer to set up both games from the same file.'
-              : 'Download it, then come back — Swapmeet watches your Downloads folder and will offer to install it the moment it appears.',
-          ),
-        );
-      }
-
-      if (status.presentFor.length > 0) {
-        const have = status.presentFor.map((g) => GAME_LABEL[g] ?? g).join(' and ');
-        body.appendChild(
-          el('div', 'alert-body', `${have} already has ScriptHookV in your library.`),
-        );
-      }
-    },
-    actions: [
-      { label: 'Not now', onClick: () => true },
-      {
-        label: 'Open the download page',
-        kind: 'primary',
-        onClick: () => {
-          void api.openExternal(status.url).catch((err: Error) => toast(err.message, 'error'));
-          watchForHookDownload();
-          toast('Watching your Downloads folder — I will offer to install it when it arrives.', 'ok');
-          return true;
-        },
-      },
-    ],
-  });
-}
 
 function hookCandidateRow(candidate: HookCandidateView, missing: string[]): HTMLElement {
   const row = el('div', 'diff-row');
@@ -1890,49 +1752,7 @@ function hookCandidateRow(candidate: HookCandidateView, missing: string[]): HTML
   return row;
 }
 
-/**
- * Poll for a ScriptHookV archive appearing in Downloads.
- *
- * Polling rather than watching: the user is off in a browser, this only runs
- * while they are mid-setup, and it stops itself after a few minutes so it
- * never becomes a background cost.
- */
-function watchForHookDownload(): void {
-  if (hookWatchTimer !== null) return;
-  const startedAt = Date.now();
 
-  hookWatchTimer = window.setInterval(async () => {
-    // Give up after five minutes; they can retry from Settings.
-    if (Date.now() - startedAt > 5 * 60 * 1000) {
-      stopHookWatch();
-      return;
-    }
-
-    const status = await api.hookStatus().catch(() => null);
-    if (!status || status.missingFor.length === 0) {
-      stopHookWatch();
-      return;
-    }
-
-    const fresh = status.candidates.filter(
-      (c) =>
-        c.source === 'downloads' &&
-        (c.gameId === null || status.missingFor.includes(c.gameId)) &&
-        Date.parse(c.modifiedAt) >= startedAt - 60_000,
-    );
-    if (fresh.length === 0) return;
-
-    stopHookWatch();
-    showHookPrompt({ ...status, candidates: fresh });
-  }, 4000);
-}
-
-function stopHookWatch(): void {
-  if (hookWatchTimer !== null) {
-    window.clearInterval(hookWatchTimer);
-    hookWatchTimer = null;
-  }
-}
 
 async function adoptGroup(
   group: AdoptGroupView,
@@ -2150,12 +1970,10 @@ async function refresh(): Promise<void> {
     // Best-effort: a scan failure must not stop the app from rendering.
     adoptable = await api.scanAdoptable(next.currentGameId).catch(() => []);
     render();
-    // Offered after the first render so the app is on screen behind it.
-    // The hook prompt goes first: without ScriptHookV nothing loads at all,
-    // which matters more than a tab of convenience links.
-    await maybePromptForHook();
-    void maybePromptForSpeedrun();
-    // Last, and quiet unless there is something to say.
+    // The ScriptHookV and speedrun prompts are gone: greeting someone with a
+    // modal before they have seen the app is the wrong way to raise either.
+    // ScriptHookV needs re-raising somewhere calmer once Browse is remade.
+    // Quiet unless there is something to say.
     void checkForUpdate();
   }
 }
