@@ -168,9 +168,9 @@ noise; turn it on in Settings if you play online.
 
 Grab a build from `release/`:
 
-- `GTArage-Setup-0.3.0-beta.1.exe` — normal installer (per-user, no admin required,
+- `GTArage-Setup-1.0.0.exe` — normal installer (per-user, no admin required,
   choose your own install directory).
-- `GTArage-0.3.0-beta.1-portable.exe` — single-file portable build, no installation.
+- `GTArage-1.0.0-portable.exe` — single-file portable build, no installation.
 
 ### Build from source
 
