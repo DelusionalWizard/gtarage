@@ -315,3 +315,107 @@ test('a real orphan is still quarantined when the config does know about mods', 
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('a config written by an older version ports without losing anything', async () => {
+  /*
+   * The shape a real pre-rebuild config has: no seenBuilds, no excludedFiles,
+   * no themeChosen, and settings that predate three features. Every one of
+   * those absences has to default rather than throw or wipe, because the first
+   * launch of a new build is exactly when someone finds out their profiles are
+   * gone.
+   *
+   * Modelled on the real file this was verified against: nine profiles across
+   * seven games, two mods, one non-vanilla profile carrying an order.
+   */
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-port-'));
+  try {
+    const old = {
+      version: 1,
+      libraryPath: path.join(dir, 'library'),
+      shelfPath: path.join(dir, 'shelf'),
+      installs: [
+        { gameId: 'gta5', path: 'C:/Games/GTAV', source: 'steam', version: '1.0.3889.0' },
+        { gameId: 'gta5e', path: 'C:/Games/GTAVE', source: 'steam' },
+      ],
+      mods: [
+        {
+          id: 'shv', gameId: 'gta5', name: 'ScriptHookV 3889.0', kind: 'asi',
+          version: '1.0', path: path.join(dir, 'library/gta5/shv/content'),
+          files: ['ScriptHookV.dll', 'dinput8.dll'], size: 2400000,
+          addedAt: '2026-08-15T00:00:00.000Z', category: 'core',
+          requires: [], core: true,
+        },
+        {
+          id: 'chaos', gameId: 'gta5', name: 'ChaosMod.asi', kind: 'asi',
+          version: '1.0', path: path.join(dir, 'library/gta5/chaos/content'),
+          files: ['ChaosMod.asi'], size: 15490000,
+          addedAt: '2026-08-15T00:00:00.000Z', category: 'scripts',
+          requires: [], core: false,
+        },
+      ],
+      profiles: [
+        {
+          id: 'gta5-vanilla', gameId: 'gta5', name: 'Vanilla (locked)',
+          order: [], enabled: [], createdAt: '2026-08-15T00:00:00.000Z',
+          vanillaLock: true,
+        },
+        {
+          id: 'gta5-msu4alii', gameId: 'gta5', name: 'Chaos',
+          order: ['shv', 'chaos'], enabled: ['shv', 'chaos'],
+          createdAt: '2026-08-15T00:00:00.000Z', vanillaLock: false,
+        },
+      ],
+      activeProfile: { gta5: 'gta5-msu4alii', gta5e: 'gta5e-vanilla' },
+      lastGameId: 'gta5',
+      settings: {
+        backupSavesOnSwap: true, saveBackupLimit: 10, useHardlinks: true,
+        blockWhileGameRunning: true, warnAboutOnline: false,
+        graphicsPerProfile: true, theme: 'dark', autoUpdate: 'notify',
+        speedrunMode: false,
+      },
+    };
+    await writeJson(path.join(dir, 'swapmeet.config.json'), old);
+
+    initConfig(dir);
+    const loaded = await loadConfig(dir);
+
+    assert.equal(getConfigError(), null, 'a valid old config is not an error');
+    assert.equal(loaded.profiles.length, 2, 'every profile survives');
+    assert.equal(loaded.mods.length, 2, 'every mod survives');
+    assert.equal(loaded.installs.length, 2, 'every install survives');
+
+    const chaos = loaded.profiles.find((p) => p.name === 'Chaos');
+    assert.ok(chaos, 'the non-vanilla profile is still there');
+    assert.deepEqual(chaos.order, ['shv', 'chaos'], 'load order is verbatim');
+    assert.deepEqual(chaos.enabled, ['shv', 'chaos'], 'enabled set is verbatim');
+    assert.equal(loaded.activeProfile.gta5, 'gta5-msu4alii', 'active profile is kept');
+
+    // Fields the rebuild added must default rather than throw.
+    assert.deepEqual(loaded.seenBuilds, {}, 'seenBuilds defaults empty');
+    assert.equal(chaos.excludedFiles, undefined, 'no exclusions is fine');
+
+    // The stored theme predates the rebuilt interface and is retired once,
+    // because it was the old default rather than anyone's choice.
+    assert.equal(loaded.settings.theme, 'light', 'an unchosen dark is retired');
+    // Settings the old file never had still arrive with sane values.
+    assert.equal(loaded.settings.autoUpdate, 'notify', 'existing settings are kept');
+    assert.equal(loaded.settings.saveBackupLimit, 10);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a deliberately chosen dark theme survives the retirement', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-theme-'));
+  try {
+    await writeJson(path.join(dir, 'swapmeet.config.json'), {
+      ...defaultConfig(dir),
+      settings: { ...defaultConfig(dir).settings, theme: 'dark', themeChosen: true },
+    });
+    initConfig(dir);
+    const loaded = await loadConfig(dir);
+    assert.equal(loaded.settings.theme, 'dark', 'a real choice is never overridden');
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
