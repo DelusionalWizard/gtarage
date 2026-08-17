@@ -1200,6 +1200,87 @@ function plainBlurb(
   return `${mod.files.length} file${mod.files.length === 1 ? '' : 's'} · ${formatBytes(mod.size)}`;
 }
 
+/**
+ * The swap summary, kept in step with the switches.
+ *
+ * The app tells people "nothing changes in your game until you press Play",
+ * which is true — toggling only edits the profile. But until this existed the
+ * app could only *assert* that restraint, never show it: pressing Play simply
+ * did the work, and the only preview was a dialog shown after the decision had
+ * already been made, which is a nag rather than information.
+ *
+ * So this sits in the panel permanently and updates as switches move. Seeing
+ * the number change while you are still deciding is strictly more useful than
+ * a confirmation afterwards, and it is the one safety claim in the app that
+ * was otherwise unevidenced.
+ */
+let swapSummary: SwapPlan | null = null;
+let swapSummaryKey = '';
+
+/** What the plan depends on. Anything else changing cannot alter the answer. */
+function swapKey(profile: Profile): string {
+  return [
+    profile.id,
+    profile.order.join(','),
+    profile.enabled.join(','),
+    JSON.stringify(profile.excludedFiles ?? {}),
+  ].join('|');
+}
+
+async function refreshSwapSummary(profile: Profile, host: HTMLElement): Promise<void> {
+  const key = swapKey(profile);
+  if (key === swapSummaryKey && swapSummary) {
+    paintSwapSummary(host, swapSummary);
+    return;
+  }
+  try {
+    const plan = await api.planSwap(profile.id);
+    swapSummaryKey = key;
+    swapSummary = plan;
+    // The panel may have been rebuilt or the tab changed while this was in
+    // flight; painting into a detached node would be invisible and confusing
+    // to debug later.
+    if (host.isConnected) paintSwapSummary(host, plan);
+  } catch {
+    // A plan that cannot be built is not worth interrupting for. Apply reports
+    // the same problem properly, with the context to act on it.
+  }
+}
+
+function paintSwapSummary(host: HTMLElement, plan: SwapPlan): void {
+  clear(host);
+  const moving = plan.filesIn + plan.filesOut;
+
+  if (moving === 0) {
+    host.appendChild(
+      el('div', 'swapline-main', 'Nothing to move — this setup is already in your game folder.'),
+    );
+    return;
+  }
+
+  const line = el('div', 'swapline-main');
+  const part = (n: number, label: string, tone: string) => {
+    const chunk = el('span', `swapline-part ${tone}`);
+    chunk.appendChild(el('b', undefined, String(n)));
+    chunk.appendChild(document.createTextNode(` ${label}`));
+    line.appendChild(chunk);
+  };
+  part(plan.filesIn, 'in', 'is-in');
+  part(plan.filesOut, 'out', 'is-out');
+  part(plan.filesKept, 'left alone', 'is-keep');
+  host.appendChild(line);
+
+  const notes: string[] = [];
+  if (plan.bytesToWrite > 0) notes.push(`about ${formatBytes(plan.bytesToWrite)} written`);
+  notes.push('anything replaced is shelved, not deleted');
+  host.appendChild(el('div', 'swapline-note', notes.join(' · ')));
+
+  // Blockers are the one thing worth colouring: they stop Apply outright.
+  for (const blocker of plan.blockers) {
+    host.appendChild(el('div', 'swapline-blocker', blocker));
+  }
+}
+
 function readyPanel(s: AppState, profile: Profile): HTMLElement {
   const panel = el('div', 'ready');
 
@@ -1218,6 +1299,15 @@ function readyPanel(s: AppState, profile: Profile): HTMLElement {
     ),
   );
   panel.appendChild(head);
+
+  // Sits under the count it explains: 'x on, y off' is the decision, this is
+  // what that decision does to the game folder.
+  if (!profile.vanillaLock || s.deployed) {
+    const swapline = el('div', 'swapline');
+    swapline.appendChild(el('div', 'swapline-main', 'Working out what moves…'));
+    panel.appendChild(swapline);
+    void refreshSwapSummary(profile, swapline);
+  }
 
   // The one conflict worth surfacing, phrased as a decision rather than an
   // error. Design 2b puts exactly one of these here, not a list.

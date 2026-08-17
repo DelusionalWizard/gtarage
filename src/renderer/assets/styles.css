@@ -3162,3 +3162,52 @@ button:disabled {
 :root[data-theme='dark'] .topnav button.is-active {
   border-bottom-color: var(--blue);
 }
+
+/*
+ * The live swap summary.
+ *
+ * Deliberately quiet: it is standing information, not an alert. It earns its
+ * permanence by changing as switches move, which is the whole point — the app
+ * could previously only assert that it had not touched anything yet.
+ */
+.swapline {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.swapline-main {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font: 400 13px var(--sans);
+  color: var(--text-2);
+}
+
+.swapline-part b {
+  font: 600 13px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.swapline-part.is-in b {
+  color: var(--green);
+}
+.swapline-part.is-out b {
+  color: var(--orange);
+}
+.swapline-part.is-keep b {
+  color: var(--muted);
+}
+
+.swapline-note {
+  font: 400 11.5px/1.5 var(--sans);
+  color: var(--faint);
+  margin-top: 6px;
+}
+
+.swapline-blocker {
+  font: 500 12px/1.5 var(--sans);
+  color: var(--orange);
+  margin-top: 8px;
+}
