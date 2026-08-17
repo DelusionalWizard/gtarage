@@ -21,7 +21,7 @@ const api = window.swapmeet;
  * view, because it is app configuration rather than one of the things you
  * switch between while managing mods.
  */
-type TabId = 'home' | 'profile' | 'order' | 'speedrun' | 'saves';
+type TabId = 'home' | 'profile' | 'order' | 'speedrun' | 'saves' | 'browse' | 'settings';
 
 let state: AppState | null = null;
 // Home is the landing screen: nearly every session is 'play what I already
@@ -50,6 +50,10 @@ let hookPromptSettled = false;
  * and 'Running'.
  */
 let gameRunning = false;
+/** Essentials for the current game, fetched when Browse is opened. */
+let essentials: CatalogMod[] = [];
+let browseLoading = false;
+let sites: ModSite[] = [];
 let runningTimer: number | null = null;
 
 async function refreshRunning(): Promise<void> {
@@ -698,7 +702,9 @@ function renderCrumbs(s: AppState): void {
 }
 
 const TAB_LABELS: Record<string, string> = {
-  home: 'Home',
+  home: 'Setups',
+  browse: 'Browse',
+  settings: 'Settings',
   profile: 'Setup',
   order: 'Load order',
   saves: 'Backups',
@@ -710,8 +716,9 @@ function renderTopnav(s: AppState): void {
   const host = byId('topnav');
   clear(host);
 
-  const items: TabId[] = ['saves'];
+  const items: TabId[] = ['browse', 'saves'];
   if (s.settings.speedrunMode) items.push('speedrun');
+  items.push('settings');
 
   // Load order only makes sense once you are inside a setup that has one.
   if (tab === 'profile' || tab === 'order') items.unshift('order');
@@ -722,6 +729,7 @@ function renderTopnav(s: AppState): void {
       tab = id;
       render();
       if (id === 'speedrun') void loadSpeedrun();
+      if (id === 'browse') void loadEssentials();
     });
     host.appendChild(btn);
   }
@@ -752,7 +760,7 @@ function renderGamePicker(s: AppState): void {
  */
 function renderHome(s: AppState, view: HTMLElement): void {
   const current = s.games.find((g) => g.id === s.currentGameId);
-  if (!current?.installed) {
+  if (!current?.installed && tab !== 'settings') {
     renderSetup(s, view);
     return;
   }
@@ -762,7 +770,7 @@ function renderHome(s: AppState, view: HTMLElement): void {
   const head = el('div', 'home-head');
   // Which game these setups belong to. Without it the question is ambiguous
   // the moment someone has both Legacy and Enhanced installed.
-  head.appendChild(el('div', 'home-game', current.name));
+  head.appendChild(el('div', 'home-game', current?.name ?? ''));
   head.appendChild(el('h1', 'ask', 'Which setup do you want to play?'));
   head.appendChild(
     el(
@@ -1317,6 +1325,427 @@ async function switchAndPlay(profile: Profile): Promise<void> {
 
 
 
+
+// --- Settings ---------------------------------------------------------------
+
+/**
+ * Settings, rebuilt from the mockup.
+ *
+ * The organising idea is in the design's own title: weight made visible. The
+ * three settings that prevent a lost save or a ban are grouped first, marked
+ * recommended, and explained in terms of what goes wrong without them. The
+ * cosmetic ones come after and look like preferences, because they are.
+ */
+function renderSettings(s: AppState, view: HTMLElement): void {
+  const sheet = el('div', 'sheet');
+
+  const groups = el('div', 'groups');
+  const sections: Array<[string, string]> = [];
+
+  const section = (
+    id: string,
+    title: string,
+    opts: { badge?: string; note?: string; blurb?: string } = {},
+  ): HTMLElement => {
+    const g = el('div', 'group');
+    g.id = id;
+    sections.push([id, title]);
+    const head = el('div', 'group-head');
+    head.appendChild(el('div', 'group-title', title));
+    if (opts.badge) head.appendChild(el('div', 'group-badge', opts.badge));
+    if (opts.note) head.appendChild(el('div', 'group-note', opts.note));
+    g.appendChild(head);
+    if (opts.blurb) g.appendChild(el('div', 'group-blurb', opts.blurb));
+    groups.appendChild(g);
+    return g;
+  };
+
+  const set = (patch: Partial<AppState['settings']>) => async () => {
+    const next = await guard('Saving…', () => api.updateSettings(patch));
+    if (next) apply(next);
+  };
+
+  const toggleRow = (
+    host: HTMLElement,
+    name: string,
+    desc: string,
+    on: boolean,
+    onChange: () => void,
+    tag?: string,
+  ): HTMLElement => {
+    const row = el('div', 'srow');
+    const main = el('div', 'srow-main');
+    const nameEl = el('div', 'srow-name');
+    nameEl.appendChild(document.createTextNode(name));
+    if (tag) nameEl.appendChild(el('span', 'srow-tag', tag));
+    main.appendChild(nameEl);
+    main.appendChild(el('div', 'srow-desc', desc));
+    row.appendChild(main);
+    const sw = el('button', `sw${on ? ' is-on' : ''}`);
+    sw.appendChild(el('div', 'sw-knob'));
+    sw.addEventListener('click', onChange);
+    row.appendChild(sw);
+    host.appendChild(row);
+    return row;
+  };
+
+  // --- safety ---------------------------------------------------------------
+  const safety = section('s-safety', 'Keeping your saves safe', {
+    badge: 'RECOMMENDED ON',
+    note: 'These three prevent a lost save or a ban',
+  });
+  const safetyRows = el('div', 'rows');
+
+  const backupRow = toggleRow(
+    safetyRows,
+    'Copy my saves before every switch',
+    'A snapshot is taken before anything moves, so a bad switch can be undone.',
+    s.settings.backupSavesOnSwap,
+    set({ backupSavesOnSwap: !s.settings.backupSavesOnSwap }),
+  );
+  // The keep-count sits with the setting it belongs to rather than in a list
+  // of numbers elsewhere.
+  const stepper = el('div', 'stepper');
+  const dec = el('button', undefined, '–');
+  dec.title = 'Keep fewer snapshots';
+  dec.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void set({ saveBackupLimit: Math.max(1, s.settings.saveBackupLimit - 1) })();
+  });
+  const count = el('span', undefined, String(s.settings.saveBackupLimit));
+  const inc = el('button', undefined, '+');
+  inc.title = 'Keep more snapshots';
+  inc.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void set({ saveBackupLimit: Math.min(99, s.settings.saveBackupLimit + 1) })();
+  });
+  stepper.append(dec, count, inc);
+  backupRow.insertBefore(stepper, backupRow.lastElementChild);
+
+  toggleRow(
+    safetyRows,
+    'Do not touch the game folder while the game is running',
+    'Half-applied mods are the most common cause of a broken install.',
+    s.settings.blockWhileGameRunning,
+    set({ blockWhileGameRunning: !s.settings.blockWhileGameRunning }),
+  );
+
+  const online = s.games.filter((g) => g.hasOnline && g.installed).map((g) => g.shortName);
+  toggleRow(
+    safetyRows,
+    'Warn me before modding a game that has an online mode',
+    'Taking a modded game online can get the account banned.',
+    s.settings.warnAboutOnline,
+    set({ warnAboutOnline: !s.settings.warnAboutOnline }),
+    online.join(' · '),
+  );
+  safety.appendChild(safetyRows);
+
+  // --- game folders ---------------------------------------------------------
+  const folders = section('s-games', 'Where the games are');
+  const gameRows = el('div', 'rows');
+  for (const game of s.games) {
+    const row = el('div', 'gamerow');
+    row.appendChild(el('div', 'gamerow-name', game.shortName));
+    row.appendChild(
+      el(
+        'div',
+        `gamerow-path${game.installed ? '' : ' is-missing'}`,
+        game.path ?? 'No folder found — choose it yourself if the game is installed',
+      ),
+    );
+    gameRows.appendChild(row);
+  }
+  folders.appendChild(gameRows);
+  const folderActs = el('div', 'notice-acts');
+  const again = el('button', 'btn', 'Search again');
+  again.addEventListener('click', () => detect_());
+  const choose = el('button', 'btn', 'Choose folder');
+  choose.addEventListener('click', () => browseForGame());
+  folderActs.append(again, choose);
+  folders.appendChild(folderActs);
+
+  // --- how files are placed -------------------------------------------------
+  const placing = section('s-files', 'How files are placed', {
+    blurb:
+      'A link is a second name for a file that already exists, so it costs almost nothing. A copy duplicates it — a 6 GB texture pack in two setups becomes 12 GB on disk.',
+  });
+  const picks = el('div', 'picks');
+  const pick = (name: string, desc: string, on: boolean, onPick: () => void) => {
+    const card = el('button', `pick${on ? ' is-on' : ''}`);
+    card.appendChild(el('div', 'pick-name', name));
+    card.appendChild(el('div', 'pick-desc', desc));
+    card.addEventListener('click', onPick);
+    picks.appendChild(card);
+  };
+  pick(
+    'Link files where possible',
+    'Falls back to copying when a setup and a game sit on different drives.',
+    s.settings.useHardlinks,
+    set({ useHardlinks: true }),
+  );
+  pick(
+    'Always copy',
+    'Slower and uses far more space. Works on every drive and setup.',
+    !s.settings.useHardlinks,
+    set({ useHardlinks: false }),
+  );
+  placing.appendChild(picks);
+
+  // --- graphics -------------------------------------------------------------
+  const gfx = section('s-graphics', 'Graphics settings per setup');
+  const gfxRows = el('div', 'rows');
+  toggleRow(
+    gfxRows,
+    'Each setup keeps its own graphics settings',
+    "Its own settings.xml and launch options, applied on the switch.",
+    s.settings.graphicsPerProfile,
+    set({ graphicsPerProfile: !s.settings.graphicsPerProfile }),
+  );
+  gfx.appendChild(gfxRows);
+
+  // --- updates --------------------------------------------------------------
+  const updates = section('s-updates', 'Updates', { note: `Version ${s.appVersion}` });
+  const updRows = el('div', 'rows');
+  const updRow = el('div', 'srow');
+  const updMain = el('div', 'srow-main');
+  updMain.appendChild(el('div', 'srow-name', 'When a new version is published'));
+  updMain.appendChild(
+    el('div', 'srow-desc', 'Downloads are checked against their published checksum before anything runs.'),
+  );
+  updRow.appendChild(updMain);
+  const seg = el('div', 'seg');
+  for (const [value, label] of [
+    ['notify', 'Tell me'],
+    ['auto', 'Auto'],
+    ['off', 'Never check'],
+  ] as Array<['notify' | 'auto' | 'off', string]>) {
+    const b = el('button', s.settings.autoUpdate === value ? 'is-on' : undefined, label);
+    b.addEventListener('click', set({ autoUpdate: value }));
+    seg.appendChild(b);
+  }
+  updRow.appendChild(seg);
+  updRows.appendChild(updRow);
+  updates.appendChild(updRows);
+  const checkActs = el('div', 'notice-acts');
+  const check = el('button', 'btn', 'Check now');
+  check.addEventListener('click', () => void checkForUpdate(true));
+  checkActs.appendChild(check);
+  updates.appendChild(checkActs);
+
+  // --- appearance -----------------------------------------------------------
+  const look = section('s-look', 'Appearance');
+  const lookRows = el('div', 'rows');
+  const lookRow = el('div', 'srow');
+  const lookMain = el('div', 'srow-main');
+  lookMain.appendChild(el('div', 'srow-name', 'Theme'));
+  lookMain.appendChild(el('div', 'srow-desc', 'The interface is designed light. Dark is available if you prefer it.'));
+  lookRow.appendChild(lookMain);
+  const themeSeg = el('div', 'seg');
+  for (const [value, label] of [
+    ['light', 'Light'],
+    ['dark', 'Dark'],
+  ] as Array<['light' | 'dark', string]>) {
+    const b = el('button', (s.settings.theme ?? 'light') === value ? 'is-on' : undefined, label);
+    // themeChosen marks a real decision, so the one-time retirement of the old
+    // default never overrides it again.
+    b.addEventListener('click', set({ theme: value, themeChosen: true }));
+    themeSeg.appendChild(b);
+  }
+  lookRow.appendChild(themeSeg);
+  lookRows.appendChild(lookRow);
+  look.appendChild(lookRows);
+
+  // --- extras ---------------------------------------------------------------
+  const extras = section('s-extras', 'Extra tools');
+  const extraRows = el('div', 'rows');
+  toggleRow(
+    extraRows,
+    'Speedrunning tools',
+    'Adds a tab with the timers, launchers and routing resources runners use.',
+    s.settings.speedrunMode,
+    set({ speedrunMode: !s.settings.speedrunMode }),
+  );
+  extras.appendChild(extraRows);
+
+  // --- where files live -----------------------------------------------------
+  const where = section('s-where', 'Where your files live');
+  const whereRows = el('div', 'rows');
+  for (const [name, dir, kind] of [
+    ['Library', s.libraryPath, 'library'],
+    ['Shelf', s.shelfPath, 'shelf'],
+  ] as Array<[string, string, 'library' | 'shelf']>) {
+    const row = el('div', 'gamerow');
+    row.appendChild(el('div', 'gamerow-name', name));
+    row.appendChild(el('div', 'gamerow-path', dir));
+    const open = el('button', 'btn', 'Open');
+    open.addEventListener('click', () => void api.openPath(kind));
+    row.appendChild(open);
+    whereRows.appendChild(row);
+  }
+  where.appendChild(whereRows);
+
+  // The rail is built last, from the sections that actually exist.
+  const rail = el('div', 'onpage');
+  rail.appendChild(el('div', 'onpage-label', 'ON THIS PAGE'));
+  for (const [id, title] of sections) {
+    const link = el('button', undefined, title);
+    link.addEventListener('click', () => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    rail.appendChild(link);
+  }
+
+  sheet.append(rail, groups);
+  view.appendChild(sheet);
+}
+
+// --- Browse -------------------------------------------------------------------
+
+/**
+ * Browse, rebuilt from the mockup.
+ *
+ * Three ways a mod arrives, and the design's argument is that they should look
+ * as different as they behave: a file you already have is a drop target, the
+ * Essentials are things Swapmeet installs itself, and a community site is a
+ * handoff where all it can do is catch what you download. The old version gave
+ * all three the same card and a search box, which implied a catalogue that
+ * does not exist.
+ */
+function renderBrowse(s: AppState, view: HTMLElement): void {
+  const page = el('div', 'browse');
+
+  const head = el('div', 'home-head');
+  head.appendChild(el('h1', 'ask', 'Add mods to your library'));
+  head.appendChild(
+    el(
+      'p',
+      'lede',
+      'Nothing here touches your game. Anything added lands in the library, and you put it in a setup afterwards.',
+    ),
+  );
+  page.appendChild(head);
+
+  // 1. A file you already have.
+  const drop = el('button', 'drop');
+  drop.appendChild(el('div', 'drop-plus', '+'));
+  const dropMain = el('div', 'note-main');
+  dropMain.appendChild(el('div', 'note-title', 'Drop a file you already downloaded'));
+  dropMain.appendChild(
+    el(
+      'div',
+      'note-body',
+      '.zip, .rar, .7z, .oiv or a folder. This is how most mods arrive — Swapmeet works out what kind it is and where its files belong.',
+    ),
+  );
+  drop.appendChild(dropMain);
+  drop.appendChild(el('div', 'site-go', 'Choose a file'));
+  drop.addEventListener('click', () => installMod('files'));
+  wireDropzone(drop);
+  page.appendChild(drop);
+
+  // 2. Essentials.
+  const essHead = el('div', 'group-head');
+  essHead.appendChild(el('div', 'group-title', 'Essentials'));
+  essHead.appendChild(el('div', 'group-badge', 'INSTALLED BY SWAPMEET'));
+  page.appendChild(essHead);
+  page.appendChild(
+    el(
+      'div',
+      'group-blurb',
+      'The pieces that let other mods run. Swapmeet installs these itself, from the official release pages.',
+    ),
+  );
+
+  const ess = el('div', 'ess');
+  if (browseLoading) {
+    ess.appendChild(el('div', 'ess-row', 'Checking the release pages…'));
+  } else if (essentials.length === 0) {
+    ess.appendChild(el('div', 'ess-row', 'Nothing to show for this game.'));
+  } else {
+    for (const mod of essentials) ess.appendChild(essentialRow(s, mod));
+  }
+  page.appendChild(ess);
+
+  // 3. The handoff.
+  const handoff = el('div', 'handoff');
+  const hHead = el('div', 'group-head');
+  hHead.appendChild(el('div', 'group-title', 'Community sites'));
+  handoff.appendChild(hHead);
+  handoff.appendChild(
+    el(
+      'div',
+      'group-blurb',
+      'These have no install button. Swapmeet opens the site, you download the way you normally would, and it catches the file.',
+    ),
+  );
+  const steps = el('div', 'steps');
+  const labels = ['1 OPENS IN A WINDOW', '2 YOU LOG IN AND DOWNLOAD', '3 SWAPMEET CATCHES IT'];
+  labels.forEach((label, i) => {
+    steps.appendChild(el('div', 'step', label));
+    if (i < labels.length - 1) steps.appendChild(el('div', 'step-arrow', '→'));
+  });
+  handoff.appendChild(steps);
+
+  const siteGrid = el('div', 'sites');
+  for (const site of sites) {
+    const card = el('button', 'site');
+    const main = el('div', 'site-main');
+    main.appendChild(el('div', 'site-name', site.name));
+    main.appendChild(el('div', 'site-note', site.loginNote ?? 'no account needed'));
+    card.appendChild(main);
+    card.appendChild(el('div', 'site-go', 'Open ↗'));
+    card.addEventListener('click', () => {
+      void api.openSite(site.id, s.currentGameId!).catch((err: Error) => toast(err.message, 'error'));
+    });
+    siteGrid.appendChild(card);
+  }
+  handoff.appendChild(siteGrid);
+  page.appendChild(handoff);
+
+  view.appendChild(page);
+}
+
+function essentialRow(s: AppState, mod: CatalogMod): HTMLElement {
+  const row = el('div', 'ess-row');
+  const main = el('div', 'ess-main');
+
+  const name = el('div', 'ess-name');
+  name.appendChild(document.createTextNode(mod.name));
+
+  // One badge, saying the most useful thing about this row's state. The
+  // provider already resolves what is installed, so no name matching here.
+  const installed = Boolean(mod.installedModId);
+  const outdated = installed && mod.installedVersion !== undefined && mod.installedVersion !== mod.version;
+  const neededBy = s.missingDeps.find((d) =>
+    d.deps.some((dep) => mod.name.toLowerCase().includes(dep.capability.toLowerCase().slice(0, 6))),
+  );
+  if (neededBy) {
+    name.appendChild(el('span', 'tag is-warn', `NEEDED BY ${neededBy.modName.toUpperCase()}`));
+  } else if (outdated) {
+    name.appendChild(el('span', 'tag is-warn', `UPDATE ${mod.version}`));
+  } else if (installed) {
+    name.appendChild(el('span', 'tag is-ok', 'INSTALLED'));
+  }
+  main.appendChild(name);
+
+  if (mod.summary) main.appendChild(el('div', 'ess-blurb', mod.summary));
+  const meta: string[] = [];
+  if (mod.version) meta.push(mod.version);
+  if (mod.installedVersion) meta.push(`you have ${mod.installedVersion}`);
+  if (mod.manualOnly) meta.push(mod.manualReason ?? 'download it yourself');
+  if (meta.length > 0) main.appendChild(el('div', 'ess-meta', meta.join(' · ')));
+  row.appendChild(main);
+
+  const act = el(
+    'button',
+    installed && !outdated ? 'btn' : 'btn is-blue',
+    outdated ? 'Update' : installed ? 'Reinstall' : 'Install',
+  );
+  act.addEventListener('click', () => void installEssential(mod));
+  row.appendChild(act);
+  return row;
+}
 
 // --- rendering: speedrun ----------------------------------------------------
 
@@ -2399,6 +2828,12 @@ function render(): void {
     case 'speedrun':
       renderSpeedrun(s, view);
       break;
+    case 'browse':
+      renderBrowse(s, view);
+      break;
+    case 'settings':
+      renderSettings(s, view);
+      break;
     case 'saves':
       renderSaves(s, view);
       break;
@@ -2453,3 +2888,51 @@ document.addEventListener('keydown', (event) => {
 });
 
 void boot();
+
+/**
+ * Fetch the Essentials for the current game.
+ *
+ * Only when Browse is on screen: this is a network round trip to the release
+ * pages, and doing it on every launch would be a cost nobody asked for.
+ */
+async function loadEssentials(): Promise<void> {
+  const s = state;
+  if (!s?.currentGameId) return;
+  browseLoading = true;
+  render();
+  try {
+    const result = await api.browse({
+      gameId: s.currentGameId,
+      providerId: 'essentials',
+      sort: 'trending',
+      search: '',
+    });
+    essentials = result.mods;
+    sites = await api.listSites(s.currentGameId);
+  } catch (err) {
+    toast((err as Error).message, 'error');
+  } finally {
+    browseLoading = false;
+    render();
+  }
+}
+
+/** Install one Essential, picking its file for the current game. */
+async function installEssential(mod: CatalogMod): Promise<void> {
+  const s = state;
+  if (!s?.currentGameId) return;
+  const files = await guard('Finding the download…', () =>
+    api.catalogFiles(mod, s.currentGameId!),
+  );
+  const chosen = files?.[0];
+  if (!chosen) {
+    toast('No download is published for this game.', 'warn');
+    return;
+  }
+  const result = await guard(`Installing ${mod.name}…`, () =>
+    api.installCatalogFile(mod, chosen, s.currentGameId!),
+  );
+  if (!result) return;
+  apply(result.state);
+  toast(result.message, result.imported ? 'ok' : 'warn');
+}
