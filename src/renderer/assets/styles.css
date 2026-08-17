@@ -3178,3 +3178,65 @@ button:disabled {
 .notices:empty {
   display: none;
 }
+
+/*
+ * Per-file switches inside a mod.
+ *
+ * These styles were written twice and lost twice - to a revert and then to a
+ * rebuild - which is why the feature sat unreachable with its planner, API and
+ * tests all shipping green.
+ */
+.field-help {
+  font: 400 12px/1.55 var(--sans);
+  color: var(--muted);
+  margin: 4px 0 10px;
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.file-row:hover {
+  background: var(--panel-2);
+}
+
+.file-row input[type='checkbox'] {
+  flex: none;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
+.file-path {
+  flex: 1;
+  min-width: 0;
+  font: 400 11.5px var(--mono);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+/* A file switched off keeps its row but stops looking like a live one. */
+.file-row.is-off .file-path {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.file-note {
+  flex: none;
+  font: 400 10.5px var(--mono);
+  color: var(--orange);
+}

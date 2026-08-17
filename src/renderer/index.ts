@@ -550,16 +550,30 @@ function renderModsTable(s: AppState, view: HTMLElement): void {
   });
 }
 
+/**
+ * One mod: what it contains, and which of its files this setup actually uses.
+ *
+ * The per-file switches are the Mod Organizer 2 behaviour people leave Vortex
+ * to get - drop a single file out of a mod so it loses a conflict, without
+ * unpacking and repacking the archive. The planner, the API and six tests for
+ * it shipped a while ago; the UI was written twice and lost twice, to a revert
+ * and then to a rebuild, which left the whole feature unreachable.
+ *
+ * Exclusions belong to the profile, not the mod, so this needs a profile to
+ * act on. With none - or on the vanilla lock, which deploys nothing - the list
+ * is still worth showing, just read-only.
+ */
 function modMenu(mod: Mod): void {
   openModal({
     title: mod.name,
-    subtitle: `${mod.kind} · ${mod.files.length} files · ${formatBytes(mod.size)} · added ${formatDate(mod.addedAt)}`,
+    subtitle: `${plainKind(mod.kind)} · ${mod.files.length} file${mod.files.length === 1 ? '' : 's'} · ${formatBytes(mod.size)} · added ${formatDate(mod.addedAt)}`,
     build: (body) => {
-      body.appendChild(el('div', 'field-label', 'Files'));
-      body.appendChild(
-        el('div', 'mono-list', mod.files.slice(0, 200).join('\n') +
-          (mod.files.length > 200 ? `\n… and ${mod.files.length - 200} more` : '')),
-      );
+      const s = state;
+      if (!s) return;
+      const profile = s.profiles.find((p) => p.id === s.activeProfileId);
+      const host = el('div');
+      body.appendChild(host);
+      fileList(s, mod, profile, host);
     },
     actions: [
       { label: 'Close', onClick: () => true },
@@ -569,17 +583,135 @@ function modMenu(mod: Mod): void {
         onClick: async () => {
           const ok = await confirmModal(
             `Remove "${mod.name}"?`,
-            'The mod is undeployed if it is live, then deleted from the library. The original archive you imported from is not touched.',
+            'It comes out of every setup that uses it and its files are deleted from the library. Your game folder is put back first, and the archive you originally installed from is not touched. This one cannot be undone.',
             'Remove mod',
           );
           if (!ok) return true;
           const next = await guard('Removing…', () => api.removeMod(mod.id));
-          if (next) apply(next);
+          if (next) {
+            librarySelection = null;
+            apply(next);
+            toast(`${mod.name} removed from the library.`, 'ok');
+          }
           return true;
         },
       },
     ],
   });
+}
+
+/**
+ * The file list, with a switch per file when a setup can act on it.
+ *
+ * The conflict verdict beside a file is what makes this worth showing at all.
+ * A bare list of paths asks the user to already know which file matters;
+ * naming the mod currently winning each contested path turns it into a
+ * decision they can actually make.
+ */
+function fileList(
+  s: AppState,
+  mod: Mod,
+  profile: Profile | undefined,
+  host: HTMLElement,
+): void {
+  clear(host);
+  const locked = !profile || profile.vanillaLock;
+  const excluded = new Set(profile?.excludedFiles?.[mod.id] ?? []);
+
+  host.appendChild(
+    el(
+      'div',
+      'field-help',
+      locked
+        ? profile?.vanillaLock
+          ? 'The vanilla setup installs nothing, so there is nothing here to switch off. Open another setup to change individual files.'
+          : 'Open a setup to switch individual files on or off.'
+        : `Switch a file off to keep the rest of ${mod.name} but let another mod win that file. This applies to "${profile!.name}" only — your other setups keep the whole mod.`,
+    ),
+  );
+
+  const nameOf = new Map(s.mods.map((m) => [m.id, m.name]));
+  const list = el('div', 'files');
+  // Capped: a texture pack can carry thousands of files and a dialog is not a
+  // file manager.
+  const shown = mod.files.slice(0, 300);
+
+  for (const file of shown) {
+    const off = excluded.has(file);
+    const row = el('label', `file-row${off ? ' is-off' : ''}`);
+
+    const box = el('input') as HTMLInputElement;
+    box.type = 'checkbox';
+    box.checked = !off;
+    box.disabled = locked;
+    box.addEventListener('change', async () => {
+      if (!profile) return;
+      const next = await guard('Updating…', () =>
+        api.setFileExcluded({
+          profileId: profile.id,
+          modId: mod.id,
+          file,
+          excluded: !box.checked,
+        }),
+      );
+      if (!next) return;
+      apply(next);
+      // Rebuild in place: switching one file off can change which mod wins
+      // every other contested file in this mod, and that would otherwise be
+      // invisible until the dialog was reopened.
+      fileList(next, mod, next.profiles.find((p) => p.id === profile.id), host);
+    });
+    row.appendChild(box);
+    row.appendChild(el('span', 'file-path', file));
+
+    // Conflicts are keyed by full deploy target; matching on the tail lines
+    // them up with the mod-relative paths shown here.
+    const clash = s.conflicts.find(
+      (c) => c.target.endsWith(file) && c.modIds.includes(mod.id),
+    );
+    if (clash) {
+      const winner = clash.winnerId === mod.id;
+      const others = clash.modIds
+        .filter((id) => id !== mod.id)
+        .map((id) => nameOf.get(id) ?? id);
+      row.appendChild(
+        el(
+          'span',
+          'file-note',
+          winner
+            ? `wins over ${others.join(', ')}`
+            : `loses to ${nameOf.get(clash.winnerId) ?? 'another mod'}`,
+        ),
+      );
+    }
+    list.appendChild(row);
+  }
+  host.appendChild(list);
+
+  if (mod.files.length > shown.length) {
+    host.appendChild(
+      el('div', 'field-help', `… and ${mod.files.length - shown.length} more files, not shown.`),
+    );
+  }
+
+  if (excluded.size > 0 && profile) {
+    const reset = el('button', 'btn', `Switch all ${excluded.size} back on`);
+    reset.addEventListener('click', async () => {
+      let next: AppState | null = null;
+      for (const file of [...excluded]) {
+        next = await api.setFileExcluded({
+          profileId: profile.id,
+          modId: mod.id,
+          file,
+          excluded: false,
+        });
+      }
+      if (!next) return;
+      apply(next);
+      fileList(next, mod, next.profiles.find((p) => p.id === profile.id), host);
+    });
+    host.appendChild(reset);
+  }
 }
 
 // --- shell: breadcrumb + secondary nav --------------------------------------
