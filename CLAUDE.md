@@ -271,6 +271,25 @@ every kind in `supportedKinds`, plus `signatureFiles` for detection.
     top-level `function` declarations in the renderer are global, though
     `let`/`const` module state is not reachable that way.
 
+39. **An `.oiv` is a script, not a file tree.** `assembly.xml` lists
+    operations, and most packages write *inside* RPF archives, which GTArage
+    cannot open. Copying the contents into `mods/` produces a mod that
+    imports, deploys and changes nothing — with no error anywhere. `shared/
+    oiv.ts` reads the assembly and says which half can be applied; the parser
+    tracks `<archive>` spans so a nested `<add>` is not miscounted as a
+    placeable file. Do not "simplify" that span tracking away.
+40. **Epic games cannot be started from their executable**, or from
+    PlayGTAV.exe. They check that the Epic launcher started them. The launcher
+    URL needs the manifest's `AppName`, which exists nowhere else on disk, so
+    it is captured at detection time into `GameInstall.launchId`. A copy
+    detected before that field existed has none, and says so rather than
+    failing silently.
+41. **A failed provider lookup is not a property of the mod.** A network
+    error, a rate limit and a repo with no releases all used to collapse into
+    `null`, and the entry was then labelled manual-only *and cached* for ten
+    minutes. `unavailable` (this attempt) and `manualOnly` (this mod) are now
+    separate, and failures are never cached, so a retry can actually retry.
+
 ## Verification
 
 ```bash
