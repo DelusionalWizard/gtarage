@@ -3156,3 +3156,25 @@ button:disabled {
   color: var(--orange);
   margin-top: 8px;
 }
+
+/*
+ * Notices.
+ *
+ * The base .notice is the orange "needs a decision" card. An informational one
+ * carries the same shape in the accent instead, because a game update or a
+ * folder full of adoptable mods is worth reading but is not a problem.
+ */
+.notice-info {
+  background: color-mix(in oklab, var(--blue) 7%, var(--panel));
+  border-color: color-mix(in oklab, var(--blue) 32%, var(--line));
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notices:empty {
+  display: none;
+}

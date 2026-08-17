@@ -659,6 +659,250 @@ function renderGamePicker(s: AppState): void {
   select.hidden = s.games.filter((g) => g.installed).length < 2;
 }
 
+// --- notices ----------------------------------------------------------------
+
+/**
+ * The things the app worked out but had no way to say.
+ *
+ * Every one of these was computed on every state rebuild, tested, and then
+ * displayed nowhere - a game update that silently stopped every script mod
+ * from loading, a corrupt config, mods whose files had vanished, and a game
+ * folder full of hand-installed mods waiting to be adopted. Building the
+ * detection and never wiring the output is the same as not building it, and
+ * worse, because it costs the work on every refresh.
+ *
+ * They share one shape deliberately: a titled card with a sentence and at
+ * most two buttons. A person should be able to tell at a glance whether
+ * something needs them, without learning a different pattern per warning.
+ */
+function renderNotices(s: AppState, host: HTMLElement): void {
+  // A damaged config is first because everything else is untrustworthy until
+  // it is dealt with: the app is running on defaults and the real file is
+  // sitting aside, unread.
+  if (s.configError) {
+    host.appendChild(
+      notice(
+        'warn',
+        'Your settings file could not be read',
+        `Swapmeet started with default settings so it could open at all. Your original file has been kept at ${s.configError.backupPath} — nothing was overwritten. (${s.configError.message})`,
+        [
+          {
+            label: 'Show me the file',
+            onClick: () => void api.openPath('config'),
+          },
+        ],
+      ),
+    );
+  }
+
+  if (s.buildAlert) {
+    const alert = s.buildAlert;
+    const hit = alert.affected.length;
+    const names = alert.affected.slice(0, 3).map((m) => m.name).join(', ');
+    const rest = hit - Math.min(hit, 3);
+
+    // Three genuinely different situations, and saying the wrong one is worse
+    // than saying nothing. "unknown" is common: a copy adopted out of a game
+    // folder is just ScriptHookV.dll, with no build named anywhere in it.
+    const hook =
+      alert.hook.state === 'mismatch'
+        ? ` The Script Hook V you have is built for ${alert.hook.builds.join(' / ')}, so it will not load until you update it.`
+        : alert.hook.state === 'match'
+          ? ' Your Script Hook V already names this build, so it should still work.'
+          : ' Swapmeet cannot tell which build your Script Hook V was made for, so it may or may not still work.';
+
+    host.appendChild(
+      notice(
+        hit > 0 ? 'warn' : 'info',
+        `${alert.gameName} has been updated`,
+        hit === 0
+          ? `It went from ${alert.previous} to ${alert.current}. Nothing you have switched on runs through Script Hook V, so this probably changes nothing for you.${hook}`
+          : `It went from ${alert.previous} to ${alert.current}. Every game update moves the internals Script Hook V hooks into, so script mods stop loading until it catches up. This is not something you broke.${hook} Affected: ${names}${rest > 0 ? ` and ${rest} more` : ''}.`,
+        [
+          {
+            label: 'Get the latest Script Hook V',
+            primary: hit > 0,
+            // Kept in step with SCRIPTHOOKV_URL in main/scripthook.ts; the
+            // renderer has no imports, so the constant cannot be shared.
+            onClick: () => void api.openExternal('http://www.dev-c.com/gtav/scripthookv/'),
+          },
+          {
+            label: 'Got it',
+            onClick: async () => {
+              const next = await guard('', () => api.acknowledgeBuild(alert.gameId));
+              if (next) apply(next);
+            },
+          },
+        ],
+      ),
+    );
+  }
+
+  if (s.brokenMods.length > 0) {
+    const first = s.brokenMods[0]!;
+    host.appendChild(
+      notice(
+        'warn',
+        s.brokenMods.length === 1
+          ? `${first.name} is missing some of its files`
+          : `${s.brokenMods.length} mods are missing files`,
+        `Files that should be in the library are not there any more — ${first.name} is missing ${first.missing}. Something outside Swapmeet deleted them. Installing again is the fix; the mods will not deploy correctly as they are.`,
+        [
+          {
+            label: 'Open Library',
+            onClick: () => {
+              tab = 'library';
+              render();
+            },
+          },
+        ],
+      ),
+    );
+  }
+
+  // Mods sitting in the game folder that Swapmeet did not put there. The scan
+  // already ran on every refresh; until now its result was thrown away.
+  const fresh = adoptable.filter((g) => !g.alreadyInLibrary);
+  if (fresh.length > 0) {
+    const bytes = fresh.reduce((n, g) => n + g.bytes, 0);
+    host.appendChild(
+      notice(
+        'info',
+        `${fresh.length} mod${fresh.length === 1 ? '' : 's'} already in your game folder`,
+        `${fresh.map((g) => g.name).slice(0, 4).join(', ')}${fresh.length > 4 ? ` and ${fresh.length - 4} more` : ''} — ${formatBytes(bytes)} installed by hand rather than by Swapmeet. Taking them in moves them to the library so setups can switch them on and off. Nothing is deleted.`,
+        [
+          {
+            label: `Take ${fresh.length === 1 ? 'it' : 'them'} in`,
+            primary: true,
+            onClick: () => void adoptAll(fresh),
+          },
+        ],
+      ),
+    );
+  }
+}
+
+/**
+ * Add-on packs and memory limits, shown inside a setup.
+ *
+ * Separate from renderNotices because it is about what this setup installs,
+ * not about the game or the app - so it belongs beside the switches that
+ * caused it rather than on the home screen.
+ */
+function renderDlcNotices(s: AppState, host: HTMLElement): void {
+  const dlc = s.dlc;
+  if (!dlc) return;
+
+  if (dlc.gaps.length > 0) {
+    const first = dlc.gaps[0]!;
+    host.appendChild(
+      notice(
+        'warn',
+        dlc.gaps.length === 1
+          ? `${first.modName} needs a line in dlclist.xml`
+          : `${dlc.gaps.length} add-on packs need a line in dlclist.xml`,
+        // The wording turns on `confirmed`. When no dlclist could be read we
+        // genuinely do not know whether the line is already there, and saying
+        // "missing" would be a lie to anyone who added it by hand.
+        `${
+          dlc.confirmed
+            ? 'This line is not in your dlclist.xml'
+            : 'Swapmeet cannot read your dlclist.xml, because it lives inside update.rpf'
+        }. Without the entry the pack installs perfectly and the game ignores it completely. Add it with OpenIV or CodeWalker: ${first.line}`,
+        dlc.gaps.length > 1
+          ? [
+              {
+                label: `Show all ${dlc.gaps.length} lines`,
+                onClick: () =>
+                  openModal({
+                    title: 'Lines to add to dlclist.xml',
+                    subtitle:
+                      'Paste these inside the <Paths> block, then save the file back into update.rpf.',
+                    build: (body) => {
+                      for (const gap of dlc.gaps) {
+                        const row = el('div', 'mono-list', gap.line);
+                        row.title = gap.modName;
+                        body.appendChild(row);
+                      }
+                    },
+                    actions: [{ label: 'Close', onClick: () => true }],
+                  }),
+              },
+            ]
+          : [],
+      ),
+    );
+  }
+
+  if (dlc.needsGameconfig) {
+    host.appendChild(
+      notice(
+        'info',
+        'A collection this size needs a bigger gameconfig',
+        `You have ${dlc.packCount} add-on packs switched on. Past roughly this many, the game runs out of the fixed memory it sets aside for vehicles and props and crashes while loading, with nothing on screen to say that is the reason. A replacement gameconfig.xml raises those limits.`,
+        [
+          {
+            label: 'Find one in Browse',
+            onClick: () => {
+              tab = 'browse';
+              render();
+              void loadEssentials();
+            },
+          },
+        ],
+      ),
+    );
+  }
+}
+
+/** One titled card. Shared by every notice so they all read the same way. */
+function notice(
+  tone: 'warn' | 'info',
+  title: string,
+  body: string,
+  actions: Array<{ label: string; onClick: () => void; primary?: boolean }> = [],
+): HTMLElement {
+  const node = el('div', `notice notice-${tone}`);
+  node.appendChild(el('div', 'notice-title', title));
+  node.appendChild(el('div', 'notice-body', body));
+  if (actions.length > 0) {
+    const row = el('div', 'notice-acts');
+    for (const action of actions) {
+      const btn = el('button', `btn${action.primary ? ' is-primary' : ''}`, action.label);
+      btn.addEventListener('click', action.onClick);
+      row.appendChild(btn);
+    }
+    node.appendChild(row);
+  }
+  return node;
+}
+
+/** Take every hand-installed mod into the library, one at a time. */
+async function adoptAll(groups: AdoptGroupView[]): Promise<void> {
+  const s = state;
+  if (!s?.currentGameId) return;
+  let taken = 0;
+  let last: AppState | null = null;
+  for (const group of groups) {
+    try {
+      const result = await guard(`Taking in ${group.name}…`, () =>
+        api.adopt(s.currentGameId!, group.id),
+      );
+      if (result) {
+        last = result.state;
+        taken += 1;
+      }
+    } catch (err) {
+      toast(`${group.name}: ${(err as Error).message}`, 'error');
+    }
+  }
+  if (last) apply(last);
+  // Re-scan, or the notice keeps offering mods that are now in the library.
+  adoptable = await api.scanAdoptable(s.currentGameId).catch(() => []);
+  render();
+  if (taken > 0) toast(`Took in ${taken} mod${taken === 1 ? '' : 's'}.`, 'ok');
+}
+
 // --- 2a: which setup do you want to play? -----------------------------------
 
 /**
@@ -677,6 +921,12 @@ function renderHome(s: AppState, view: HTMLElement): void {
   }
 
   const home = el('div', 'home');
+
+  // Anything the app worked out that the user needs to know before choosing
+  // a setup: a game update, a damaged config, mods it can take in.
+  const notices = el('div', 'notices');
+  renderNotices(s, notices);
+  home.appendChild(notices);
 
   const head = el('div', 'home-head');
   // Which game these setups belong to. Without it the question is ambiguous
@@ -935,6 +1185,12 @@ function renderProfile(s: AppState, view: HTMLElement): void {
   head.appendChild(installFolder);
 
   head.appendChild(rescan);
+
+  // About what this setup installs, so it sits beside the switches that
+  // caused it rather than on the home screen.
+  const dlcNotices = el('div', 'notices');
+  renderDlcNotices(s, dlcNotices);
+  main.appendChild(dlcNotices);
 
   main.appendChild(renderPills(s, profile));
 
