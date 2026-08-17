@@ -103,10 +103,26 @@ export function selectAssets<T extends { name: string }>(
   return [...chosen].sort((a, b) => scoreAsset(b) - scoreAsset(a));
 }
 
-async function fetchLatestRelease(repo: string, tag?: string): Promise<GhRelease | null> {
+/**
+ * The outcome of asking GitHub for a release.
+ *
+ * `failed` is the distinction this type exists for. A network error, a rate
+ * limit and a repo that genuinely publishes nothing all used to collapse into
+ * `null`, and the caller then described the mod as manual-only forever — a
+ * permanent claim made on the strength of a temporary failure. Worse, that
+ * answer was cached, so one rate-limited minute poisoned the next ten.
+ */
+interface ReleaseLookup {
+  release: GhRelease | null;
+  failed: boolean;
+}
+
+async function fetchLatestRelease(repo: string, tag?: string): Promise<ReleaseLookup> {
   const cacheKey = tag ? `${repo}@${tag}` : repo;
   const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.release;
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return { release: cached.release, failed: false };
+  }
 
   let release: GhRelease | null = null;
 
@@ -117,10 +133,11 @@ async function fetchLatestRelease(repo: string, tag?: string): Promise<GhRelease
         { Accept: 'application/vnd.github+json' },
       );
     } catch {
-      release = null;
+      // Not cached: a failure must not stick, or Retry cannot retry.
+      return { release: null, failed: true };
     }
     cache.set(cacheKey, { at: Date.now(), release });
-    return release;
+    return { release, failed: false };
   }
 
   try {
@@ -138,20 +155,21 @@ async function fetchLatestRelease(repo: string, tag?: string): Promise<GhRelease
       );
       release = all.find((r) => !r.draft) ?? null;
     } catch {
-      release = null;
+      return { release: null, failed: true };
     }
   }
 
   cache.set(cacheKey, { at: Date.now(), release });
-  return release;
+  return { release, failed: false };
 }
 
 /** Turn a catalog definition plus its live release into a browsable mod. */
 function toCatalogMod(
   def: EssentialDef,
-  release: GhRelease | null,
+  lookup: ReleaseLookup,
   gameId: GameId,
 ): CatalogMod {
+  const { release, failed } = lookup;
   if (!def.repo) {
     return {
       providerId: 'essentials',
@@ -175,11 +193,18 @@ function toCatalogMod(
       name: def.name,
       summary: def.summary,
       author: def.author,
-      version: 'unavailable',
+      version: failed ? 'unknown' : 'no release',
       url: def.homepage,
       category: def.category,
-      manualOnly: true,
-      manualReason: 'GitHub did not return a release just now. Open the project page to download it by hand.',
+      // Only the second of these is a property of the mod. The first is a
+      // property of this minute.
+      ...(failed
+        ? { unavailable: true, unavailableReason: 'GitHub could not be reached just now.' }
+        : {
+            manualOnly: true,
+            manualReason:
+              'This project has no published release to download. Open its page instead.',
+          }),
       files: [],
     };
   }
@@ -229,7 +254,9 @@ export async function browseEssentials(gameId: GameId, search: string): Promise<
     defs.map(async (def) =>
       toCatalogMod(
         def,
-        def.repo ? await fetchLatestRelease(def.repo, def.releaseTags?.[gameId]) : null,
+        def.repo
+          ? await fetchLatestRelease(def.repo, def.releaseTags?.[gameId])
+          : { release: null, failed: false },
         gameId,
       ),
     ),

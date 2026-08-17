@@ -2379,6 +2379,8 @@ function essentialRow(entry: EssentialView, gameId: GameId): HTMLElement {
         `${entry.installedVersion} → ${entry.version} AVAILABLE`,
       ),
     );
+  } else if (entry.unavailable) {
+    nameLine.appendChild(el('div', 'ess-pill', 'COULD NOT CHECK'));
   } else if (entry.manualOnly) {
     nameLine.appendChild(el('div', 'ess-pill is-manual', 'MANUAL ONLY'));
   } else {
@@ -2402,6 +2404,8 @@ function essentialRow(entry: EssentialView, gameId: GameId): HTMLElement {
     let sub: string;
     if (failed) {
       sub = `${failed} Try again, or open the page yourself.`;
+    } else if (entry.unavailable) {
+      sub = 'GTArage could not reach its release page just now.';
     } else if (entry.manualOnly) {
       sub =
         entry.manualReason ??
@@ -2430,6 +2434,10 @@ function essentialRow(entry: EssentialView, gameId: GameId): HTMLElement {
   } else if (failed) {
     const retry = el('button', 'btn btn-sm', 'Retry');
     retry.addEventListener('click', () => void installEssential(entry, gameId));
+    row.appendChild(retry);
+  } else if (entry.unavailable) {
+    const retry = el('button', 'btn btn-sm', 'Check again');
+    retry.addEventListener('click', () => void loadEssentials(gameId, true));
     row.appendChild(retry);
   } else if (entry.manualOnly) {
     const open = el('button', 'btn btn-sm', 'Open page');
@@ -3726,7 +3734,9 @@ async function maybeShowSetupPrompt(s: AppState): Promise<void> {
   }
 
   const core = coreEssentials(view);
-  const wanted = new Set(core.filter((e) => !e.installedVersion).map((e) => e.id));
+  const wanted = new Set(
+    core.filter((e) => !e.installedVersion && !e.unavailable).map((e) => e.id),
+  );
 
   const dismiss = async (): Promise<void> => {
     const next = await api.dismissSetupPrompt().catch(() => null);
@@ -3783,7 +3793,7 @@ async function maybeShowSetupPrompt(s: AppState): Promise<void> {
           const row = el('label', 'setup-tool');
           const box = el('input') as HTMLInputElement;
           box.type = 'checkbox';
-          if (entry.installedVersion) {
+          if (entry.installedVersion || entry.unavailable) {
             box.checked = false;
             box.disabled = true;
           } else {
@@ -3798,6 +3808,8 @@ async function maybeShowSetupPrompt(s: AppState): Promise<void> {
           const name = el('div', 'setup-tool-name', entry.name);
           if (entry.installedVersion) {
             name.appendChild(el('span', 'tag is-ok', 'already installed'));
+          } else if (entry.unavailable) {
+            name.appendChild(el('span', 'tag', 'could not check'));
           } else if (entry.manualOnly) {
             name.appendChild(el('span', 'tag', 'opens its page'));
             row.title = entry.manualReason ?? 'GTArage cannot fetch this one directly.';

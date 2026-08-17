@@ -63,6 +63,15 @@ export interface CatalogMod {
    */
   manualOnly?: boolean;
   manualReason?: string;
+  /**
+   * Set when GTArage could not reach the provider for this entry.
+   *
+   * Distinct from manualOnly, which is a permanent property of the mod.
+   * This one is a property of the attempt, and must never be presented as
+   * though the mod itself cannot be fetched.
+   */
+  unavailable?: boolean;
+  unavailableReason?: string;
   /** Library mod id, when this is already installed. */
   installedModId?: string;
   /** Library mod version, when installed, so the UI can flag updates. */

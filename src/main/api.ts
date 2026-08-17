@@ -504,6 +504,7 @@ async function essentialsFor(
       entry.manualOnly = true;
       if (mod.manualReason) entry.manualReason = mod.manualReason;
     }
+    if (mod.unavailable) entry.unavailable = true;
     if (installed) {
       entry.installedVersion = installed.version;
       entry.installedAt = installed.addedAt;
@@ -513,6 +514,16 @@ async function essentialsFor(
     }
     return entry;
   });
+
+  // Every fetchable entry failing is not nine broken mods, it is one broken
+  // connection, and the screen should say so once rather than nine times.
+  const fetchable = entries.filter((e) => !e.manualOnly);
+  if (fetchable.length > 0 && fetchable.every((e) => e.unavailable)) {
+    return {
+      entries: [],
+      error: 'GitHub could not be reached, or is rate-limiting this machine.',
+    };
+  }
 
   return { entries };
 }

@@ -63,6 +63,12 @@ export interface EssentialView {
   /** Set when the author publishes no downloadable release. */
   manualOnly?: boolean;
   manualReason?: string;
+  /**
+   * Set when this entry could not be checked just now. A property of the
+   * attempt, never of the mod — the row offers a retry rather than claiming
+   * the tool has to be fetched by hand.
+   */
+  unavailable?: boolean;
   /** The version in the library, when a mod there matches this entry. */
   installedVersion?: string;
   /** When the installed copy was added, ISO. */
