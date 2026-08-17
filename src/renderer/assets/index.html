@@ -2,136 +2,50 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <title>Swapmeet</title>
     <!--
-      Strict CSP: the renderer loads nothing from the network and evaluates no
-      inline or dynamic script. A mod manager reads a lot of untrusted text
-      (archive filenames, mod titles), so the UI is built with DOM calls and
-      textContent rather than innerHTML.
+      Everything is same-origin and inline scripting is refused outright. The
+      renderer is a classic script (see CLAUDE.md gotcha 1) and the fonts are
+      bundled locally, which is what `font-src 'self'` requires.
     -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
     />
-    <title>Swapmeet</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <!-- Custom chrome: the OS title bar is off, so this row is draggable. -->
-    <header class="titlebar">
-      <div class="brand-mark" aria-hidden="true"></div>
-      <div class="brand">SWAPMEET</div>
-      <div class="brand-version" id="app-version"></div>
+    <!--
+      The shell is design 2a/2b: a white title strip carrying a breadcrumb,
+      and one content stage under it. There is deliberately no profile rail,
+      no tab strip and no persistent action bar - in this direction the
+      screen you are on says what it is, and the single action it wants lives
+      inside that screen rather than in permanent furniture around it.
+    -->
+    <div class="app">
+      <header class="titlebar" id="titlebar">
+        <div class="crumbs" id="crumbs"></div>
 
-      <div class="titlebar-divider"></div>
+        <div class="titlebar-spacer"></div>
 
-      <label class="visually-hidden" for="game-select">Game</label>
-      <select id="game-select" class="game-select"></select>
+        <nav class="topnav" id="topnav"></nav>
 
-      <div class="game-note" id="game-note"></div>
+        <select
+          id="game-select"
+          class="game-select"
+          title="Which game Swapmeet is managing"
+        ></select>
 
-      <div class="titlebar-spacer"></div>
-
-      <!--
-        Settings gets its own place in the chrome rather than a tab.
-        It is app configuration, not one of the things you switch between
-        while working, which is what the tab row is for.
-      -->
-      <button
-        id="btn-settings"
-        class="chrome-btn"
-        title="Settings, folders and the game folder check"
-      >
-        <span class="chrome-btn-icon" aria-hidden="true">&#9881;</span>
-        Settings
-      </button>
-
-      <div class="titlebar-divider"></div>
-
-      <div class="window-controls">
-        <button id="win-min" class="win-btn" title="Minimise" aria-label="Minimise">&#8211;</button>
-        <button id="win-max" class="win-btn" title="Maximise" aria-label="Maximise">&#9633;</button>
-        <button id="win-close" class="win-btn win-close" title="Close" aria-label="Close">&#10005;</button>
-      </div>
-    </header>
-
-    <div class="shell">
-      <!-- 1a: profile rail -->
-      <aside class="sidebar">
-        <div class="rail-label" title="A profile is a named set of mods you switch on together">Profiles</div>
-        <div id="profile-list" class="profile-list"></div>
-        <button id="new-profile" class="ghost-btn" title="Create another set of mods you can switch between">+ new profile</button>
-
-        <div class="rail-spacer"></div>
-
-        <div class="rail-foot">
-          <div class="rail-label">Game folder</div>
-          <div id="game-path" class="game-path">Not set up</div>
-          <div id="game-status" class="game-status"></div>
-          <div class="rail-actions">
-            <button id="btn-detect" class="link-btn" title="Search Steam, Epic, the Rockstar launcher and your drives again">search again</button>
-            <button id="btn-browse" class="link-btn" title="Point Swapmeet at the folder your game is installed in">choose folder…</button>
-            <button id="btn-open-game" class="link-btn" title="Open the game folder in Explorer">open in Explorer</button>
-          </div>
+        <div class="win-btns">
+          <button id="win-min" class="win-btn" title="Minimise" aria-label="Minimise">&#8211;</button>
+          <button id="win-max" class="win-btn" title="Maximise" aria-label="Maximise">&#9633;</button>
+          <button id="win-close" class="win-btn win-close" title="Close" aria-label="Close">&#10005;</button>
         </div>
-      </aside>
+      </header>
 
-      <!-- 1b: tabbed main column -->
-      <main class="main">
-        <nav class="tabs" id="tabs">
-          <button class="tab is-active" data-tab="mods">Mods</button>
-          <button class="tab" data-tab="order">Load order</button>
-          <button class="tab" data-tab="browse">Browse</button>
-          <!-- Hidden unless speedrunning mode is switched on in Settings. -->
-          <button class="tab" data-tab="speedrun" id="tab-speedrun" hidden>Speedrun</button>
-          <button class="tab" data-tab="saves">Saves</button>
-        </nav>
-
-        <div class="toolbar" id="toolbar">
-          <div class="search">
-            <span class="search-slash">/</span>
-            <input id="search" type="search" placeholder="search your mods…" spellcheck="false" />
-          </div>
-          <div class="chips" id="chips"></div>
-
-          <label class="mini-toggle" title="Hide mods that are switched off in this profile">
-            <input type="checkbox" id="hide-disabled" />
-            <span>Hide off</span>
-          </label>
-
-          <!--
-            One button. Windows cannot show a picker that takes files *and*
-            folders, so this opens the file picker (which is what almost every
-            mod is) and offers the folder picker from inside the same flow.
-          -->
-          <button
-            id="btn-install"
-            class="solid-btn"
-            title="Install a mod from a .zip, .rar, .oiv, a loose file, or a folder"
-          >
-            Install mod
-          </button>
-        </div>
-
-        <section class="view" id="view"></section>
-
-        <footer class="actionbar">
-          <div class="action-status" id="action-status"></div>
-          <div class="actionbar-spacer"></div>
-          <!--
-            Apply and Launch are separate: changing profile is far more common
-            than changing profile *and* starting the game, and pairing them
-            forced a game launch every time you wanted to switch.
-          -->
-          <button id="btn-apply" class="primary-btn" title="Show what will change, then install this profile into your game folder">Apply profile</button>
-          <button id="btn-launch" class="outline-btn" title="Start the game without changing anything">Launch game</button>
-        </footer>
-      </main>
-
-      <!-- 1b: needs-attention inspector -->
-      <aside class="inspector" id="inspector"></aside>
+      <main class="stage" id="view"></main>
     </div>
 
-    <!-- Busy overlay, shown during deploys -->
     <div class="overlay" id="overlay" hidden>
       <div class="overlay-card">
         <div class="overlay-title" id="overlay-title">Working…</div>
@@ -140,9 +54,8 @@
       </div>
     </div>
 
-    <!-- Generic modal: confirmations, prompts, swap preview -->
     <div class="modal-scrim" id="modal-scrim" hidden>
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head">
           <div class="modal-title" id="modal-title"></div>
           <div class="modal-sub" id="modal-sub"></div>

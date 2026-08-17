@@ -44,7 +44,9 @@ export function defaultConfig(userDataDir: string): AppConfig {
       blockWhileGameRunning: true,
       warnAboutOnline: false,
       graphicsPerProfile: true,
-      theme: 'dark',
+      // The interface is design 2a/2b, which is a light, warm-paper direction.
+      // Dark is the alternate rather than the default it used to be.
+      theme: 'light',
       autoUpdate: 'notify',
       speedrunMode: false,
     },
@@ -210,10 +212,24 @@ export function getConfigPath(): string {
  */
 function hydrate(loaded: Partial<AppConfig>, userDataDir: string): AppConfig {
   const base = defaultConfig(userDataDir);
+
+  /*
+   * Retire the old theme default once.
+   *
+   * Every config written before the interface was rebuilt carries
+   * `theme: 'dark'`, because that was the default — not because anyone chose
+   * it. The interface it belonged to no longer exists, so honouring the
+   * stored value would show almost every existing user a dark version of a
+   * design that is light by construction. `themeChosen` records a real
+   * decision, so anyone who actually picks dark keeps it from here on.
+   */
+  const settings = { ...base.settings, ...(loaded.settings ?? {}) };
+  if (!settings.themeChosen) settings.theme = base.settings.theme;
+
   return {
     ...base,
     ...loaded,
-    settings: { ...base.settings, ...(loaded.settings ?? {}) },
+    settings,
     activeProfile: { ...(loaded.activeProfile ?? {}) },
     seenBuilds: { ...(loaded.seenBuilds ?? {}) },
     installs: loaded.installs ?? [],

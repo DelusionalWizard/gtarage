@@ -21,10 +21,19 @@ const api = window.swapmeet;
  * view, because it is app configuration rather than one of the things you
  * switch between while managing mods.
  */
-type TabId = 'mods' | 'order' | 'browse' | 'speedrun' | 'saves' | 'settings';
+type TabId =
+  | 'home'
+  | 'profile'
+  | 'order'
+  | 'browse'
+  | 'speedrun'
+  | 'saves'
+  | 'settings';
 
 let state: AppState | null = null;
-let tab: TabId = 'mods';
+// Home is the landing screen: nearly every session is 'play what I already
+// set up', not 'manage my library'.
+let tab: TabId = 'home';
 let search = '';
 let filter = 'all';
 /** Hide mods switched off in the current profile, to keep the list readable. */
@@ -237,119 +246,9 @@ const ERA_LABEL: Record<GameView['era'], string> = {
   '3d': '3D era (original)',
 };
 
-function renderTitlebar(s: AppState): void {
-  const select = byId<HTMLSelectElement>('game-select');
-  clear(select);
-
-  const byEra = new Map<GameView['era'], GameView[]>();
-  for (const game of s.games) {
-    const list = byEra.get(game.era);
-    if (list) list.push(game);
-    else byEra.set(game.era, [game]);
-  }
-
-  for (const [era, games] of byEra) {
-    const group = el('optgroup');
-    group.label = ERA_LABEL[era];
-    for (const game of games) {
-      const option = el('option');
-      option.value = game.id;
-      option.textContent = game.installed
-        ? `${game.shortName} · ${game.modCount} mods`
-        : `${game.shortName} — not found`;
-      option.selected = game.id === s.currentGameId;
-      group.appendChild(option);
-    }
-    select.appendChild(group);
-  }
-
-  const current = s.games.find((g) => g.id === s.currentGameId);
-  const note = current
-    ? current.installed
-      ? `${current.name}${current.version ? ` · ${current.version}` : ''}`
-      : `${current.name} — not detected`
-    : 'No game selected';
-  byId('app-version').textContent = `v${s.appVersion}`;
-
-  const noteEl = byId('game-note');
-  noteEl.textContent = note;
-  // Capped at 40vw and ellipsised, so keep the full text on hover.
-  noteEl.title = current?.path ? `${note}\n${current.path}` : note;
-}
 
 // --- rendering: sidebar -----------------------------------------------------
 
-function renderSidebar(s: AppState): void {
-  const list = byId('profile-list');
-  clear(list);
-
-  if (s.profiles.length === 0) {
-    list.appendChild(
-      el('div', 'profile-meta', 'No profiles yet \u2014 set up a game to get started.'),
-    );
-  }
-
-  for (const profile of s.profiles) {
-    const enabledCount = profile.enabled.length;
-    const bytes = s.mods
-      .filter((m) => profile.enabled.includes(m.id))
-      .reduce((sum, m) => sum + m.size, 0);
-
-    const row = el('button', `profile${profile.id === s.activeProfileId ? ' is-active' : ''}`);
-    const main = el('div', 'profile-main');
-    const nameEl = el('div', 'profile-name', profile.name);
-    nameEl.title = profile.name; // ellipsised when long
-    main.appendChild(nameEl);
-    main.appendChild(
-      el(
-        'div',
-        'profile-meta',
-        profile.vanillaLock
-          ? 'no mods · safe for online'
-          : `${enabledCount} mod${enabledCount === 1 ? '' : 's'} · ${formatBytes(bytes)}`,
-      ),
-    );
-    row.appendChild(main);
-
-    if (s.deployed?.profileId === profile.id) {
-      row.appendChild(el('div', 'badge badge-live', 'LIVE'));
-    } else if (profile.vanillaLock) {
-      row.appendChild(el('div', 'badge badge-lock', 'SAFE'));
-    }
-
-    row.addEventListener('click', async () => {
-      if (!s.currentGameId) return;
-      const next = await api.setActiveProfile(s.currentGameId, profile.id);
-      apply(next);
-    });
-    row.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      profileMenu(profile);
-    });
-
-    list.appendChild(row);
-  }
-
-  const current = s.games.find((g) => g.id === s.currentGameId);
-  byId('game-path').textContent = current?.path ?? 'Not set up';
-
-  const status = byId('game-status');
-  clear(status);
-  const dot = el('div', 'dot');
-  let label: string;
-  if (!current?.installed) {
-    dot.classList.add('dot-off');
-    label = 'game not set up yet';
-  } else if (s.deployed) {
-    dot.classList.add('dot-warn');
-    label = `${s.deployed.fileCount} mod files installed`;
-  } else {
-    dot.classList.add('dot-ok');
-    label = 'clean — no mods installed';
-  }
-  status.appendChild(dot);
-  status.appendChild(el('span', '', label));
-}
 
 /** Rename / duplicate / delete, offered on right-click. */
 function profileMenu(profile: Profile): void {
@@ -529,39 +428,6 @@ function visibleMods(s: AppState): Mod[] {
     .sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999));
 }
 
-function renderChips(s: AppState): void {
-  const chips = byId('chips');
-  clear(chips);
-
-  const profile = s.profiles.find((p) => p.id === s.activeProfileId);
-  const conflicts = conflictMap(s.conflicts);
-  const categories = [...new Set(s.mods.map((m) => m.category))].sort();
-
-  const defs: Array<{ id: string; label: string; alert?: boolean }> = [
-    { id: 'all', label: `all ${s.mods.length}` },
-    { id: 'enabled', label: `on ${profile?.enabled.length ?? 0}` },
-    ...categories.map((c) => ({
-      id: c,
-      label: `${c} ${s.mods.filter((m) => m.category === c).length}`,
-    })),
-  ];
-  if (conflicts.size > 0) {
-    defs.push({ id: 'conflicts', label: `conflicts ${s.conflicts.length}`, alert: true });
-  }
-
-  for (const def of defs) {
-    const chip = el(
-      'button',
-      `chip${filter === def.id ? ' is-active' : ''}${def.alert ? ' is-alert' : ''}`,
-      def.label,
-    );
-    chip.addEventListener('click', () => {
-      filter = def.id;
-      render();
-    });
-    chips.appendChild(chip);
-  }
-}
 
 function renderModsTable(s: AppState, view: HTMLElement): void {
   const profile = s.profiles.find((p) => p.id === s.activeProfileId);
@@ -782,6 +648,552 @@ function renderOrder(s: AppState, view: HTMLElement): void {
   view.appendChild(stack);
   // No drop target here: installing belongs on the Mods tab, and having two
   // places that accept mods made it unclear which one was "the" way in.
+}
+
+// --- shell: breadcrumb + secondary nav --------------------------------------
+
+/**
+ * The breadcrumb, which is the whole of this design's navigation state.
+ *
+ * Design 2a shows a dot and the app name; 2b shows "Swapmeet › <setup>". That
+ * is the entire model - one level of drill-down - so there is no tab strip and
+ * no profile rail to keep in step with it.
+ */
+function renderCrumbs(s: AppState): void {
+  const host = byId('crumbs');
+  clear(host);
+
+  if (tab === 'home') {
+    host.appendChild(el('div', 'crumb-dot'));
+    host.appendChild(el('div', 'crumb is-current', 'Swapmeet'));
+    return;
+  }
+
+  const back = el('button', 'crumb', 'Swapmeet');
+  back.addEventListener('click', () => {
+    tab = 'home';
+    render();
+  });
+  host.appendChild(back);
+  host.appendChild(el('div', 'crumb-sep', '›'));
+
+  const profile = s.profiles.find((p) => p.id === s.activeProfileId);
+  const label =
+    tab === 'profile'
+      ? (profile?.name ?? 'Setup')
+      : tab === 'order'
+        ? `${profile?.name ?? 'Setup'} · load order`
+        : TAB_LABELS[tab];
+  host.appendChild(el('div', 'crumb is-current', label));
+}
+
+const TAB_LABELS: Record<string, string> = {
+  home: 'Home',
+  profile: 'Setup',
+  order: 'Load order',
+  browse: 'Browse',
+  saves: 'Backups',
+  settings: 'Settings',
+  speedrun: 'Speedrun',
+};
+
+/** The screens that are not part of the drill-down: tools, not places. */
+function renderTopnav(s: AppState): void {
+  const host = byId('topnav');
+  clear(host);
+
+  const items: TabId[] = ['browse', 'saves'];
+  if (s.settings.speedrunMode) items.push('speedrun');
+  items.push('settings');
+
+  // Load order only makes sense once you are inside a setup that has one.
+  if (tab === 'profile' || tab === 'order') items.unshift('order');
+
+  for (const id of items) {
+    const btn = el('button', tab === id ? 'is-active' : undefined, TAB_LABELS[id]);
+    btn.addEventListener('click', () => {
+      tab = id;
+      render();
+      if (id === 'browse' && !browseResult && !browseLoading) void loadBrowse();
+      if (id === 'speedrun') void loadSpeedrun();
+    });
+    host.appendChild(btn);
+  }
+}
+
+function renderGamePicker(s: AppState): void {
+  const select = byId<HTMLSelectElement>('game-select');
+  clear(select);
+  for (const game of s.games) {
+    const option = el('option', undefined, game.installed ? game.shortName : `${game.shortName} — not found`);
+    option.value = game.id;
+    option.disabled = !game.installed;
+    if (game.id === s.currentGameId) option.selected = true;
+    select.appendChild(option);
+  }
+  select.hidden = s.games.filter((g) => g.installed).length < 2;
+}
+
+// --- 2a: which setup do you want to play? -----------------------------------
+
+/**
+ * The home screen, design 2a.
+ *
+ * The question at the top is the whole thesis of this direction. Nearly every
+ * session is "play the thing I already set up", not "manage my library", so
+ * the app opens by asking the only question that matters and puts one obvious
+ * button on each answer.
+ */
+function renderHome(s: AppState, view: HTMLElement): void {
+  const current = s.games.find((g) => g.id === s.currentGameId);
+  if (!current?.installed) {
+    renderSetup(s, view);
+    return;
+  }
+
+  const home = el('div', 'home');
+
+  const head = el('div', 'home-head');
+  head.appendChild(el('h1', 'ask', 'Which setup do you want to play?'));
+  head.appendChild(
+    el(
+      'p',
+      'lede',
+      'Pick a setup and press Play. Swapmeet swaps the mods and your save files for you, and keeps a backup of everything it touches.',
+    ),
+  );
+  home.appendChild(head);
+
+  const grid = el('div', 'setups');
+  for (const profile of s.profiles) grid.appendChild(setupCard(s, profile));
+  home.appendChild(grid);
+
+  const foot = el('div', 'home-foot');
+  foot.appendChild(backupCard(s));
+
+  const add = el('button', 'note-card is-dashed');
+  add.appendChild(el('div', 'note-icon', '+'));
+  const addMain = el('div', 'note-main');
+  addMain.appendChild(el('div', 'note-title', 'Make a new setup'));
+  addMain.appendChild(el('div', 'note-body', 'Start empty, or copy one you already have'));
+  add.appendChild(addMain);
+  add.addEventListener('click', () => newProfile());
+  foot.appendChild(add);
+
+  home.appendChild(foot);
+  view.appendChild(home);
+}
+
+function setupCard(s: AppState, profile: Profile): HTMLElement {
+  const live = s.deployed?.profileId === profile.id;
+  const card = el('div', `setup${live ? ' is-live' : ''}`);
+
+  const head = el('div', 'setup-head');
+  head.appendChild(
+    el('div', `setup-chip${live ? ' is-live' : profile.vanillaLock ? ' is-safe' : ''}`),
+  );
+  head.appendChild(el('div', 'setup-name', profile.name));
+  if (live) head.appendChild(el('div', 'setup-tag is-good', 'IN USE'));
+  else if (profile.vanillaLock) head.appendChild(el('div', 'setup-tag is-good', 'SAFE'));
+  card.appendChild(head);
+
+  card.appendChild(el('div', 'setup-blurb', blurbFor(s, profile)));
+
+  const enabled = profile.vanillaLock ? [] : s.mods.filter((m) => profile.enabled.includes(m.id));
+  const bytes = enabled.reduce((sum, m) => sum + m.size, 0);
+
+  const facts = el('div', 'setup-facts');
+  facts.appendChild(fact('Mods', enabled.length === 0 ? 'None' : `${enabled.length} on`));
+  facts.appendChild(fact('Size on disk', enabled.length === 0 ? '—' : formatBytes(bytes)));
+  facts.appendChild(
+    fact('Last played', profile.lastLaunchedAt ? formatDate(profile.lastLaunchedAt) : 'Never'),
+  );
+  card.appendChild(facts);
+
+  card.appendChild(el('div', 'setup-grow'));
+
+  // The card itself is the way in. 2a asks for one obvious button per card,
+  // so the button is reserved for playing and opening is the card click.
+  card.tabIndex = 0;
+  card.title = `Open ${profile.name}`;
+  const enter = (event: Event) => {
+    if (event.target instanceof HTMLElement && event.target.closest('button')) return;
+    void openProfile(profile);
+  };
+  card.addEventListener('click', enter);
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      void openProfile(profile);
+    }
+  });
+
+  const play = el(
+    'button',
+    `btn btn-wide ${live ? 'is-blue' : ''}`,
+    live ? 'Play now' : 'Switch and play',
+  );
+  play.addEventListener('click', () => void switchAndPlay(profile));
+  card.appendChild(play);
+
+  return card;
+}
+
+function fact(label: string, value: string): HTMLElement {
+  const row = el('div', 'setup-fact');
+  row.appendChild(el('span', undefined, label));
+  row.appendChild(el('b', undefined, value));
+  return row;
+}
+
+/** A setup described the way someone would describe it out loud. */
+function blurbFor(s: AppState, profile: Profile): string {
+  if (profile.vanillaLock) {
+    return 'No mods at all. Use this before going online so you do not get banned.';
+  }
+  const on = s.mods.filter((m) => profile.enabled.includes(m.id) && !m.core);
+  if (on.length === 0) return 'Nothing switched on yet. Open it to add some mods.';
+  const named = on.slice(0, 3).map((m) => m.name);
+  const rest = on.length - named.length;
+  return rest > 0 ? `${named.join(', ')} and ${rest} more.` : `${named.join(', ')}.`;
+}
+
+function backupCard(s: AppState): HTMLElement {
+  const card = el('div', 'note-card');
+  const ok = s.settings.backupSavesOnSwap;
+  card.appendChild(el('div', `note-icon${ok ? ' is-good' : ''}`, ok ? '✓' : '!'));
+  const main = el('div', 'note-main');
+  main.appendChild(
+    el('div', 'note-title', ok ? 'Everything is backed up' : 'Save backups are switched off'),
+  );
+  const newest = saves[0];
+  main.appendChild(
+    el(
+      'div',
+      'note-body',
+      ok
+        ? newest
+          ? `Last backup ${formatDate(newest.createdAt)} · ${saves.length} restore point${saves.length === 1 ? '' : 's'} kept`
+          : 'No snapshots yet — one is taken before your first switch'
+        : 'Your saves are not copied before a switch. Turn this back on in Settings.',
+    ),
+  );
+  card.appendChild(main);
+  const view = el('button', 'btn', 'View backups');
+  view.addEventListener('click', () => {
+    tab = 'saves';
+    render();
+  });
+  card.appendChild(view);
+  return card;
+}
+
+// --- 2b: inside a setup ------------------------------------------------------
+
+/**
+ * One setup's contents, design 2b.
+ *
+ * The list is on/off switches with a plain-language sentence under each name,
+ * and the panel on the right holds the single action plus the reassurances
+ * about what a switch actually does to your files. Load order, conflicts and
+ * deploy mechanics are still there, but they are stated in words rather than
+ * shown as a table to be interpreted.
+ */
+function renderProfile(s: AppState, view: HTMLElement): void {
+  const profile = s.profiles.find((p) => p.id === s.activeProfileId);
+  if (!profile) {
+    view.appendChild(emptyState('No setup selected', 'Go back and pick one.'));
+    return;
+  }
+
+  const wrap = el('div', 'inside');
+
+  const main = el('div', 'inside-main');
+  const head = el('div');
+  head.appendChild(el('div', 'inside-title', "What's in this setup"));
+  head.appendChild(
+    el(
+      'div',
+      'inside-lede',
+      profile.vanillaLock
+        ? 'This setup deliberately installs nothing. That is what makes it safe to play online from, so it cannot be changed.'
+        : 'Turn things on or off. Nothing changes in your game until you press Play.',
+    ),
+  );
+  main.appendChild(head);
+
+  main.appendChild(renderPills(s, profile));
+
+  const mods = thingsFor(s, profile);
+  if (mods.length === 0) {
+    main.appendChild(
+      emptyState(
+        profile.vanillaLock ? 'Nothing here, on purpose' : 'Nothing in this setup yet',
+        profile.vanillaLock
+          ? 'The vanilla setup is empty by design.'
+          : 'Drag a mod in anywhere, or use Browse to fetch the essentials.',
+        profile.vanillaLock ? undefined : 'Add mod files',
+        profile.vanillaLock ? undefined : () => installMod('files'),
+      ),
+    );
+  } else {
+    const list = el('div', 'things');
+    for (const mod of mods) list.appendChild(thingRow(s, profile, mod));
+    main.appendChild(list);
+  }
+  wrap.appendChild(main);
+
+  wrap.appendChild(readyPanel(s, profile));
+  view.appendChild(wrap);
+}
+
+/**
+ * The plain-language filters.
+ *
+ * These are the categories a player recognises, not the kinds the deploy
+ * engine sorts by. "Needed to run mods" is a real thing someone can reason
+ * about; "asi" is not.
+ */
+const PLAIN_GROUPS: Array<{ id: string; label: string; kinds: string[] }> = [
+  { id: 'all', label: 'Everything', kinds: [] },
+  { id: 'plays', label: 'How the game plays', kinds: ['asi', 'script', 'cleo', 'oiv', 'replace'] },
+  { id: 'looks', label: 'How it looks', kinds: ['graphics'] },
+  { id: 'core', label: 'Needed to run mods', kinds: [] },
+];
+
+function renderPills(s: AppState, profile: Profile): HTMLElement {
+  const row = el('div', 'pills');
+  for (const group of PLAIN_GROUPS) {
+    const count = group.id === 'all' ? undefined : thingsFor(s, profile, group.id).length;
+    if (count === 0) continue;
+    const pill = el('button', `pill${filter === group.id ? ' is-active' : ''}`, group.label);
+    pill.addEventListener('click', () => {
+      filter = group.id;
+      render();
+    });
+    row.appendChild(pill);
+  }
+  return row;
+}
+
+function thingsFor(s: AppState, profile: Profile, which = filter): Mod[] {
+  const inProfile = profile.order
+    .map((id) => s.mods.find((m) => m.id === id))
+    .filter((m): m is Mod => m !== undefined);
+  if (which === 'all') return inProfile;
+  if (which === 'core') return inProfile.filter((m) => m.core);
+  const group = PLAIN_GROUPS.find((g) => g.id === which);
+  if (!group) return inProfile;
+  return inProfile.filter((m) => !m.core && group.kinds.includes(m.kind));
+}
+
+function thingRow(s: AppState, profile: Profile, mod: Mod): HTMLElement {
+  const on = profile.enabled.includes(mod.id);
+  const conflicts = conflictMap(s.conflicts).get(mod.id) ?? 0;
+  const row = el('div', 'thing');
+
+  row.appendChild(el('div', 'thing-icon'));
+
+  const main = el('div', 'thing-main');
+  const head = el('div', 'thing-head');
+  head.appendChild(el('div', 'thing-name', mod.name));
+
+  // One badge, in words. The conflict badge wins when there is one, because
+  // that is the only state that needs a decision.
+  if (conflicts > 0 && on) {
+    head.appendChild(el('div', 'thing-badge is-warn', 'conflict'));
+  } else if (mod.core) {
+    head.appendChild(el('div', 'thing-badge', 'required'));
+  } else {
+    head.appendChild(el('div', 'thing-badge', plainKind(mod.kind)));
+  }
+  main.appendChild(head);
+  main.appendChild(el('div', 'thing-blurb', plainBlurb(s, profile, mod, on, conflicts)));
+  row.appendChild(main);
+
+  const sw = el('button', `sw${on ? ' is-on' : ''}`);
+  sw.appendChild(el('div', 'sw-knob'));
+  sw.disabled = profile.vanillaLock;
+  sw.title = profile.vanillaLock
+    ? 'The vanilla setup is deliberately empty'
+    : on
+      ? `Switch ${mod.name} off`
+      : `Switch ${mod.name} on`;
+  sw.addEventListener('click', async () => {
+    const next = await guard('Updating…', () => api.toggleMod(profile.id, mod.id, !on));
+    if (next) apply(next);
+  });
+  row.appendChild(sw);
+  return row;
+}
+
+/** Mod kinds, said the way a player would say them. */
+function plainKind(kind: string): string {
+  switch (kind) {
+    case 'graphics':
+      return 'how it looks';
+    case 'asi':
+    case 'script':
+    case 'cleo':
+      return 'how it plays';
+    case 'replace':
+    case 'oiv':
+      return 'game files';
+    case 'modloader':
+      return 'required';
+    default:
+      return kind;
+  }
+}
+
+/**
+ * A sentence about what this mod is doing right now.
+ *
+ * The conflict case is the one that earns its place: rather than "conflict
+ * x1", it names the mod that is winning and why, which is the difference
+ * between a status and an explanation.
+ */
+function plainBlurb(
+  s: AppState,
+  profile: Profile,
+  mod: Mod,
+  on: boolean,
+  conflicts: number,
+): string {
+  if (conflicts > 0 && on) {
+    const clash = s.conflicts.find((c) => c.modIds.includes(mod.id));
+    const winner = clash ? s.mods.find((m) => m.id === clash.winnerId) : undefined;
+    if (winner && winner.id !== mod.id) {
+      return `Changes the same file as ${winner.name}, which is winning it. Move this one later in the load order to flip that.`;
+    }
+    if (winner) {
+      const others = (clash?.modIds ?? [])
+        .filter((id) => id !== mod.id)
+        .map((id) => s.mods.find((m) => m.id === id)?.name)
+        .filter(Boolean);
+      return `Wins a file that ${others.join(' and ')} also changes.`;
+    }
+  }
+  if (mod.core) return 'One of the pieces that lets any of this run. Leave it on.';
+  if (!on) return 'Switched off, so none of its files go into your game.';
+  return `${mod.files.length} file${mod.files.length === 1 ? '' : 's'} · ${formatBytes(mod.size)}`;
+}
+
+function readyPanel(s: AppState, profile: Profile): HTMLElement {
+  const panel = el('div', 'ready');
+
+  const on = profile.vanillaLock ? 0 : profile.enabled.length;
+  const off = Math.max(0, profile.order.length - on);
+
+  const head = el('div');
+  head.appendChild(el('div', 'ready-title', 'Ready to play'));
+  head.appendChild(
+    el(
+      'div',
+      'ready-sub',
+      profile.vanillaLock
+        ? 'This setup puts your game back to completely unmodded.'
+        : `${on} thing${on === 1 ? '' : 's'} on, ${off} off.`,
+    ),
+  );
+  panel.appendChild(head);
+
+  // The one conflict worth surfacing, phrased as a decision rather than an
+  // error. Design 2b puts exactly one of these here, not a list.
+  const clash = s.conflicts[0];
+  if (clash) {
+    const winner = s.mods.find((m) => m.id === clash.winnerId);
+    const loser = s.mods.find((m) => m.id === clash.modIds.find((id) => id !== clash.winnerId));
+    if (winner && loser) {
+      const notice = el('div', 'notice');
+      notice.appendChild(el('div', 'notice-title', 'Two mods want the same file'));
+      const body = el('div', 'notice-body');
+      body.appendChild(document.createTextNode('Only one can change it. We have kept '));
+      body.appendChild(el('b', undefined, winner.name));
+      body.appendChild(
+        document.createTextNode(
+          ` on, because it is later in the load order. ${
+            s.conflicts.length > 1 ? `${s.conflicts.length - 1} other file(s) are contested too.` : ''
+          }`,
+        ),
+      );
+      notice.appendChild(body);
+      const acts = el('div', 'notice-acts');
+      const fine = el('button', 'btn is-primary', 'Sounds good');
+      fine.addEventListener('click', () => toast('Left as it is.', 'ok'));
+      acts.appendChild(fine);
+      const flip = el('button', 'btn', `Use ${loser.name}`);
+      flip.addEventListener('click', async () => {
+        const next = await guard('Reordering…', () =>
+          api.moveMod(profile.id, loser.id, profile.order.length - 1),
+        );
+        if (next) apply(next);
+      });
+      acts.appendChild(flip);
+      notice.appendChild(acts);
+      panel.appendChild(notice);
+    }
+  }
+
+  const ticks = el('div', 'ticks');
+  for (const line of [
+    s.settings.backupSavesOnSwap
+      ? 'Your save file is copied before every switch'
+      : 'Save snapshots are off — turn them on in Settings',
+    'Mods are moved, never deleted',
+    'You can put the game back to vanilla any time',
+  ]) {
+    ticks.appendChild(el('div', 'tick', line));
+  }
+  panel.appendChild(ticks);
+
+  panel.appendChild(el('div', 'ready-grow'));
+
+  const play = el('button', 'play', 'Play with this setup');
+  play.addEventListener('click', () => void applyProfile(true));
+  panel.appendChild(play);
+
+  const alt = el('div', 'play-alt');
+  alt.appendChild(document.createTextNode('or '));
+  const save = el('button', undefined, 'save without playing');
+  save.addEventListener('click', () => void applyProfile(false));
+  alt.appendChild(save);
+  panel.appendChild(alt);
+
+  return panel;
+}
+
+/** Make a setup current and drill into it. */
+async function openProfile(profile: Profile): Promise<void> {
+  if (state?.activeProfileId !== profile.id) {
+    const next = await guard('Opening…', () =>
+      api.setActiveProfile(profile.gameId, profile.id),
+    );
+    if (!next) return;
+    apply(next);
+  }
+  filter = 'all';
+  tab = 'profile';
+  render();
+}
+
+/**
+ * Switch to a setup and play it.
+ *
+ * Routed through the same apply path as the button inside the setup, rather
+ * than a shortcut of its own: the preview, the blockers and the online check
+ * all still have to happen. This is a faster route to the same decision, not
+ * a way around it.
+ */
+async function switchAndPlay(profile: Profile): Promise<void> {
+  if (state?.activeProfileId !== profile.id) {
+    const next = await guard('Switching setup…', () =>
+      api.setActiveProfile(profile.gameId, profile.id),
+    );
+    if (!next) return;
+    apply(next);
+  }
+  await applyProfile(true);
 }
 
 // --- rendering: browse ------------------------------------------------------
@@ -1496,7 +1908,7 @@ function renderSettings(s: AppState, view: HTMLElement): void {
   const themeRow = el('div', 'setting');
   const themeMain = el('div', 'setting-main');
   themeMain.appendChild(el('div', 'setting-name', 'Theme'));
-  themeMain.appendChild(el('div', 'setting-desc', 'Dark suits a games library; light suits a bright room.'));
+  themeMain.appendChild(el('div', 'setting-desc', 'The interface is designed light. Dark is available if you prefer it.'));
   themeRow.appendChild(themeMain);
   const themeSel = el('select', 'mini-select');
   for (const [value, label] of [
@@ -1506,12 +1918,17 @@ function renderSettings(s: AppState, view: HTMLElement): void {
     const option = el('option');
     option.value = value;
     option.textContent = label;
-    option.selected = (s.settings.theme ?? 'dark') === value;
+    option.selected = (s.settings.theme ?? 'light') === value;
     themeSel.appendChild(option);
   }
   themeSel.addEventListener('change', async () => {
     const next = await guard('Saving…', () =>
-      api.updateSettings({ theme: themeSel.value as 'dark' | 'light' }),
+      // themeChosen marks this as a real decision, so the one-time reset in
+      // hydrate() never overrides it again.
+      api.updateSettings({
+        theme: themeSel.value as 'dark' | 'light',
+        themeChosen: true,
+      }),
     );
     if (next) apply(next);
   });
@@ -1652,301 +2069,6 @@ function renderSettings(s: AppState, view: HTMLElement): void {
 
 // --- rendering: inspector ---------------------------------------------------
 
-function renderInspector(s: AppState): void {
-  const insp = byId('inspector');
-  clear(insp);
-
-  const profile = s.profiles.find((p) => p.id === s.activeProfileId);
-  const current = s.games.find((g) => g.id === s.currentGameId);
-
-  // Needs attention
-  const attention = el('div');
-  attention.appendChild(el('div', 'insp-label', 'Needs attention'));
-
-  // A damaged settings file outranks everything: the app looks freshly
-  // installed to someone who had a library a minute ago, and they need to know
-  // their profiles were not thrown away before they start rebuilding them.
-  if (s.configError) {
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(el('div', 'alert-title', 'Your settings could not be read'));
-    box.appendChild(el('div', 'alert-body', s.configError.message));
-    box.appendChild(
-      el(
-        'div',
-        'alert-body',
-        'Your mod files are untouched. The damaged file was kept, so nothing is lost for good.',
-      ),
-    );
-    const actions = el('div', 'alert-actions');
-    const show = el('button', 'small-btn', 'Show me the file');
-    show.addEventListener('click', () => void api.openPath('config'));
-    actions.appendChild(show);
-    box.appendChild(actions);
-    attention.appendChild(box);
-  }
-
-  if (!current?.installed) {
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(el('div', 'alert-title', 'No game folder yet'));
-    box.appendChild(
-      el(
-        'div',
-        'alert-body',
-        'Swapmeet could not find this game on its own. Search again, or point it at the folder the game is installed in.',
-      ),
-    );
-    const actions = el('div', 'alert-actions');
-    const detect = el('button', 'small-btn is-primary', 'Find my game');
-    detect.addEventListener('click', () => detect_());
-    actions.appendChild(detect);
-    const browse = el('button', 'small-btn', 'Choose folder…');
-    browse.addEventListener('click', () => browseForGame());
-    actions.appendChild(browse);
-    box.appendChild(actions);
-    attention.appendChild(box);
-  } else if (s.brokenMods.length > 0) {
-    // Ranked first: a mod whose files are gone cannot be installed at all, and
-    // every other warning about it is downstream of that.
-    const first = s.brokenMods[0]!;
-
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(
-      el(
-        'div',
-        'alert-title',
-        s.brokenMods.length === 1
-          ? `${first.name} is missing its files`
-          : `${s.brokenMods.length} mods are missing their files`,
-      ),
-    );
-    box.appendChild(
-      el(
-        'div',
-        'alert-body',
-        `${first.name} is in your library but its files are gone from disk. That usually means antivirus quarantined them, a cloud-sync folder reclaimed them, or an install did not finish. Re-install the mod, or remove it to clear this.`,
-      ),
-    );
-
-    const actions = el('div', 'alert-actions');
-    const removeBroken = el('button', 'small-btn is-primary', 'Remove from library');
-    removeBroken.addEventListener('click', async () => {
-      const ok = await confirmModal(
-        `Remove "${first.name}"?`,
-        'Its files are already gone, so this only clears the entry. Your game folder is not touched.',
-        'Remove it',
-      );
-      if (!ok) return;
-      const next = await guard('Removing…', () => api.removeMod(first.id));
-      if (next) {
-        apply(next);
-        toast(`${first.name} removed from the library.`, 'ok');
-      }
-    });
-    actions.appendChild(removeBroken);
-
-    const findAgain = el('button', 'small-btn', 'Re-install it');
-    findAgain.addEventListener('click', () => {
-      tab = 'browse';
-      render();
-    });
-    actions.appendChild(findAgain);
-    box.appendChild(actions);
-    attention.appendChild(box);
-  } else if (adoptable.filter((g) => !g.alreadyInLibrary).length > 0) {
-    // Ranked above everything else: until these are imported, the library is
-    // not a true picture of what the game is actually loading.
-    const pending = adoptable.filter((g) => !g.alreadyInLibrary);
-    const first = pending[0]!;
-
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(
-      el(
-        'div',
-        'alert-title',
-        pending.length === 1
-          ? `${first.name} is installed but not managed`
-          : `${pending.length} mods are installed but not managed`,
-      ),
-    );
-    box.appendChild(
-      el(
-        'div',
-        'alert-body',
-        `Swapmeet found ${first.name} already in your game folder — someone installed it by hand. Import it and Swapmeet can switch it on and off with your profiles. Your existing files are left exactly where they are.`,
-      ),
-    );
-
-    const actions = el('div', 'alert-actions');
-    const importBtn = el('button', 'small-btn is-primary', `Import ${first.name}`);
-    importBtn.addEventListener('click', () => void adoptGroup(first, s));
-    actions.appendChild(importBtn);
-    if (pending.length > 1) {
-      const all = el('button', 'small-btn', 'Import all');
-      all.addEventListener('click', async () => {
-        for (const group of pending) await adoptGroup(group, s, true);
-        await refresh();
-        toast(`Imported ${pending.length} mods from your game folder.`, 'ok');
-      });
-      actions.appendChild(all);
-    }
-    const ignore = el('button', 'small-btn', 'Not now');
-    ignore.addEventListener('click', () => {
-      adoptable = [];
-      render();
-    });
-    actions.appendChild(ignore);
-    box.appendChild(actions);
-    attention.appendChild(box);
-  } else if (s.missingDeps.length > 0) {
-    // A missing script hook outranks a file conflict: with one, nothing loads
-    // at all, and the conflict is academic.
-    const total = s.missingDeps.reduce((n, entry) => n + entry.deps.length, 0);
-    const first = s.missingDeps[0]!;
-
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(
-      el(
-        'div',
-        'alert-title',
-        total === 1 ? 'A mod is missing a prerequisite' : `${total} prerequisites missing`,
-      ),
-    );
-
-    const body = el('div', 'alert-body');
-    body.appendChild(
-      document.createTextNode(
-        `${first.modName} needs ${first.deps.map((d) => d.label).join(' and ')}. `,
-      ),
-    );
-    body.appendChild(el('em', '', first.deps[0]?.reason ?? ''));
-    box.appendChild(body);
-
-    const actions = el('div', 'alert-actions');
-    const installable = first.deps.find((d) => d.essentialId);
-    if (installable) {
-      const btn = el('button', 'small-btn is-primary', `Install ${installable.label}`);
-      btn.addEventListener('click', () => void installDependency(installable, s));
-      actions.appendChild(btn);
-    }
-    const seeAll = el('button', 'small-btn', 'See all');
-    seeAll.addEventListener('click', () => showDependencies(s));
-    actions.appendChild(seeAll);
-    box.appendChild(actions);
-    attention.appendChild(box);
-  } else if (s.conflicts.length > 0) {
-    const first = s.conflicts[0]!;
-    const winner = s.mods.find((m) => m.id === first.winnerId);
-    const losers = first.modIds
-      .filter((id) => id !== first.winnerId)
-      .map((id) => s.mods.find((m) => m.id === id)?.name ?? id);
-
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(
-      el(
-        'div',
-        'alert-title',
-        s.conflicts.length === 1
-          ? 'Two mods write the same file'
-          : `${s.conflicts.length} file conflicts`,
-      ),
-    );
-    const body = el('div', 'alert-body');
-    body.appendChild(document.createTextNode(`${losers.join(', ')} and ${winner?.name ?? '?'} both write `));
-    body.appendChild(el('code', '', first.target));
-    body.appendChild(
-      document.createTextNode(
-        `. ${winner?.name ?? 'The last one'} wins, because it sits lower in the load order.`,
-      ),
-    );
-    box.appendChild(body);
-
-    const actions = el('div', 'alert-actions');
-    const openOrder = el('button', 'small-btn is-primary', 'Open load order');
-    openOrder.addEventListener('click', () => {
-      tab = 'order';
-      render();
-    });
-    actions.appendChild(openOrder);
-    const showAll = el('button', 'small-btn', 'See all');
-    showAll.addEventListener('click', () => showConflicts(s));
-    actions.appendChild(showAll);
-    box.appendChild(actions);
-    attention.appendChild(box);
-  } else if (s.settings.warnAboutOnline && current.hasOnline && s.deployed && !profile?.vanillaLock) {
-    const box = el('div', 'alert alert-warn');
-    box.appendChild(el('div', 'alert-title', 'Modded files are live'));
-    box.appendChild(
-      el(
-        'div',
-        'alert-body',
-        `${current.shortName} has an online mode, and modded files can get you banned from it. Switch to the Vanilla profile and apply it before you play online.`,
-      ),
-    );
-    box.appendChild(el('div', 'alert-actions')).appendChild(
-      (() => {
-        const btn = el('button', 'small-btn is-primary', 'Go vanilla');
-        btn.addEventListener('click', () => goVanilla(s));
-        return btn;
-      })(),
-    );
-    attention.appendChild(box);
-  } else {
-    const box = el('div', 'alert alert-ok');
-    box.appendChild(el('div', 'alert-title', 'All good'));
-    box.appendChild(
-      el(
-        'div',
-        'alert-body',
-        s.deployed
-          ? `${s.deployed.profileName} is installed in your game folder, with no mods fighting over the same file.`
-          : 'Your game folder is untouched. Switch some mods on, then press Apply & launch to put them in.',
-      ),
-    );
-    attention.appendChild(box);
-  }
-  insp.appendChild(attention);
-
-  // Profile stats
-  const stats = el('div');
-  stats.appendChild(el('div', 'insp-label', 'Profile'));
-
-  const addStat = (label: string, value: string, tone?: 'good' | 'warn') => {
-    const row = el('div', 'stat-row');
-    row.appendChild(el('span', '', label));
-    row.appendChild(
-      el('span', `stat-value${tone ? ` is-${tone}` : ''}`, value),
-    );
-    stats.appendChild(row);
-  };
-
-  addStat('Mods enabled', `${profile?.enabled.length ?? 0} / ${s.mods.length}`);
-  addStat('Size on disk', formatBytes(s.activeBytes));
-  addStat(
-    'In the game folder',
-    s.deployed ? `${s.deployed.fileCount} files` : 'nothing yet',
-    s.deployed ? 'warn' : 'good',
-  );
-  addStat('Last applied', s.deployed ? formatDate(s.deployed.deployedAt) : '—');
-  addStat(
-    'Save backup',
-    s.settings.backupSavesOnSwap ? 'automatic' : 'off',
-    s.settings.backupSavesOnSwap ? 'good' : 'warn',
-  );
-  insp.appendChild(stats);
-
-  insp.appendChild(el('div', 'insp-spacer'));
-
-  if (current) {
-    insp.appendChild(el('div', 'note-box', current.notes));
-  }
-  insp.appendChild(
-    el(
-      'div',
-      'note-box',
-      'Applying a profile copies mods into your game folder. If a mod would overwrite one of the game\u2019s own files, Swapmeet moves the original somewhere safe first \u2014 it is put back when you switch profiles. Nothing is ever deleted.',
-    ),
-  );
-}
 
 // --- updates ----------------------------------------------------------------
 
@@ -2572,8 +2694,9 @@ async function boot(): Promise<void> {
  */
 window.swapmeetEvents.onSiteEvent((event) => {
   if (event.kind === 'progress') {
-    const pct = event.total ? Math.round(((event.received ?? 0) / event.total) * 100) : 0;
-    byId('action-status').textContent = `Downloading ${event.fileName} — ${pct}%`;
+    // Progress used to go to the action bar, which this shell does not have.
+    // Deliberately silent: a toast per chunk would be a stream of noise, and
+    // the completion event already reports the outcome.
     return;
   }
   toast(
@@ -3008,21 +3131,13 @@ function render(): void {
   const s = state;
   if (!s) return;
 
-  // Theme is a data attribute on the root; the stylesheet redefines only the
-  // colour tokens, so everything follows without a second stylesheet.
-  document.documentElement.dataset.theme = s.settings.theme ?? 'dark';
+  // The 2a/2b palette is the default; dark is the alternate. The stylesheet
+  // redefines only the colour tokens, so everything follows.
+  document.documentElement.dataset.theme = s.settings.theme ?? 'light';
 
-  renderTitlebar(s);
-  renderSidebar(s);
-  renderInspector(s);
-
-  for (const btn of document.querySelectorAll<HTMLElement>('.tab')) {
-    btn.classList.toggle('is-active', btn.dataset.tab === tab);
-  }
-
-  // The search/filter toolbar only makes sense on the mods tab.
-  byId('toolbar').hidden = tab !== 'mods';
-  if (tab === 'mods') renderChips(s);
+  renderCrumbs(s);
+  renderTopnav(s);
+  renderGamePicker(s);
 
   const view = byId('view');
   clear(view);
@@ -3030,52 +3145,44 @@ function render(): void {
   const current = s.games.find((g) => g.id === s.currentGameId);
   if (!current?.installed && tab !== 'settings') {
     renderSetup(s, view);
-  } else {
-    switch (tab) {
-      case 'mods':
-        renderModsTable(s, view);
-        break;
-      case 'order':
-        renderOrder(s, view);
-        break;
-      case 'browse':
-        renderBrowse(s, view);
-        break;
-      case 'speedrun':
-        renderSpeedrun(s, view);
-        break;
-      case 'saves':
-        renderSaves(s, view);
-        break;
-      case 'settings':
-        renderSettings(s, view);
-        break;
-    }
+    return;
   }
 
-  const profile = s.profiles.find((p) => p.id === s.activeProfileId);
-  const statusEl = byId('action-status');
-  statusEl.title = s.deployed
-    ? `${s.deployed.profileName} was installed ${formatExact(s.deployed.deployedAt)}`
-    : 'No mods are installed in the game folder yet';
-  statusEl.textContent = s.deployed
-    ? `${s.deployed.profileName} is installed \u00b7 ${s.deployed.fileCount} files \u00b7 ${s.conflicts.length} conflict(s)`
-    : `Nothing installed yet \u00b7 ${profile?.enabled.length ?? 0} mod(s) switched on and ready`;
+  // Speedrun is opt-in; leaving it selected after it is switched off would
+  // strand the user on a screen with no way back that they can see.
+  if (!s.settings.speedrunMode && tab === 'speedrun') tab = 'home';
 
-  byId<HTMLButtonElement>('btn-apply').disabled = !profile || !current?.installed;
-  byId<HTMLButtonElement>('btn-launch').disabled = !current?.installed;
-  byId<HTMLButtonElement>('btn-install').disabled = !current?.installed;
-
-  // Speedrunning is an opt-in surface; the tab only exists when it is on.
-  byId('tab-speedrun').hidden = !s.settings.speedrunMode;
-  if (!s.settings.speedrunMode && tab === 'speedrun') tab = 'mods';
-
-  // The toolbar only makes sense on the mods list.
-  byId('toolbar').hidden = tab !== 'mods';
-  byId('btn-settings').classList.toggle('is-active', tab === 'settings');
+  switch (tab) {
+    case 'home':
+      renderHome(s, view);
+      break;
+    case 'profile':
+      renderProfile(s, view);
+      break;
+    case 'order':
+      renderOrder(s, view);
+      break;
+    case 'browse':
+      renderBrowse(s, view);
+      break;
+    case 'speedrun':
+      renderSpeedrun(s, view);
+      break;
+    case 'saves':
+      renderSaves(s, view);
+      break;
+    case 'settings':
+      renderSettings(s, view);
+      break;
+  }
 }
 
 // --- wiring -----------------------------------------------------------------
+//
+// Only the chrome is wired here now. In the 2a/2b shell the controls live
+// inside the screen that owns them, so there is no permanent action bar,
+// toolbar or profile rail to bind - each screen attaches its own handlers as
+// it renders.
 
 byId('win-min').addEventListener('click', () => api.windowMinimize());
 byId('win-max').addEventListener('click', () => api.windowMaximize());
@@ -3088,56 +3195,8 @@ byId('game-select').addEventListener('change', async (event) => {
   saves = await api.listSaves(gameId);
   sites = await api.listSites(gameId);
   browseResult = null;
-  render();
-  if (tab === 'browse') void loadBrowse();
-});
-
-byId('tabs').addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest('.tab') as HTMLElement | null;
-  if (!target?.dataset.tab) return;
-  tab = target.dataset.tab as TabId;
-  render();
-  // The browser only queries the network when it is actually on screen.
-  if (tab === 'browse' && !browseResult && !browseLoading) void loadBrowse();
-  if (tab === 'speedrun') void loadSpeedrun();
-});
-
-/*
- * Debounced: every keystroke rebuilds the whole mod table, which is fine for
- * a dozen mods and visibly laggy for a few hundred. 90ms is below the
- * threshold where typing feels delayed but coalesces a fast typist's input
- * into one render.
- */
-let searchTimer: number | null = null;
-byId('search').addEventListener('input', (event) => {
-  search = (event.target as HTMLInputElement).value;
-  if (searchTimer !== null) window.clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(() => {
-    searchTimer = null;
-    render();
-  }, 90);
-});
-
-byId('btn-install').addEventListener('click', () => installMod('files'));
-byId('new-profile').addEventListener('click', () => newProfile());
-byId('btn-detect').addEventListener('click', () => detect_());
-byId('btn-browse').addEventListener('click', () => browseForGame());
-byId('btn-open-game').addEventListener('click', () => {
-  if (state?.currentGameId) void api.openPath('game', state.currentGameId);
-});
-
-// Apply and Launch are independent: switching profile should not force the
-// game to start, and starting the game should not force a redeploy.
-byId('btn-apply').addEventListener('click', () => applyProfile(false));
-byId('btn-launch').addEventListener('click', () => launchOnly());
-
-byId('btn-settings').addEventListener('click', () => {
-  tab = tab === 'settings' ? 'mods' : 'settings';
-  render();
-});
-
-byId('hide-disabled').addEventListener('change', (event) => {
-  hideDisabled = (event.target as HTMLInputElement).checked;
+  // Switching game invalidates which setup you were looking at.
+  tab = 'home';
   render();
 });
 
@@ -3145,30 +3204,25 @@ byId('modal-scrim').addEventListener('click', (event) => {
   if (event.target === byId('modal-scrim')) closeModal();
 });
 
-// Keyboard: "/" focuses the filter, Escape closes the modal, Enter applies.
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
-    closeModal();
+    // Escape backs out one level, which is the whole navigation model.
+    if (!byId('modal-scrim').hidden) {
+      closeModal();
+      return;
+    }
+    if (tab !== 'home') {
+      tab = 'home';
+      render();
+    }
     return;
   }
-  const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(
-    (document.activeElement?.tagName ?? '').toUpperCase(),
-  );
-  if (event.key === '/' && !typing) {
-    event.preventDefault();
-    tab = 'mods';
-    render();
-    byId('search').focus();
-  }
-  // Deliberately *not* bound to bare Enter. Applying moves files in and out of
-  // the game folder and launches the game; having that on the key people press
-  // to dismiss things was far too easy to trigger by accident.
+
+  // Deliberately *not* bound to bare Enter. Applying moves files in and out
+  // of the game folder and launches the game; having that on the key people
+  // press to dismiss things was far too easy to trigger by accident.
   if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && byId('modal-scrim').hidden) {
     void applyProfile(true);
-  }
-  if (event.key.toLowerCase() === 'n' && (event.ctrlKey || event.metaKey)) {
-    event.preventDefault();
-    newProfile();
   }
 });
 

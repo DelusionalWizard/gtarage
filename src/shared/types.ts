@@ -334,6 +334,14 @@ export interface AppConfig {
     /** Interface theme. */
     theme: 'dark' | 'light';
     /**
+     * Set once the user picks a theme themselves.
+     *
+     * Distinguishes a real choice from the old default, so rebuilding the
+     * interface can retire the stale value without overriding anyone who
+     * genuinely wants dark. See hydrate() in main/config.ts.
+     */
+    themeChosen?: boolean;
+    /**
      * What to do when a newer Swapmeet is published.
      *
      * `notify` is the default rather than `auto`: this app writes to game

@@ -65,6 +65,56 @@
 }
 
 :root {
+/*
+   * Taken directly from designs 2a and 2b: a warm paper ground, white cards,
+   * hairline borders in the same warm family, and exactly one saturated
+   * colour (the blue) reserved for the single action a screen wants you to
+   * take. The greens and the orange are status only.
+   */
+  --bg: #faf9f6;
+  --chrome: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f7f5f1;
+  --raised: #f3f0ea;
+  --line: #ece8e1;
+  --line-strong: #e0dbd3;
+  --line-dashed: #d8d2c8;
+
+  --text: #1c1a17;
+  --text-2: #3a3630;
+  --muted: #57514a;
+  --dim: #7a736a;
+  --faint: #a8a29a;
+  --ghost: #c9c3ba;
+
+  /* The one accent. 2a puts it on "Play now" and nowhere else. */
+  --blue: oklch(0.62 0.15 250);
+  --green: oklch(0.5 0.13 145);
+  --green-soft: oklch(0.95 0.03 145);
+  --orange: oklch(0.5 0.15 45);
+  --orange-soft: oklch(0.98 0.02 45);
+  --orange-line: oklch(0.9 0.06 45);
+  --amber: oklch(0.58 0.15 78);
+  --red: oklch(0.52 0.2 27);
+
+  --sans: "Space Grotesk", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+
+  --rail: 236px;
+  --inspector: 330px;
+  --titlebar: 38px;
+  --actionbar: 58px;
+}
+
+/*
+ * Dark theme.
+ *
+ * Only the colour tokens are redefined — every rule is written against the
+ * variables, so the whole interface follows without a second stylesheet.
+ * The status hues are lifted rather than reused: the light palette's green
+ * and orange are tuned to sit on paper and go muddy against near-black.
+ */
+:root[data-theme='dark'] {
   --bg: #0d0f11;
   --chrome: #111315;
   --panel: #141719;
@@ -81,95 +131,54 @@
   --faint: #5c646b;
   --ghost: #4f575e;
 
-  --amber: oklch(0.72 0.19 90);
+  --blue: oklch(0.66 0.15 250);
   --green: oklch(0.72 0.19 145);
+  --green-soft: oklch(0.28 0.06 145);
   --orange: oklch(0.72 0.19 45);
-  --blue: oklch(0.62 0.16 250);
+  --orange-soft: oklch(0.24 0.05 45);
+  --orange-line: oklch(0.42 0.1 45);
+  --amber: oklch(0.72 0.19 90);
   --red: oklch(0.62 0.2 25);
-
-  --sans: "Space Grotesk", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --mono: "JetBrains Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
-
-  --rail: 236px;
-  --inspector: 330px;
-  --titlebar: 38px;
-  --actionbar: 58px;
-}
-
-/*
- * Light theme.
- *
- * Only the colour tokens are redefined — every rule below is written against
- * the variables, so the whole interface follows without a second stylesheet
- * to keep in sync.
- *
- * The status colours are darkened rather than reused. The dark palette's
- * amber and green are tuned to glow against near-black; on white they lose
- * almost all contrast, and "ok" in pale green on pale grey is unreadable.
- * Same hues, lower lightness.
- */
-:root[data-theme='light'] {
-  --bg: #f7f8f9;
-  --chrome: #eef0f2;
-  --panel: #ffffff;
-  --panel-2: #f2f4f6;
-  --raised: #e8ebee;
-  --line: #e2e6ea;
-  --line-strong: #d3d9df;
-  --line-dashed: #c2cad2;
-
-  --text: #14181c;
-  --text-2: #2f3843;
-  --muted: #55606c;
-  --dim: #6b7682;
-  --faint: #838d99;
-  --ghost: #9aa4af;
-
-  --amber: oklch(0.58 0.15 78);
-  --green: oklch(0.52 0.15 148);
-  --orange: oklch(0.58 0.17 48);
-  --blue: oklch(0.5 0.16 250);
-  --red: oklch(0.52 0.2 27);
 }
 
 /* The amber-on-light chips need dark text to stay legible. */
-:root[data-theme='light'] .seg-btn.is-active,
-:root[data-theme='light'] .chrome-btn.is-active,
-:root[data-theme='light'] .primary-btn,
-:root[data-theme='light'] .badge-live {
+:root[data-theme='dark'] .seg-btn.is-active,
+:root[data-theme='dark'] .chrome-btn.is-active,
+:root[data-theme='dark'] .primary-btn,
+:root[data-theme='dark'] .badge-live {
   color: #fff;
 }
 
 /* The solid button inverts in dark mode; on light it must not go white-on-white. */
-:root[data-theme='light'] .solid-btn {
+:root[data-theme='dark'] .solid-btn {
   background: var(--text);
   color: var(--bg);
 }
 
-:root[data-theme='light'] .solid-btn:hover {
+:root[data-theme='dark'] .solid-btn:hover {
   background: #000;
 }
 
 /* Toast shadows read as smudges on a light ground. */
-:root[data-theme='light'] .toast {
+:root[data-theme='dark'] .toast {
   box-shadow: 0 6px 18px rgba(20, 24, 28, 0.14);
 }
 
 /* The scrims are tuned for a dark page behind them. */
-:root[data-theme='light'] .overlay,
-:root[data-theme='light'] .modal-scrim {
+:root[data-theme='dark'] .overlay,
+:root[data-theme='dark'] .modal-scrim {
   background: rgba(20, 24, 28, 0.34);
 }
 
 /* The drag grip is drawn in a fixed colour that vanishes on white. */
-:root[data-theme='light'] .grip span {
+:root[data-theme='dark'] .grip span {
   background: var(--faint);
 }
 
 /* Row separators are hardcoded near-black elsewhere. */
-:root[data-theme='light'] .row,
-:root[data-theme='light'] .card-row,
-:root[data-theme='light'] .setting {
+:root[data-theme='dark'] .row,
+:root[data-theme='dark'] .card-row,
+:root[data-theme='dark'] .setting {
   border-color: var(--line);
 }
 
@@ -220,57 +229,6 @@ select {
   -webkit-app-region: drag;
 }
 
-.titlebar button,
-.titlebar select {
-  -webkit-app-region: no-drag;
-}
-
-.brand-mark {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  background: var(--amber);
-  flex: none;
-}
-
-.brand {
-  font: 500 12px var(--mono);
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-
-.brand-version {
-  font: 400 11px var(--mono);
-  color: var(--ghost);
-}
-
-.titlebar-divider {
-  width: 1px;
-  height: 16px;
-  background: var(--line-strong);
-}
-
-.game-select {
-  -webkit-appearance: none;
-  appearance: none;
-  background: var(--raised);
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  padding: 5px 26px 5px 10px;
-  font: 500 11.5px var(--mono);
-  color: var(--text-2);
-  cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, var(--dim) 50%),
-    linear-gradient(135deg, var(--dim) 50%, transparent 50%);
-  background-position: calc(100% - 14px) 51%, calc(100% - 9px) 51%;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
-}
-
-.game-select:focus-visible {
-  outline: 1px solid var(--amber);
-}
-
 .game-note {
   font: 400 11px var(--mono);
   color: var(--ghost);
@@ -280,33 +238,9 @@ select {
   max-width: 40vw;
 }
 
-.titlebar-spacer {
-  flex: 1;
-}
-
 .window-controls {
   display: flex;
   height: 100%;
-}
-
-.win-btn {
-  width: 44px;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--dim);
-  font: 400 12px var(--mono);
-  cursor: pointer;
-}
-
-.win-btn:hover {
-  background: var(--raised);
-  color: var(--text);
-}
-
-.win-close:hover {
-  background: var(--red);
-  color: #fff;
 }
 
 /* --- shell -------------------------------------------------------------- */
@@ -324,23 +258,6 @@ select {
   flex-direction: column;
   border-right: 1px solid var(--line);
   padding: 16px 0 0;
-  min-height: 0;
-}
-
-.rail-label {
-  padding: 0 16px 10px;
-  font: 500 10px var(--mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--faint);
-}
-
-.profile-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 8px;
-  overflow-y: auto;
   min-height: 0;
 }
 
@@ -426,16 +343,6 @@ select {
   border-color: var(--faint);
 }
 
-.rail-spacer {
-  flex: 1;
-  min-height: 12px;
-}
-
-.rail-foot {
-  padding: 14px 16px;
-  border-top: 1px solid var(--line);
-}
-
 .game-path {
   font: 400 11px var(--mono);
   color: var(--muted);
@@ -471,13 +378,6 @@ select {
   background: var(--faint);
 }
 
-.rail-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-}
-
 .link-btn {
   background: none;
   border: 0;
@@ -500,85 +400,6 @@ select {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-}
-
-.tabs {
-  display: flex;
-  gap: 22px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--line);
-  flex: none;
-}
-
-.tab {
-  padding: 12px 2px;
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  font: 500 13px var(--sans);
-  color: var(--dim);
-  cursor: pointer;
-}
-
-.tab:hover {
-  color: var(--text-2);
-}
-
-.tab.is-active {
-  color: var(--text);
-  border-bottom-color: var(--amber);
-  font-weight: 600;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 18px;
-  border-bottom: 1px solid var(--line);
-  flex: none;
-}
-
-.search {
-  flex: 1;
-  min-width: 120px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 10px;
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-}
-
-.search:focus-within {
-  border-color: var(--faint);
-}
-
-.search-slash {
-  font: 400 11px var(--mono);
-  color: var(--ghost);
-}
-
-.search input {
-  flex: 1;
-  background: none;
-  border: 0;
-  outline: 0;
-  font: 400 12px var(--mono);
-  color: var(--text-2);
-  user-select: text;
-}
-
-.search input::placeholder {
-  color: var(--ghost);
-}
-
-.chips {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
 }
 
 .chip {
@@ -620,12 +441,6 @@ select {
   background: #fff;
 }
 
-.view {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
 /* --- mod table ---------------------------------------------------------- */
 
 .table-head,
@@ -633,19 +448,6 @@ select {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 92px 110px 130px 56px;
   align-items: center;
-}
-
-.table-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 9px 18px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-  font: 500 9.5px var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--faint);
 }
 
 .row {
@@ -1114,10 +916,6 @@ button:disabled {
   white-space: nowrap;
 }
 
-.actionbar-spacer {
-  flex: 1;
-}
-
 /* --- empty states ------------------------------------------------------- */
 
 .empty {
@@ -1512,9 +1310,6 @@ button:disabled {
   .shell {
     grid-template-columns: var(--rail) minmax(0, 1fr);
   }
-  .inspector {
-    display: none;
-  }
 }
 
 /* --- mod browser -------------------------------------------------------- */
@@ -1600,14 +1395,6 @@ button:disabled {
   white-space: normal;
 }
 
-/* Inline drop target on the Mods tab: a visible affordance, since "you can
-   drop files on the window" is not discoverable on its own. */
-.dropzone-inline {
-  margin: 14px 18px 4px;
-  padding: 12px;
-  font: 400 11px var(--mono);
-}
-
 /* --- graphics profile panel --------------------------------------------- */
 
 .gfx-row {
@@ -1685,16 +1472,6 @@ button:disabled {
   user-select: none;
 }
 
-.mini-toggle:hover {
-  color: var(--text-2);
-}
-
-.mini-toggle input {
-  accent-color: var(--amber);
-  margin: 0;
-  cursor: pointer;
-}
-
 /*
  * Long values (paths, timestamps) must wrap rather than be clipped: a
  * truncated file path is worse than useless, because it looks like a
@@ -1719,4 +1496,703 @@ button:disabled {
  */
 [hidden] {
   display: none !important;
+}
+
+
+/* ===========================================================================
+ * Shell and screens, rebuilt to designs 2a and 2b.
+ *
+ * The previous shell was design 1a: a dark control room with a profile rail,
+ * a tab strip and a permanent action bar. This direction throws all three
+ * away. The screen you are on states what it is in a sentence, and the one
+ * action it wants sits inside the screen rather than in furniture that is
+ * always present whether it applies or not.
+ * ======================================================================== */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 0;
+  background: var(--bg);
+}
+
+/* --- title strip ---------------------------------------------------------- */
+
+.titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 8px 0 18px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+}
+
+.titlebar button,
+.titlebar select,
+.titlebar .crumb {
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-spacer {
+  flex: 1;
+}
+
+/* The breadcrumb is the only navigation state the design shows: where you
+   are, and the one place back. */
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.crumb-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.crumb {
+  font: 500 13px var(--sans);
+  color: var(--dim);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crumb:hover {
+  color: var(--text);
+}
+
+.crumb.is-current {
+  font-weight: 600;
+  color: var(--text);
+  cursor: default;
+}
+
+.crumb-sep {
+  flex: none;
+  font: 400 13px var(--sans);
+  color: var(--ghost);
+}
+
+.topnav {
+  display: flex;
+  gap: 2px;
+}
+
+.topnav button {
+  font: 500 12.5px var(--sans);
+  color: var(--dim);
+  background: none;
+  border: 0;
+  padding: 7px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.topnav button:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.topnav button.is-active {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.game-select {
+  font: 500 12.5px var(--sans);
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 6px 9px;
+  max-width: 230px;
+  cursor: pointer;
+}
+
+.win-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.win-btn {
+  width: 34px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  font: 400 13px var(--sans);
+  cursor: pointer;
+}
+
+.win-btn:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.win-close:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg);
+  container: view / inline-size;
+}
+
+/* --- 2a: which setup do you want to play? --------------------------------- */
+
+.home {
+  padding: 36px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.home-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ask {
+  font: 600 26px/1.15 var(--sans);
+  letter-spacing: -0.015em;
+  color: var(--text);
+  margin: 0;
+}
+
+.lede {
+  font: 400 14.5px/1.6 var(--sans);
+  color: var(--dim);
+  max-width: 640px;
+  margin: 0;
+}
+
+.setups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.setup {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+/* The live setup is the only card with any lift on it. */
+.setup.is-live {
+  border-color: color-mix(in oklab, var(--blue) 40%, var(--line));
+  box-shadow: 0 2px 10px rgba(40, 70, 140, 0.1);
+}
+
+.setup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-chip {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--raised);
+}
+
+.setup-chip.is-live {
+  background: color-mix(in oklab, var(--blue) 24%, var(--panel));
+}
+
+.setup-chip.is-safe {
+  background: var(--green-soft);
+}
+
+.setup-name {
+  flex: 1;
+  min-width: 0;
+  font: 600 15.5px var(--sans);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.setup-tag {
+  flex: none;
+  font: 600 10px var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+
+.setup-tag.is-good {
+  color: var(--green);
+}
+
+.setup-blurb {
+  font: 400 13.5px/1.6 var(--sans);
+  color: var(--dim);
+}
+
+.setup-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: 400 12.5px var(--sans);
+  color: var(--muted);
+}
+
+.setup-fact b {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-grow {
+  flex: 1;
+}
+
+/* --- the two cards under the grid ---------------------------------------- */
+
+.home-foot {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.note-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+  text-align: left;
+}
+
+.note-card.is-dashed {
+  border-style: dashed;
+  border-color: var(--line-dashed);
+  cursor: pointer;
+}
+
+.note-card.is-dashed:hover {
+  border-color: var(--blue);
+}
+
+.note-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--raised);
+  color: var(--faint);
+  font: 400 18px var(--sans);
+}
+
+.note-icon.is-good {
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.note-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-title {
+  font: 600 13.5px var(--sans);
+  color: var(--text);
+}
+
+.note-body {
+  font: 400 12.5px var(--sans);
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+/* --- 2b: inside a setup --------------------------------------------------- */
+
+.inside {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  min-height: 100%;
+}
+
+@container view (max-width: 900px) {
+  .inside {
+    grid-template-columns: 1fr;
+  }
+  .ready {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+.inside-main {
+  min-width: 0;
+  padding: 30px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.inside-title {
+  font: 600 22px var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.inside-lede {
+  font: 400 14px/1.6 var(--sans);
+  color: var(--dim);
+  margin-top: 6px;
+}
+
+/* Filter pills. The labels are plain language, not mod-kind jargon. */
+.pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  font: 500 12.5px var(--sans);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pill:hover {
+  border-color: var(--dim);
+}
+
+.pill.is-active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.things {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.thing {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 16px 18px;
+}
+
+.thing-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.thing-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.thing-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.thing-name {
+  font: 600 14.5px var(--sans);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.thing-badge {
+  font: 500 10.5px var(--mono);
+  color: var(--muted);
+  background: var(--raised);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.thing-badge.is-warn {
+  color: var(--orange);
+  background: var(--orange-soft);
+}
+
+.thing-blurb {
+  font: 400 13px/1.55 var(--sans);
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+/* The 2b switch: bigger and softer than a control-room toggle. */
+.sw {
+  flex: none;
+  width: 46px;
+  height: 26px;
+  border-radius: 13px;
+  border: 0;
+  background: var(--line-strong);
+  padding: 3px;
+  display: flex;
+  justify-content: flex-start;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.sw-knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+
+.sw.is-on {
+  background: var(--blue);
+  justify-content: flex-end;
+}
+
+.sw:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- the right-hand "ready to play" panel -------------------------------- */
+
+.ready {
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  padding: 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ready-title {
+  font: 600 15px var(--sans);
+  color: var(--text);
+}
+
+.ready-sub {
+  font: 400 13px/1.6 var(--sans);
+  color: var(--dim);
+  margin-top: 6px;
+}
+
+.notice {
+  padding: 16px;
+  border-radius: 11px;
+  background: var(--orange-soft);
+  border: 1px solid var(--orange-line);
+}
+
+.notice-title {
+  font: 600 13.5px var(--sans);
+  color: var(--text-2);
+}
+
+.notice-body {
+  font: 400 12.5px/1.6 var(--sans);
+  color: var(--muted);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.notice-body b {
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.notice-acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.ticks {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.tick {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font: 400 13px/1.5 var(--sans);
+  color: var(--muted);
+}
+
+.tick::before {
+  content: "\2713";
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--green-soft);
+  color: var(--green);
+  font: 700 10px var(--sans);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ready-grow {
+  flex: 1;
+}
+
+/* The one blue button on the screen. */
+.play {
+  flex: none;
+  height: 46px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--blue);
+  color: #fff;
+  font: 600 14.5px var(--sans);
+  cursor: pointer;
+}
+
+.play:hover {
+  filter: brightness(1.06);
+}
+
+.play:disabled {
+  background: var(--line-strong);
+  color: var(--faint);
+  cursor: default;
+  filter: none;
+}
+
+.play-alt {
+  flex: none;
+  text-align: center;
+  font: 400 12.5px var(--sans);
+  color: var(--faint);
+}
+
+.play-alt button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* --- buttons shared by the two screens ------------------------------------ */
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  font: 500 12.5px var(--sans);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--dim);
+}
+
+.btn.is-primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.btn.is-blue {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* A full-width card button, used for the per-setup action in 2a. */
+.btn-wide {
+  height: 40px;
+  width: 100%;
+  border-radius: 8px;
+}
+
+/* Generic page used by the secondary screens (browse, saves, settings) so
+   they sit on the same paper as the two designed ones. */
+.page {
+  padding: 30px 32px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1080px;
+}
+
+/* The whole card opens the setup; only the button plays it. */
+.setup {
+  cursor: pointer;
+}
+
+.setup:hover {
+  border-color: var(--dim);
+}
+
+.setup:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
