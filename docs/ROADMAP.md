@@ -1,6 +1,6 @@
 # Roadmap - what the community actually asks for
 
-Fourteen candidates, ranked against what Swapmeet already does. Drawn from
+Fourteen candidates, ranked against what GTArage already does. Drawn from
 MO2-vs-Vortex threads, Vortex's issue tracker, GTA V modding guides and Script
 Hook V breakage reports. Effort is against this codebase, not calendar time.
 

@@ -1,6 +1,6 @@
 # Design brief: Library
 
-Paste into Claude Design, in the same project as the existing Swapmeet
+Paste into Claude Design, in the same project as the existing GTArage
 mockups (`f938fa3e-21bb-4b7e-9c6b-7166df262410`), so it inherits the 2a/2b
 language and the conventions already set by Settings & Browse.
 
@@ -8,7 +8,7 @@ language and the conventions already set by Settings & Browse.
 
 ## Prompt
 
-Design the **Library** screen for **Swapmeet**, a mod manager for the Grand
+Design the **Library** screen for **GTArage**, a mod manager for the Grand
 Theft Auto games. It is the fourth item in the app's navigation, alongside
 Setups, Browse and Settings.
 
@@ -23,7 +23,7 @@ the accent, never an inversion of the light idiom to white.
 
 ### The problem it solves
 
-Swapmeet keeps mods in a **library**, and a **setup** is an ordered selection
+GTArage keeps mods in a **library**, and a **setup** is an ordered selection
 from that library. Today the app only ever shows the mods that are in the
 setup you happen to have open. That means:
 
@@ -39,7 +39,7 @@ has to make legible, and it is the interesting problem here.
 
 ### What it holds
 
-Every mod for the currently selected game. For each one Swapmeet knows:
+Every mod for the currently selected game. For each one GTArage knows:
 
 - Name, version, and size on disk.
 - What kind it is, in plain words: how it plays / how it looks / game files /
@@ -78,7 +78,7 @@ Every mod for the currently selected game. For each one Swapmeet knows:
 ### Notes
 
 - Window chrome is the app's own: a 44px title strip carrying a breadcrumb
-  (`Swapmeet › Library`) and the window buttons, with the nav on the right.
+  (`GTArage › Library`) and the window buttons, with the nav on the right.
 - Assume 1280×900, resizable, and that the content column can be as narrow as
   ~700px.
 - Sizes are real: a script mod is ~2 MB, a texture pack can be 6 GB. The

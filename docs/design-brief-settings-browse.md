@@ -1,6 +1,6 @@
 # Design brief: Settings and Browse
 
-Paste into Claude Design, in the same project as the existing Swapmeet
+Paste into Claude Design, in the same project as the existing GTArage
 mockups (`f938fa3e-21bb-4b7e-9c6b-7166df262410`), so the new screens inherit
 the 2a/2b language rather than starting a fresh visual direction.
 
@@ -8,7 +8,7 @@ the 2a/2b language rather than starting a fresh visual direction.
 
 ## Prompt
 
-Design two screens for **Swapmeet**, a mod manager for the Grand Theft Auto
+Design two screens for **GTArage**, a mod manager for the Grand Theft Auto
 games. They must sit inside the existing 2a/2b direction — "Clean & beginner
 friendly": warm paper ground, white cards, hairline borders in the same warm
 family, Space Grotesk for names and prose, JetBrains Mono for labels and
@@ -64,7 +64,7 @@ old version made them look the same, which was the core mistake:
    installed; some are required by a mod the user already has.
 2. **Community sites** — GTA5-Mods, GTAinside, LibertyCity, ModDB. No API, so
    these open a real browser window inside the app where the user logs in
-   themselves and Swapmeet captures the download. This is a *handoff*, not a
+   themselves and GTArage captures the download. This is a *handoff*, not a
    catalogue, and should look like one.
 3. **A file the user already has** — drag in a .zip/.rar/.oiv/folder. Today
    this is buried, despite being how most mods actually arrive.
@@ -85,7 +85,7 @@ Do not design a Nexus integration. It is being removed.
 ### Notes
 
 - Window chrome is the app's own: a 44px white title strip with a breadcrumb
-  (`Swapmeet › Settings`) and the window buttons. Both screens are reached
+  (`GTArage › Settings`) and the window buttons. Both screens are reached
   from a quiet top nav, not tabs.
 - Assume a 1280×900 window, resizable, and that the content column can be as
   narrow as ~700px when other panels are open.

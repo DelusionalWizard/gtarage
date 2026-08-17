@@ -1,6 +1,6 @@
 # Design brief: feature video
 
-Paste into Claude Design, in the same project as the Swapmeet mockups
+Paste into Claude Design, in the same project as the GTArage mockups
 (`f938fa3e-21bb-4b7e-9c6b-7166df262410`), so the frames are drawn in the app's
 real visual language rather than a fresh one.
 
@@ -14,11 +14,11 @@ one.
 
 ## Prompt
 
-Design a **storyboard for a short feature video** introducing **Swapmeet**, an
+Design a **storyboard for a short feature video** introducing **GTArage**, an
 open-source mod manager for the Grand Theft Auto games. Target two to three
 minutes, roughly 14–18 shots.
 
-Draw every frame in Swapmeet's existing visual language — the same warm paper
+Draw every frame in GTArage's existing visual language — the same warm paper
 ground, white cards, Space Grotesk and JetBrains Mono, single blue accent — and
 use the **real screens** from this project rather than inventing new ones. A
 frame that shows something the app cannot do is worse than no frame.
@@ -51,7 +51,7 @@ Then, in this order:
 7. **Library.** Everything you own, which setups use it, and what nothing is
    using. Adding a mod to a second setup does not download or copy it again.
 8. **Browse.** Three ways a mod arrives: a file you already have, the
-   essentials Swapmeet installs itself, and community sites where it opens the
+   essentials GTArage installs itself, and community sites where it opens the
    page and catches your download.
 9. **Settings**, briefly — the safety options grouped first, and the
    explanation of links versus copies.
@@ -66,7 +66,7 @@ This is the part that matters most. The video will be believed.
   currently reachable in the interface. Leave them out.
 - **The Definitive Editions are supported but untested with mods.** Do not
   imply otherwise.
-- Swapmeet **never scrapes** the community sites, and there is no Nexus
+- GTArage **never scrapes** the community sites, and there is no Nexus
   account integration. The browser handoff is the whole mechanism.
 - The builds are **unsigned**, and it is **beta**. If the closing frame makes
   any claim about safety, it should be the true one: nothing is deleted,
