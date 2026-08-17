@@ -812,8 +812,8 @@ function setupCard(s: AppState, profile: Profile): HTMLElement {
 
   card.appendChild(el('div', 'setup-grow'));
 
-  // The card itself is the way in. 2a asks for one obvious button per card,
-  // so the button is reserved for playing and opening is the card click.
+  // The card body is a second way in, alongside the explicit button. The
+  // handler ignores clicks that land on a button so the two never fight.
   card.tabIndex = 0;
   card.title = `Open ${profile.name}`;
   const enter = (event: Event) => {
@@ -827,6 +827,10 @@ function setupCard(s: AppState, profile: Profile): HTMLElement {
       void openProfile(profile);
     }
   });
+
+  const open = el('button', 'btn btn-wide', 'Open this setup');
+  open.addEventListener('click', () => void openProfile(profile));
+  card.appendChild(open);
 
   const play = el(
     'button',
