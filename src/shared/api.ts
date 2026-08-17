@@ -8,14 +8,7 @@
  * files -- from becoming a remote-code-execution hazard.
  */
 
-import type {
-  BrowseQuery,
-  BrowseResult,
-  CatalogFile,
-  CatalogMod,
-} from './catalog';
 import type { HookVerdict } from './buildwatch';
-import type { ModSite } from './sites';
 import type {
   AppConfig,
   Conflict,
@@ -31,23 +24,12 @@ import type {
 export const CALL_CHANNEL = 'gtarage:call';
 /** Main -> renderer progress during a long deploy. */
 export const PROGRESS_CHANNEL = 'gtarage:progress';
-/** Main -> renderer notifications from the embedded mod-site browser. */
-export const SITE_CHANNEL = 'gtarage:site';
 
 /** A library mod together with the prerequisites it is still missing. */
 export interface MissingDeps {
   modId: string;
   modName: string;
   deps: ModDependency[];
-}
-
-/** Pushed to the renderer when the embedded browser captures a download. */
-export interface SiteEvent {
-  kind: 'progress' | 'imported' | 'staged' | 'failed';
-  fileName: string;
-  message: string;
-  received?: number;
-  total?: number;
 }
 
 export interface GameView {
@@ -448,21 +430,8 @@ export interface GTArageApi {
 
   updateSettings(patch: Partial<AppConfig['settings']>): Promise<AppState>;
 
-  // --- mod browser ---------------------------------------------------------
+  // --- prerequisites --------------------------------------------------------
 
-  /** List mods from a provider. */
-  browse(query: BrowseQuery): Promise<BrowseResult>;
-  /** Fetch a mod's downloadable files. */
-  catalogFiles(mod: CatalogMod, gameId: GameId): Promise<CatalogFile[]>;
-  /**
-   * Download a catalog file and import it into the library. Executables are
-   * staged but never imported, and say so in the result.
-   */
-  installCatalogFile(
-    mod: CatalogMod,
-    file: CatalogFile,
-    gameId: GameId,
-  ): Promise<{ state: AppState; imported: boolean; message: string }>;
   /**
    * Install the Essentials entry that provides a detected dependency.
    * Returns a message when the tool has to be fetched by hand instead.
@@ -474,10 +443,6 @@ export interface GTArageApi {
   /** Re-run dependency detection over the whole library for a game. */
   rescanDependencies(gameId: GameId): Promise<AppState>;
 
-  /** Mod sites available for a game. */
-  listSites(gameId: GameId): Promise<ModSite[]>;
-  /** Open the embedded browser at a site. Downloads there are captured. */
-  openSite(siteId: string, gameId: GameId): Promise<void>;
   /** Open a URL in the user's real browser. http/https only. */
   openExternal(url: string): Promise<void>;
 

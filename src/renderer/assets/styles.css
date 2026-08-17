@@ -1860,13 +1860,11 @@ button:disabled {
 }
 
 /* ===========================================================================
- * Settings and Browse, from the "Settings & Browse" mockups.
+ * Settings, from the "Settings & Browse" mockups.
  *
- * The two ideas the design is built on, both stated in its own panel titles:
- * settings show their weight (the three that prevent a lost save or a ban do
- * not look like the cosmetic ones), and the three ways to get a mod look as
- * different as they behave — GTArage installs Essentials itself, and a
- * community site is a handoff where it can only catch what you download.
+ * The idea the design is built on, stated in its own panel title: settings
+ * show their weight, so the three that prevent a lost save or a ban do not
+ * look like the cosmetic ones.
  * ======================================================================== */
 
 .sheet {
@@ -2145,15 +2143,7 @@ button:disabled {
   color: var(--faint);
 }
 
-/* --- Browse --------------------------------------------------------------- */
-
-.browse {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  padding: 30px 34px 48px;
-  max-width: 1080px;
-}
+/* --- Drop target ----------------------------------------------------------- */
 
 .drop {
   display: flex;
@@ -2251,89 +2241,6 @@ button:disabled {
 .tag.is-warn {
   background: var(--orange-soft);
   color: var(--orange);
-}
-
-/*
- * The handoff band.
- *
- * Deliberately a different surface from the Essentials card: these have no
- * install button because GTArage cannot fetch them, and the design's whole
- * argument is that this difference should be visible before you read a word.
- */
-.handoff {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel-2);
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.steps {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.step {
-  font: 500 10px var(--mono);
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 5px 11px;
-}
-
-.step-arrow {
-  color: var(--ghost);
-  font: 400 13px var(--sans);
-}
-
-.sites {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 10px;
-}
-
-.site {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 15px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  text-align: left;
-  cursor: pointer;
-}
-
-.site:hover {
-  border-color: var(--blue);
-}
-
-.site-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.site-name {
-  font: 600 13.5px var(--sans);
-  color: var(--text);
-}
-
-.site-note {
-  font: 400 11px var(--mono);
-  color: var(--faint);
-  margin-top: 2px;
-}
-
-.site-go {
-  flex: none;
-  font: 500 12px var(--sans);
-  color: var(--muted);
 }
 
 /* ===========================================================================

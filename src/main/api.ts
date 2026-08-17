@@ -44,13 +44,11 @@ import type {
   HookCandidateView,
   SaveSnapshotView,
   UpdateView,
-  SiteEvent,
   VerifyView,
 } from '../shared/api';
-import { PROGRESS_CHANNEL, SITE_CHANNEL } from '../shared/api';
+import { PROGRESS_CHANNEL } from '../shared/api';
+import type { CatalogFile, CatalogMod } from '../shared/catalog';
 import {
-  browse as runBrowse,
-  catalogFiles as runCatalogFiles,
   clearStaged,
   fetchCatalogFile,
   invalidateCaches,
@@ -77,7 +75,6 @@ import {
   graphicsStatus,
   swapGraphics,
 } from './graphics';
-import { listSites, openModSite } from './modsites';
 import { browseEssentials } from './providers/github';
 import type { AppConfig, GameId, Mod, Profile, SwapPlan } from '../shared/types';
 import {
@@ -329,15 +326,12 @@ async function buildState(config: AppConfig): Promise<AppState> {
   };
 }
 
-function emitSite(event: SiteEvent): void {
-  mainWindow?.webContents.send(SITE_CHANNEL, event);
-}
-
 /**
- * Import a file the embedded browser captured.
+ * Import a file that was downloaded into the staging folder.
  *
- * Shared by the site-browser hook and the in-app download path so both end up
- * in the library through exactly one code path.
+ * The only remaining caller is the prerequisite installer, but it stays a
+ * separate function because a rebuilt Browse will want exactly this: take a
+ * file that has landed on disk and put it through the normal import.
  */
 async function importStagedFile(
   filePath: string,
@@ -363,44 +357,6 @@ async function importStagedFile(
   };
 }
 
-/** Wire the embedded browser's download capture into the library. */
-export function modSiteHooks() {
-  return {
-    stagingDir(gameId: GameId): string {
-      return stagingDir(peekConfig(), gameId);
-    },
-    onProgress(fileName: string, received: number, total: number): void {
-      emitSite({ kind: 'progress', fileName, message: 'Downloading', received, total });
-    },
-    onComplete(capture: {
-      filePath: string;
-      fileName: string;
-      gameId: GameId;
-      executable: boolean;
-    }): void {
-      if (capture.executable) {
-        // Installers are never imported or run. They are left in the staging
-        // folder for the user to deal with deliberately.
-        emitSite({
-          kind: 'staged',
-          fileName: capture.fileName,
-          message: `${capture.fileName} is an installer, so GTArage saved it without importing or running it. Open the downloads folder to use it.`,
-        });
-        return;
-      }
-      void importStagedFile(capture.filePath, capture.gameId).then(async (outcome) => {
-        emitSite({
-          kind: outcome.imported ? 'imported' : 'failed',
-          fileName: capture.fileName,
-          message: outcome.message,
-        });
-      });
-    },
-    onFailed(fileName: string, reason: string): void {
-      emitSite({ kind: 'failed', fileName, message: `${fileName} download ${reason}.` });
-    },
-  };
-}
 
 
 async function state(): Promise<AppState> {
@@ -451,6 +407,61 @@ function requireInstall(config: AppConfig, gameId: GameId): string {
 }
 
 // --- implementation ---------------------------------------------------------
+
+/**
+ * Download one catalog file and put it in the library.
+ *
+ * No longer reachable from the renderer -- it backs the prerequisite
+ * installer, which is the only thing that still fetches from the Essentials
+ * catalogue now that Browse is gone.
+ */
+async function installCatalogFile(
+mod: CatalogMod,
+file: CatalogFile,
+gameId: GameId,
+): Promise<{ state: AppState; imported: boolean; message: string }> {
+  const config = await loadConfig(userDataDir);
+
+  if (mod.manualOnly) {
+    throw new Error(
+      mod.manualReason ?? 'This mod has to be downloaded from its own site.',
+    );
+  }
+
+  let fetched;
+  try {
+    fetched = await fetchCatalogFile(config, gameId, mod, file, (received, total) => {
+      emitProgress(received, total || file.size, `Downloading ${file.name}`);
+    });
+  } catch (err) {
+    throw err;
+  }
+
+  if (fetched.executable) {
+    return {
+      state: await state(),
+      imported: false,
+      message: `${fetched.fileName} is an installer. GTArage saved it to the downloads folder but will not run it — install it yourself, then import what it produces.`,
+    };
+  }
+
+  const outcome = await importStagedFile(fetched.filePath, gameId);
+
+  // The provider knows the real name and version; the importer can only
+  // guess them from a filename, which yields things like "1.0" for a
+  // release actually tagged v9.7.3. Prefer the catalog's answer.
+  if (outcome.imported && outcome.modId) {
+    await mutate((cfg) => {
+      const imported = cfg.mods.find((m) => m.id === outcome.modId);
+      if (!imported) return;
+      imported.name = mod.name;
+      imported.version = mod.version.replace(/^v/i, '');
+      imported.source = mod.url;
+    });
+  }
+
+  return { state: await state(), imported: outcome.imported, message: outcome.message };
+}
 
 export const handlers: GTArageApi = {
   async getState() {
@@ -1310,61 +1321,7 @@ export const handlers: GTArageApi = {
     });
   },
 
-  // --- mod browser ---------------------------------------------------------
-
-  async browse(query) {
-    const config = await loadConfig(userDataDir);
-    return runBrowse(config, query, modsForGame(config, query.gameId));
-  },
-
-  async catalogFiles(mod, gameId) {
-    const config = await loadConfig(userDataDir);
-    return runCatalogFiles(config, mod, gameId);
-  },
-
-  async installCatalogFile(mod, file, gameId) {
-    const config = await loadConfig(userDataDir);
-
-    if (mod.manualOnly) {
-      throw new Error(
-        mod.manualReason ?? 'This mod has to be downloaded from its own site.',
-      );
-    }
-
-    let fetched;
-    try {
-      fetched = await fetchCatalogFile(config, gameId, mod, file, (received, total) => {
-        emitProgress(received, total || file.size, `Downloading ${file.name}`);
-      });
-    } catch (err) {
-      throw err;
-    }
-
-    if (fetched.executable) {
-      return {
-        state: await state(),
-        imported: false,
-        message: `${fetched.fileName} is an installer. GTArage saved it to the downloads folder but will not run it — install it yourself, then import what it produces.`,
-      };
-    }
-
-    const outcome = await importStagedFile(fetched.filePath, gameId);
-
-    // The provider knows the real name and version; the importer can only
-    // guess them from a filename, which yields things like "1.0" for a
-    // release actually tagged v9.7.3. Prefer the catalog's answer.
-    if (outcome.imported && outcome.modId) {
-      await mutate((cfg) => {
-        const imported = cfg.mods.find((m) => m.id === outcome.modId);
-        if (!imported) return;
-        imported.name = mod.name;
-        imported.version = mod.version.replace(/^v/i, '');
-        imported.source = mod.url;
-      });
-    }
-
-    return { state: await state(), imported: outcome.imported, message: outcome.message };
-  },
+  // --- prerequisites --------------------------------------------------------
 
   async installDependency(essentialId, gameId) {
     const catalog = await browseEssentials(gameId, '');
@@ -1382,7 +1339,7 @@ export const handlers: GTArageApi = {
     }
     const file = mod.files.find((f) => f.primary) ?? mod.files[0];
     if (!file) throw new Error(`${mod.name} has no downloadable file right now.`);
-    return handlers.installCatalogFile(mod, file, gameId);
+    return installCatalogFile(mod, file, gameId);
   },
 
   async rescanDependencies(gameId) {
@@ -1402,14 +1359,6 @@ export const handlers: GTArageApi = {
     }
     await saveConfig(config);
     return buildState(config);
-  },
-
-  async listSites(gameId) {
-    return listSites(gameId);
-  },
-
-  async openSite(siteId, gameId) {
-    openModSite(siteId, gameId);
   },
 
   async openExternal(url) {

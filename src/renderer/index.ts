@@ -25,7 +25,6 @@ type TabId =
   | 'home'
   | 'profile'
   | 'library'
-  | 'browse'
   | 'settings'
   | 'speedrun'
   | 'saves';
@@ -57,7 +56,6 @@ let hookPromptSettled = false;
  * and 'Running'.
  */
 let gameRunning = false;
-let sites: ModSite[] = [];
 let runningTimer: number | null = null;
 
 async function refreshRunning(): Promise<void> {
@@ -482,7 +480,7 @@ function renderModsTable(s: AppState, view: HTMLElement): void {
     view.appendChild(
       emptyState(
         'No mods yet',
-        'Drag a mod in anywhere \u2014 a .zip, .rar or .oiv archive, a folder, or a loose file. Or open the Browse tab, where GTArage can fetch the essential tools straight from their official release pages. Mods are kept in GTArage\u2019s own folder, so your game is not touched until you apply a profile.',
+        'Drag a mod in anywhere \u2014 a .zip, .rar or .oiv archive, a folder, or a loose file. Mods are kept in GTArage\u2019s own folder, so your game is not touched until you apply a profile.',
         'Add mod files',
         () => installMod('files'),
       ),
@@ -783,7 +781,6 @@ function renderCrumbs(s: AppState): void {
 const TAB_LABELS: Record<string, string> = {
   home: 'Setups',
   library: 'Library',
-  browse: 'Browse',
   settings: 'Settings',
   profile: 'Setup',
   saves: 'Backups',
@@ -795,7 +792,7 @@ function renderTopnav(s: AppState): void {
   const host = byId('topnav');
   clear(host);
 
-  const items: TabId[] = ['home', 'browse', 'library'];
+  const items: TabId[] = ['home', 'library'];
   if (s.settings.speedrunMode) items.push('speedrun');
   items.push('saves');
   items.push('settings');
@@ -1005,15 +1002,7 @@ function renderDlcNotices(s: AppState, host: HTMLElement): void {
         'info',
         'A collection this size needs a bigger gameconfig',
         `You have ${dlc.packCount} add-on packs switched on. Past roughly this many, the game runs out of the fixed memory it sets aside for vehicles and props and crashes while loading, with nothing on screen to say that is the reason. A replacement gameconfig.xml raises those limits.`,
-        [
-          {
-            label: 'Find one in Browse',
-            onClick: () => {
-              tab = 'browse';
-              render();
-                      },
-          },
-        ],
+        [],
       ),
     );
   }
@@ -1365,7 +1354,7 @@ function renderProfile(s: AppState, view: HTMLElement): void {
         profile.vanillaLock ? 'Nothing here, on purpose' : 'Nothing in this setup yet',
         profile.vanillaLock
           ? 'The vanilla setup is empty by design.'
-          : 'Drag a mod in anywhere, or use Browse to fetch the essentials.',
+          : 'Drag a mod in anywhere, or add mod files below.',
         profile.vanillaLock ? undefined : 'Add mod files',
         profile.vanillaLock ? undefined : () => installMod('files'),
       ),
@@ -1826,14 +1815,6 @@ async function switchAndPlay(profile: Profile): Promise<void> {
   await applyProfile(true);
 }
 
-// --- rendering: browse ------------------------------------------------------
-
-
-
-
-
-
-
 // --- Settings ---------------------------------------------------------------
 
 /**
@@ -2159,68 +2140,6 @@ function renderSettings(s: AppState, view: HTMLElement): void {
   view.appendChild(sheet);
 }
 
-// --- Browse -------------------------------------------------------------------
-
-/**
- * Browse, rebuilt from the mockup.
- *
- * Three ways a mod arrives, and the design's argument is that they should look
- * as different as they behave: a file you already have is a drop target, the
- * Essentials are things GTArage installs itself, and a community site is a
- * handoff where all it can do is catch what you download. The old version gave
- * all three the same card and a search box, which implied a catalogue that
- * does not exist.
- */
-/**
- * Browse: the community sites, and nothing else for now.
- *
- * The Essentials list, the drop target and the page heading are gone pending
- * a rebuild. What remains is the one thing that was never in question - the
- * handoff, where GTArage opens a site, you download as you normally would,
- * and it catches the file.
- */
-function renderBrowse(s: AppState, view: HTMLElement): void {
-  const page = el('div', 'browse');
-  // 3. The handoff.
-  const handoff = el('div', 'handoff');
-  const hHead = el('div', 'group-head');
-  hHead.appendChild(el('div', 'group-title', 'Community sites'));
-  handoff.appendChild(hHead);
-  handoff.appendChild(
-    el(
-      'div',
-      'group-blurb',
-      'These have no install button. GTArage opens the site, you download the way you normally would, and it catches the file.',
-    ),
-  );
-  const steps = el('div', 'steps');
-  const labels = ['1 OPENS IN A WINDOW', '2 YOU LOG IN AND DOWNLOAD', '3 GTARAGE CATCHES IT'];
-  labels.forEach((label, i) => {
-    steps.appendChild(el('div', 'step', label));
-    if (i < labels.length - 1) steps.appendChild(el('div', 'step-arrow', '→'));
-  });
-  handoff.appendChild(steps);
-
-  const siteGrid = el('div', 'sites');
-  for (const site of sites) {
-    const card = el('button', 'site');
-    const main = el('div', 'site-main');
-    main.appendChild(el('div', 'site-name', site.name));
-    main.appendChild(el('div', 'site-note', site.loginNote ?? 'no account needed'));
-    card.appendChild(main);
-    card.appendChild(el('div', 'site-go', 'Open ↗'));
-    card.addEventListener('click', () => {
-      void api.openSite(site.id, s.currentGameId!).catch((err: Error) => toast(err.message, 'error'));
-    });
-    siteGrid.appendChild(card);
-  }
-  handoff.appendChild(siteGrid);
-  page.appendChild(handoff);
-
-  view.appendChild(page);
-}
-
-
 // --- Library ------------------------------------------------------------------
 
 /** Which mod the Library detail panel is showing. */
@@ -2525,21 +2444,6 @@ function emptyLibrary(): HTMLElement {
   );
 
   const cards = el('div', 'lib-empty-cards');
-
-  const first = el('div', 'note-card lib-empty-card');
-  const firstMain = el('div', 'note-main');
-  firstMain.appendChild(el('div', 'note-title', 'Find one on a mod site'));
-  firstMain.appendChild(
-    el('div', 'note-body', 'Browse opens the site, you download as usual, and the file is caught.'),
-  );
-  first.appendChild(firstMain);
-  const openBrowse = el('button', 'btn is-blue btn-wide', 'Open Browse');
-  openBrowse.addEventListener('click', () => {
-    tab = 'browse';
-    render();
-  });
-  first.appendChild(openBrowse);
-  cards.appendChild(first);
 
   const second = el('div', 'note-card is-dashed lib-empty-card');
   const secondMain = el('div', 'note-main');
@@ -3171,7 +3075,7 @@ function renderSetup(s: AppState, view: HTMLElement): void {
     ],
     [
       'Add some mods',
-      'Drag in a .zip or a folder, or use the Browse tab to get the essential tools straight from their official release pages. Mods go into GTArage\u2019s own library, not into the game.',
+      'Drag in a .zip or a folder, or use Add mod files. Mods go into GTArage\u2019s own library, not into the game.',
     ],
     [
       'Turn them on and press Apply',
@@ -3251,7 +3155,7 @@ async function refresh(): Promise<void> {
     render();
     // The ScriptHookV and speedrun prompts are gone: greeting someone with a
     // modal before they have seen the app is the wrong way to raise either.
-    // ScriptHookV needs re-raising somewhere calmer once Browse is remade.
+    // ScriptHookV needs re-raising somewhere calmer once Browse is rebuilt.
     // Quiet unless there is something to say.
     void checkForUpdate();
   }
@@ -3281,24 +3185,6 @@ async function boot(): Promise<void> {
     );
   }
 }
-
-/**
- * Downloads captured by the embedded mod-site browser arrive here, not
- * through a call the UI made, so they get their own listener.
- */
-window.gtarageEvents.onSiteEvent((event) => {
-  if (event.kind === 'progress') {
-    // Progress used to go to the action bar, which this shell does not have.
-    // Deliberately silent: a toast per chunk would be a stream of noise, and
-    // the completion event already reports the outcome.
-    return;
-  }
-  toast(
-    event.message,
-    event.kind === 'imported' ? 'ok' : event.kind === 'staged' ? 'warn' : 'error',
-  );
-  if (event.kind === 'imported') void refresh();
-});
 
 async function detect_(): Promise<void> {
   const next = await guard('Looking for games…', () => api.detectGames());
@@ -3729,9 +3615,6 @@ function render(): void {
       break;
     case 'library':
       renderLibrary(s, view);
-      break;
-    case 'browse':
-      renderBrowse(s, view);
       break;
     case 'settings':
       renderSettings(s, view);

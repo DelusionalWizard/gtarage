@@ -8,7 +8,7 @@ import path from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import { CALL_CHANNEL, type ApiMethod } from '../shared/api';
-import { handlers, initApi, modSiteHooks } from './api';
+import { handlers, initApi } from './api';
 import {
   initConfig,
   libraryFor,
@@ -23,7 +23,6 @@ import { detectGames } from './detect';
 import { ensureVanillaProfile } from './config';
 import { ensureDir } from './fsutil';
 import { repairLibrary, sweepOrphanedModFolders } from './library';
-import { initModSites } from './modsites';
 
 const isDev = process.argv.includes('--dev');
 
@@ -182,7 +181,6 @@ app.whenReady().then(async () => {
 
   const win = createWindow();
   initApi(userDataDir, win);
-  initModSites(modSiteHooks());
 
 
   // One channel, dispatched by method name. Anything not in `handlers` is
