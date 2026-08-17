@@ -28,6 +28,8 @@ const execFileAsync = promisify(execFile);
 interface Candidate {
   path: string;
   source: GameInstall['source'];
+  /** The storefront's id for this copy, when the probe learned one. */
+  launchId?: string;
   /** Restrict matching to this game when the source already told us which. */
   hint?: GameId;
 }
@@ -104,9 +106,18 @@ async function epicCandidates(): Promise<Candidate[]> {
     if (!name.endsWith('.item')) continue;
     try {
       const raw = await fs.readFile(path.join(dir, name), 'utf8');
-      const manifest = JSON.parse(raw) as { InstallLocation?: string };
+      const manifest = JSON.parse(raw) as {
+        InstallLocation?: string;
+        AppName?: string;
+      };
       if (manifest.InstallLocation) {
-        out.push({ path: manifest.InstallLocation, source: 'epic' });
+        out.push({
+          path: manifest.InstallLocation,
+          source: 'epic',
+          // Without this the copy is detectable but not launchable: Epic
+          // titles refuse to start from their own executable.
+          ...(manifest.AppName ? { launchId: manifest.AppName } : {}),
+        });
       }
     } catch {
       // A malformed manifest is Epic's problem, not ours.
@@ -262,6 +273,7 @@ export async function detectGames(): Promise<GameInstall[]> {
           path: path.resolve(cand.path),
           source: cand.source,
           version: await exeVersion(cand.path, def),
+          ...(cand.launchId ? { launchId: cand.launchId } : {}),
         });
         break; // one folder is one game
       }

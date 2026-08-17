@@ -134,6 +134,15 @@ export interface GameInstall {
   source: 'steam' | 'epic' | 'rockstar' | 'registry' | 'scan' | 'manual';
   /** Executable version string when we can read one. */
   version?: string;
+  /**
+   * The storefront's own id for this copy, when it has one.
+   *
+   * Epic is the case that needs it: its games cannot be started by running
+   * the executable, and the launcher URL wants the manifest's `AppName`
+   * rather than anything derivable from the folder. Captured at detection
+   * time because the manifest is the only place it exists.
+   */
+  launchId?: string;
 }
 
 /**

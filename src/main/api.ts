@@ -1384,6 +1384,32 @@ export const handlers: GTArageApi = {
       }
     }
 
+    /*
+     * Epic is the one storefront the executable fallback cannot rescue.
+     *
+     * Its titles check that the Epic launcher started them and quit
+     * otherwise, so running the exe -- or even PlayGTAV.exe -- fails the same
+     * way every time. The launcher URL wants the manifest's AppName, which is
+     * captured at detection because it exists nowhere else on disk.
+     */
+    if (install?.source === 'epic' && install.launchId) {
+      try {
+        await shell.openExternal(
+          `com.epicgames.launcher://apps/${encodeURIComponent(install.launchId)}?action=launch&silent=true`,
+        );
+        return { ok: true };
+      } catch {
+        // Fall through, though the exes are unlikely to help here.
+      }
+    }
+    if (install?.source === 'epic' && !install.launchId) {
+      return {
+        ok: false,
+        error:
+          'This copy came from the Epic launcher, and GTArage does not have its app id — Epic games will not start from their own executable. Start it from Epic once, then press Search again in Settings so the manifest can be read.',
+      };
+    }
+
     const order = def.launchWith ?? def.executables;
     for (const exe of order) {
       const full = path.join(gamePath, exe);
