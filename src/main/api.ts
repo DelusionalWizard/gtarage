@@ -105,12 +105,13 @@ import { detectGames, identifyFolder } from './detect';
 import {
   deployProfile,
   isGameRunning,
+  manifestPath,
   readManifest,
   runningGameProcesses,
   undeployAll,
   verifyGameFolder,
 } from './deploy';
-import { ensureDir, exists, freeSpace } from './fsutil';
+import { ensureDir, exists, freeSpace, move, safeJoin, writeJson } from './fsutil';
 import {
   classifyFiles,
   findBrokenMods,
@@ -853,6 +854,69 @@ export const handlers: SwapmeetApi = {
     const gamePath = requireInstall(config, gameId);
     const report = await verifyGameFolder(config, gameId, gamePath);
     return { clean: report.clean, missing: report.missing, orphans: report.orphans };
+  },
+
+  async gameRunning(gameId) {
+    return isGameRunning(gameId);
+  },
+
+  /**
+   * Reconcile the manifest with what is actually on disk.
+   *
+   * People delete mod files out of the game folder by hand, and until now the
+   * app went on insisting they were installed. Anything the manifest claims
+   * and disk does not have is dropped.
+   *
+   * The subtlety is the displaced originals: if a deployed file had covered
+   * one of the game's own and the mod file was then deleted by hand, the
+   * original is sitting on the shelf with nothing pointing at it any more. It
+   * is restored here rather than stranded — the same promise undeploy makes.
+   */
+  async rescan(gameId) {
+    const config = await loadConfig(userDataDir);
+    const gamePath = requireInstall(config, gameId);
+    const manifest = await readManifest(config, gameId);
+    if (!manifest) {
+      const empty = await verifyGameFolder(config, gameId, gamePath);
+      return { dropped: 0, restored: 0, orphans: empty.orphans.length };
+    }
+
+    const kept: typeof manifest.files = [];
+    let dropped = 0;
+    let restored = 0;
+
+    for (const file of manifest.files) {
+      const abs = safeJoin(gamePath, file.target);
+      if (await exists(abs)) {
+        kept.push(file);
+        continue;
+      }
+      if (file.backup && (await exists(file.backup))) {
+        try {
+          await move(file.backup, abs);
+          restored += 1;
+          dropped += 1;
+          continue;
+        } catch {
+          // Could not put it back: keep the entry, so the shelf copy stays
+          // accounted for rather than being orphaned by this very operation.
+          kept.push(file);
+          continue;
+        }
+      }
+      dropped += 1;
+    }
+
+    if (dropped > 0) {
+      if (kept.length === 0) {
+        await fs.rm(manifestPath(config, gameId), { force: true });
+      } else {
+        await writeJson(manifestPath(config, gameId), { ...manifest, files: kept });
+      }
+    }
+
+    const report = await verifyGameFolder(config, gameId, gamePath);
+    return { dropped, restored, orphans: report.orphans.length };
   },
 
   async scanAdoptable(gameId) {

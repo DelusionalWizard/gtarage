@@ -367,6 +367,19 @@ export interface SwapmeetApi {
   /** Check the game folder against the manifest. */
   verify(gameId: GameId): Promise<VerifyView>;
 
+  /** Is the game running right now? Used to avoid starting a second copy. */
+  gameRunning(gameId: GameId): Promise<boolean>;
+
+  /**
+   * Re-check the game folder against what we think is installed.
+   *
+   * Files the user deleted by hand are dropped from the manifest, so the app
+   * stops claiming they are installed. Where such a file had displaced one of
+   * the game's own, the original is put back — deleting the mod file by hand
+   * should not strand the file it was covering.
+   */
+  rescan(gameId: GameId): Promise<{ dropped: number; restored: number; orphans: number }>;
+
   /** Mod files already sitting in the game folder that Swapmeet did not install. */
   scanAdoptable(gameId: GameId): Promise<AdoptGroupView[]>;
   /** Copy such files into the library so Swapmeet can manage them. */

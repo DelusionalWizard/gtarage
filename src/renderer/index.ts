@@ -943,6 +943,37 @@ function renderProfile(s: AppState, view: HTMLElement): void {
   );
   main.appendChild(head);
 
+  // Re-check the game folder. People delete mod files by hand and the app
+  // went on insisting they were installed.
+  const rescan = el('button', 'btn', 'Re-check my game folder');
+  rescan.title =
+    'Look at the game folder again and forget anything that is no longer there';
+  rescan.addEventListener('click', async () => {
+    if (!s.currentGameId) return;
+    const report = await guard('Checking the game folder…', () =>
+      api.rescan(s.currentGameId!),
+    );
+    if (!report) return;
+    const next = await api.getState();
+    apply(next);
+    if (report.dropped === 0 && report.orphans === 0) {
+      toast('Everything matches — nothing has been touched by hand.', 'ok');
+    } else {
+      const bits: string[] = [];
+      if (report.dropped > 0) {
+        bits.push(`forgot ${report.dropped} file(s) no longer in the game folder`);
+      }
+      if (report.restored > 0) {
+        bits.push(`put back ${report.restored} original game file(s)`);
+      }
+      if (report.orphans > 0) {
+        bits.push(`found ${report.orphans} file(s) Swapmeet did not install`);
+      }
+      toast(bits.join(' · '), 'warn');
+    }
+  });
+  head.appendChild(rescan);
+
   main.appendChild(renderPills(s, profile));
 
   const mods = thingsFor(s, profile);
@@ -2892,6 +2923,38 @@ async function goVanilla(s: AppState): Promise<void> {
  * Warns first when the profile on disk is not the one selected, since that is
  * the one case where launching does something the user probably did not mean.
  */
+/**
+ * Start the game, asking first if a copy is already running.
+ *
+ * Play and Switch-and-play are both one click, and clicking twice used to
+ * start a second copy silently — two GTA processes fighting over the same
+ * save files and the same mod folder. The prompt defaults to not launching,
+ * because the overwhelmingly common case is an impatient second click rather
+ * than a deliberate second instance.
+ */
+async function startGame(gameId: GameId): Promise<void> {
+  let running = false;
+  try {
+    running = await api.gameRunning(gameId);
+  } catch {
+    // If we cannot tell, do not block the launch — the check is a courtesy,
+    // not a lock.
+  }
+
+  if (running) {
+    const ok = await confirmModal(
+      'The game is already running',
+      'A copy of the game is open right now. Starting another one means two copies sharing the same save files and the same mod folder, which can lose progress. Only do this if you meant to.',
+      'Launch another anyway',
+    );
+    if (!ok) return;
+  }
+
+  const launched = await api.launchGame(gameId);
+  if (launched.ok) toast('Starting the game…', 'ok');
+  else toast(launched.error ?? 'Could not start the game.', 'error');
+}
+
 async function launchOnly(): Promise<void> {
   const s = state;
   if (!s?.currentGameId) return;
@@ -2911,9 +2974,7 @@ async function launchOnly(): Promise<void> {
     if (!ok) return;
   }
 
-  const launched = await api.launchGame(s.currentGameId);
-  if (launched.ok) toast('Starting the game…', 'ok');
-  else toast(launched.error ?? 'Could not start the game.', 'error');
+  await startGame(s.currentGameId);
 }
 
 /** The swap preview, then the deploy. */
@@ -2943,8 +3004,7 @@ async function applyProfile(launch = false): Promise<void> {
   );
 
   if (launch && state?.currentGameId) {
-    const launched = await api.launchGame(state.currentGameId);
-    if (!launched.ok) toast(launched.error ?? 'Could not start the game.', 'error');
+    await startGame(state.currentGameId);
   }
 }
 

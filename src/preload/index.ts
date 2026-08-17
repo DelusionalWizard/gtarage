@@ -24,6 +24,8 @@ const METHODS: ApiMethod[] = [
   'getState',
   'acknowledgeBuild',
   'setFileExcluded',
+  'gameRunning',
+  'rescan',
   'selectGame',
   'detectGames',
   'browseForGame',
