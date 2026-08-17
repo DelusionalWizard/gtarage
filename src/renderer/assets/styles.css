@@ -2308,7 +2308,7 @@ button:disabled {
   padding: 0 10px 8px;
 }
 
-.onpage a {
+.onpage button {
   font: 400 13px var(--sans);
   color: var(--dim);
   padding: 7px 10px;
@@ -2319,7 +2319,7 @@ button:disabled {
   text-align: left;
 }
 
-.onpage a:hover {
+.onpage button:hover {
   background: var(--raised);
   color: var(--text);
 }

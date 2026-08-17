@@ -251,6 +251,16 @@ every kind in `supportedKinds`, plus `signatureFiles` for detection.
     written on acknowledge, never at detection time. Recording what is detected
     destroys the feature outright: the first state refresh overwrites the
     previous build and the alert is never shown to anyone.
+36. **Style the element you actually create.**  was written for a
+    list of links and the code builds buttons, so nothing matched and the rail
+    fell through to the UA's default button chrome — eight white slabs down the
+    side of a dark window. A class that silently applies to nothing looks like
+    a theming bug rather than a selector bug, which is what made it slow to
+    spot. Match on the class, or check the tag.
+37. **Measure a theme after the last render, not before.**  rewrites
+     from state, so a harness that stamps the
+    theme and then triggers a render measures the other one. Several dark-mode
+    checks silently reported light this way and passed.
 
 ## Verification
 
