@@ -1,5 +1,5 @@
 /**
- * Updating Swapmeet itself.
+ * Updating GTArage itself.
  *
  * Deliberately hand-rolled rather than pulling in `electron-updater`. The app
  * has no runtime dependencies, and it already owns a hardened downloader —
@@ -57,6 +57,10 @@ export interface UpdateInfo {
   cannotSelfUpdate?: boolean;
 }
 
+// Still `swapmeet`: that is the repository name on GitHub. The app was renamed
+// to GTArage before the repo was, and pointing this at the new name early would
+// 404 for every user already running a beta. GitHub redirects the old path
+// indefinitely after a rename, so this keeps working either way.
 const RELEASES_API = 'https://api.github.com/repos/DelusionalWizard/swapmeet/releases/latest';
 
 interface GhRelease {
@@ -113,7 +117,7 @@ async function readChecksums(
   try {
     // Small YAML with a fixed shape; a parser would be overkill.
     const text = await fetch(manifest.browser_download_url, {
-      headers: { 'User-Agent': 'Swapmeet' },
+      headers: { 'User-Agent': 'GTArage' },
     }).then((r) => r.text());
 
     const sha512 = text.match(/^sha512:\s*(\S+)\s*$/m)?.[1];

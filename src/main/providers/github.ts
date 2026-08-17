@@ -163,7 +163,7 @@ function toCatalogMod(
       url: def.homepage,
       category: def.category,
       manualOnly: true,
-      manualReason: def.manualReason ?? 'This tool is distributed outside any API Swapmeet can call.',
+      manualReason: def.manualReason ?? 'This tool is distributed outside any API GTArage can call.',
       files: [],
     };
   }

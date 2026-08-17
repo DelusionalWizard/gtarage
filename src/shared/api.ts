@@ -28,11 +28,11 @@ import type {
 } from './types';
 
 /** One channel carries every call, dispatched by method name. */
-export const CALL_CHANNEL = 'swapmeet:call';
+export const CALL_CHANNEL = 'gtarage:call';
 /** Main -> renderer progress during a long deploy. */
-export const PROGRESS_CHANNEL = 'swapmeet:progress';
+export const PROGRESS_CHANNEL = 'gtarage:progress';
 /** Main -> renderer notifications from the embedded mod-site browser. */
-export const SITE_CHANNEL = 'swapmeet:site';
+export const SITE_CHANNEL = 'gtarage:site';
 
 /** A library mod together with the prerequisites it is still missing. */
 export interface MissingDeps {
@@ -283,9 +283,9 @@ export interface ProgressEvent {
 
 /**
  * Every operation the UI can perform. Implemented in the main process,
- * mirrored onto `window.swapmeet` by the preload script.
+ * mirrored onto `window.gtarage` by the preload script.
  */
-export interface SwapmeetApi {
+export interface GTArageApi {
   getState(): Promise<AppState>;
 
   /**
@@ -368,6 +368,16 @@ export interface SwapmeetApi {
   /** Check the game folder against the manifest. */
   verify(gameId: GameId): Promise<VerifyView>;
 
+  /**
+   * Delete everything GTArage has put on this PC and quit.
+   *
+   * Undeploys every game first, so mod files are taken back out of the game
+   * folders and anything they displaced is restored, and only then removes the
+   * library, the shelf and the settings file. Irreversible by design - the
+   * shelf is what makes everything else undoable, and this removes the shelf.
+   */
+  purgeEverything(): Promise<{ removed: string[]; problems: string[] }>;
+
   /** Is the game running right now? Used to avoid starting a second copy. */
   gameRunning(gameId: GameId): Promise<boolean>;
 
@@ -381,12 +391,12 @@ export interface SwapmeetApi {
    */
   rescan(gameId: GameId): Promise<{ dropped: number; restored: number; orphans: number }>;
 
-  /** Mod files already sitting in the game folder that Swapmeet did not install. */
+  /** Mod files already sitting in the game folder that GTArage did not install. */
   scanAdoptable(gameId: GameId): Promise<AdoptGroupView[]>;
-  /** Copy such files into the library so Swapmeet can manage them. */
+  /** Copy such files into the library so GTArage can manage them. */
   adopt(gameId: GameId, groupId: string): Promise<{ state: AppState; message: string }>;
 
-  /** Ask GitHub whether a newer Swapmeet exists. */
+  /** Ask GitHub whether a newer GTArage exists. */
   checkForUpdate(): Promise<UpdateView>;
   /**
    * Download the update, verify it against its published checksum, then run
@@ -396,7 +406,7 @@ export interface SwapmeetApi {
 
   /** Speedrunning tools relevant to this game, and whether each is installed. */
   speedrunTools(gameId: GameId): Promise<SpeedrunToolView[]>;
-  /** Point Swapmeet at a portable tool it could not find, and remember it. */
+  /** Point GTArage at a portable tool it could not find, and remember it. */
   locateSpeedrunTool(toolId: string, gameId: GameId): Promise<SpeedrunToolView[]>;
   /** Start an installed speedrunning tool. */
   launchSpeedrunTool(toolId: string, gameId: GameId): Promise<void>;
@@ -478,4 +488,4 @@ export interface SwapmeetApi {
   windowClose(): Promise<void>;
 }
 
-export type ApiMethod = keyof SwapmeetApi;
+export type ApiMethod = keyof GTArageApi;

@@ -1,4 +1,4 @@
-# Swapmeet - Developer Notes
+# GTArage - Developer Notes
 
 Context for anyone (human or AI) continuing this project. Read this first.
 
@@ -13,10 +13,10 @@ Primarily a *file manager for mods*. It also has a mod browser: it downloads
 from two sanctioned APIs (GitHub Releases for the curated Essentials
 catalogue, and the official Nexus API with the user's own key), and opens the
 API-less community sites in an embedded browser where the user logs in and
-Swapmeet only captures the resulting download. It never scrapes.
+GTArage only captures the resulting download. It never scrapes.
 
 Distinct from the sibling project `../GTAV-ProfileManager`, which switches a
-whole GTA V install between hard-linked folder copies. Swapmeet works at
+whole GTA V install between hard-linked folder copies. GTArage works at
 per-mod granularity and covers every title.
 
 ## Stack
@@ -109,7 +109,7 @@ every kind in `supportedKinds`, plus `signatureFiles` for detection.
     `src/test/catalog.test.ts` pins all of this.
 11. **`File.path` no longer exists.** Electron 32 removed it, so drag-and-drop
     handlers that read `file.path` get `undefined` and silently do nothing.
-    Use `webUtils.getPathForFile` via the preload (`window.swapmeetFiles`).
+    Use `webUtils.getPathForFile` via the preload (`window.gtarageFiles`).
 12. **Windows cannot combine `openFile` and `openDirectory`** in one
     `showOpenDialog` — it honours only one, which is why "Add mod" appeared to
     accept folders only. Hence two separate buttons and an `importMods(gameId,
@@ -296,8 +296,8 @@ Must print `0`.
 npm run dist
 ```
 
-Produces `release/Swapmeet-Setup-<version>.exe` (NSIS, per-user, no admin) and
-`release/Swapmeet-<version>-portable.exe`. Icon is generated at
+Produces `release/GTArage-Setup-<version>.exe` (NSIS, per-user, no admin) and
+`release/GTArage-<version>-portable.exe`. Icon is generated at
 `build/icon.png`. `dist/test/**` and source maps are excluded from the
 package.
 

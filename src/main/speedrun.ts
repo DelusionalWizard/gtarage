@@ -2,7 +2,7 @@
  * Finding and starting the speedrunning tools.
  *
  * Detection only looks in the handful of places installers actually use, and
- * launching is a plain `execFile` of something the user already has. Swapmeet
+ * launching is a plain `execFile` of something the user already has. GTArage
  * never downloads or installs any of these: most are installers, and quietly
  * fetching and running executables is precisely the behaviour a mod manager
  * should not have.
@@ -75,7 +75,7 @@ export async function detectSpeedrunTools(
 /**
  * Start a detected tool.
  *
- * Detached and unreferenced, so closing Swapmeet does not take the timer or
+ * Detached and unreferenced, so closing GTArage does not take the timer or
  * the capture software down with it — which would be a genuinely bad surprise
  * mid-run.
  */
@@ -87,10 +87,10 @@ export async function launchSpeedrunTool(
   const tools = await detectSpeedrunTools(gameId, userPaths);
   const tool = tools.find((t) => t.id === toolId);
 
-  if (!tool) throw new Error('That tool is not one Swapmeet knows about.');
+  if (!tool) throw new Error('That tool is not one GTArage knows about.');
   if (!tool.path) {
     throw new Error(
-      `${tool.name} is not installed, or is somewhere Swapmeet does not look. Install it, or start it yourself.`,
+      `${tool.name} is not installed, or is somewhere GTArage does not look. Install it, or start it yourself.`,
     );
   }
 

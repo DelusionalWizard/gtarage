@@ -15,7 +15,7 @@ import {
   SITE_CHANNEL,
   type ApiMethod,
   type ProgressEvent,
-  type SwapmeetApi,
+  type GTArageApi,
   type SiteEvent,
 } from '../shared/api';
 
@@ -25,6 +25,7 @@ const METHODS: ApiMethod[] = [
   'acknowledgeBuild',
   'setFileExcluded',
   'setModInProfile',
+  'purgeEverything',
   'gameRunning',
   'rescan',
   'selectGame',
@@ -81,9 +82,9 @@ const api = Object.fromEntries(
     method,
     (...args: unknown[]) => ipcRenderer.invoke(CALL_CHANNEL, method, args),
   ]),
-) as unknown as SwapmeetApi;
+) as unknown as GTArageApi;
 
-contextBridge.exposeInMainWorld('swapmeet', api);
+contextBridge.exposeInMainWorld('gtarage', api);
 
 /**
  * Resolving a dropped file to a real path.
@@ -93,7 +94,7 @@ contextBridge.exposeInMainWorld('swapmeet', api);
  * silently does nothing. `webUtils.getPathForFile` is the replacement, and it
  * only exists in the preload, which is why this crosses the bridge.
  */
-contextBridge.exposeInMainWorld('swapmeetFiles', {
+contextBridge.exposeInMainWorld('gtarageFiles', {
   getPathForFile(file: File): string {
     try {
       return webUtils.getPathForFile(file);
@@ -103,7 +104,7 @@ contextBridge.exposeInMainWorld('swapmeetFiles', {
   },
 });
 
-contextBridge.exposeInMainWorld('swapmeetEvents', {
+contextBridge.exposeInMainWorld('gtarageEvents', {
   onProgress(handler: (event: ProgressEvent) => void): () => void {
     const listener = (_e: unknown, payload: ProgressEvent) => handler(payload);
     ipcRenderer.on(PROGRESS_CHANNEL, listener);

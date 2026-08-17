@@ -32,7 +32,7 @@ export function stagingDir(config: AppConfig, gameId: GameId): string {
 /**
  * Mark catalog entries that are already in the library.
  *
- * Matching is by normalised name: providers have no notion of Swapmeet's mod
+ * Matching is by normalised name: providers have no notion of GTArage's mod
  * ids, and names are what a user recognises. Imperfect, but it only drives a
  * badge and an "update available" hint, never a destructive action.
  */

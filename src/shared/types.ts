@@ -4,7 +4,7 @@
  * only, no class instances, no functions.
  */
 
-/** Every title Swapmeet knows how to manage. */
+/** Every title GTArage knows how to manage. */
 export type GameId =
   // 3D era, original releases
   | 'gta3'
@@ -103,7 +103,7 @@ export interface GameDef {
   /** Kinds this game can actually take. */
   supportedKinds: ModKind[];
   /**
-   * Paths Swapmeet will never write into or clean up, relative to the game
+   * Paths GTArage will never write into or clean up, relative to the game
    * root. Protects the base install from a bad mod archive.
    */
   protectedPaths: string[];
@@ -147,7 +147,7 @@ export interface ModDependency {
   label: string;
   /** The evidence that produced this, shown so the user can judge it. */
   reason: string;
-  /** Essentials catalog id that provides it, when Swapmeet can install it. */
+  /** Essentials catalog id that provides it, when GTArage can install it. */
   essentialId?: string;
   /** True when the mod works without it, just with less. */
   optional?: boolean;
@@ -351,7 +351,7 @@ export interface AppConfig {
      */
     themeChosen?: boolean;
     /**
-     * What to do when a newer Swapmeet is published.
+     * What to do when a newer GTArage is published.
      *
      * `notify` is the default rather than `auto`: this app writes to game
      * folders, and replacing itself without asking — potentially mid-session,

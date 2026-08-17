@@ -2,7 +2,7 @@
  * Dependency detection.
  *
  * Mod pages say "requires ScriptHookV" in prose, if they say it at all, and
- * that prose does not travel with the archive. So Swapmeet works it out from
+ * that prose does not travel with the archive. So GTArage works it out from
  * the files themselves.
  *
  * The strongest signal is the PE import table. An `.asi` or `.dll` is a
@@ -199,7 +199,7 @@ const RULES: Record<string, Rule> = {
 };
 
 /**
- * Every catalog entry Swapmeet would offer as a fix on this game.
+ * Every catalog entry GTArage would offer as a fix on this game.
  *
  * Exists so a test can assert that each offered fix is something the game's
  * catalogue actually lists. The failure it guards against is silent: a
@@ -299,7 +299,7 @@ async function readHead(file: string, bytes: number): Promise<Buffer> {
  *
  * Evidence is ranked: a PE import beats an assembly reference, which beats a
  * sentence in a readme. Each dependency records the evidence that produced it
- * so the user can see why Swapmeet thinks so, and disagree.
+ * so the user can see why GTArage thinks so, and disagree.
  */
 export async function scanDependencies(
   modDir: string,

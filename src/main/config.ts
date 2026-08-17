@@ -14,6 +14,15 @@ import type { AppConfig, GameId, Mod, Profile } from '../shared/types';
 import { exists, readJsonStrict, writeJson } from './fsutil';
 
 
+/**
+ * The settings filename.
+ *
+ * Renaming the app changes userData, so this and the migration list below are
+ * the two things a rename has to touch. Previous names live in LEGACY_APPS in
+ * main/index.ts.
+ */
+const CONFIG_FILE = 'gtarage.config.json';
+
 let configPath = '';
 let cache: AppConfig | null = null;
 
@@ -112,6 +121,7 @@ async function isEmptyDir(p: string): Promise<boolean> {
 export async function migrateLegacyUserData(
   newDir: string,
   legacyDir: string,
+  legacyConfigName: string,
 ): Promise<string | null> {
   try {
     if (!(await exists(legacyDir))) return null;
@@ -119,7 +129,7 @@ export async function migrateLegacyUserData(
 
     // Only the folders that hold real user data. Everything else in there is
     // Chromium's own cache, which is worthless and regenerates itself.
-    const wanted = ['library', 'shelf', 'rigging.config.json'];
+    const wanted = ['library', 'shelf', legacyConfigName];
     let movedAnything = false;
 
     for (const entry of wanted) {
@@ -128,7 +138,7 @@ export async function migrateLegacyUserData(
 
       const to = path.join(
         newDir,
-        entry === 'rigging.config.json' ? 'swapmeet.config.json' : entry,
+        entry === legacyConfigName ? CONFIG_FILE : entry,
       );
 
       // A destination that exists but is empty is what a half-finished
@@ -157,7 +167,7 @@ export async function migrateLegacyUserData(
     // and the caller repoints them.
     return movedAnything || (await exists(legacyDir)) ? legacyDir : null;
   } catch (err) {
-    console.error('[swapmeet] could not migrate previous data:', err);
+    console.error('[gtarage] could not migrate previous data:', err);
     return null;
   }
 }
@@ -197,7 +207,7 @@ export function repointPaths(
 
 /** Point the store at a directory. Called once, at app startup. */
 export function initConfig(userDataDir: string): void {
-  configPath = path.join(userDataDir, 'swapmeet.config.json');
+  configPath = path.join(userDataDir, CONFIG_FILE);
   cache = null;
   loadError = null;
 }
@@ -256,7 +266,7 @@ export async function loadConfig(userDataDir: string): Promise<AppConfig> {
       // If even the copy fails, still refuse to run destructively.
     }
     loadError = {
-      message: `Your settings file could not be read (${result.error.message}). Swapmeet has started with default settings and kept a copy of the damaged file.`,
+      message: `Your settings file could not be read (${result.error.message}). GTArage has started with default settings and kept a copy of the damaged file.`,
       backupPath,
     };
     cache = defaultConfig(userDataDir);

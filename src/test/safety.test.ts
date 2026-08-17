@@ -1,5 +1,5 @@
 /**
- * Regression tests for the ways Swapmeet could previously lose a user's files.
+ * Regression tests for the ways GTArage could previously lose a user's files.
  *
  * Every case here is a bug that shipped. They share a shape: nothing threw,
  * nothing was reported, and the damage was only visible later -- which is
@@ -19,7 +19,7 @@ import { exists, safeJoin, writeJson, readJsonStrict } from '../main/fsutil';
 import type { Mod, GameId } from '../shared/types';
 
 async function tmp(prefix: string): Promise<string> {
-  return fs.mkdtemp(path.join(os.tmpdir(), `swapmeet-${prefix}-`));
+  return fs.mkdtemp(path.join(os.tmpdir(), `gtarage-${prefix}-`));
 }
 
 async function put(abs: string, content: string): Promise<void> {
@@ -86,7 +86,7 @@ test('a damaged config is preserved, not silently replaced', async (t) => {
   const dir = await tmp('config');
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
 
-  const configPath = path.join(dir, 'swapmeet.config.json');
+  const configPath = path.join(dir, 'gtarage.config.json');
   // A truncated write, a bad hand-edit, a half-flushed file after a power cut.
   await fs.writeFile(configPath, '{ "profiles": [{"id": "roleplay"', 'utf8');
 
@@ -137,7 +137,7 @@ test('concurrent config saves cannot tear the file', async (t) => {
   );
 
   const result = await readJsonStrict<Record<string, unknown>>(
-    path.join(dir, 'swapmeet.config.json'),
+    path.join(dir, 'gtarage.config.json'),
   );
   assert.ok(result.ok, 'the config must still be valid JSON after concurrent writes');
   assert.ok(result.ok && result.data, 'and must not be empty');
@@ -261,7 +261,7 @@ test('an empty mod list never sweeps a library that has folders in it', async ()
    * so this asserts the property the call site must preserve: given zero known
    * ids, nothing may be touched.
    */
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-sweep-'));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-sweep-'));
   try {
     const mod = path.join(root, 'chaosmod', 'content');
     await fs.mkdir(mod, { recursive: true });
@@ -288,7 +288,7 @@ test('an empty mod list never sweeps a library that has folders in it', async ()
 test('a real orphan is still quarantined when the config does know about mods', async () => {
   // The guard must not disable the feature: with a populated config, a folder
   // nothing refers to is still moved aside.
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-sweep2-'));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-sweep2-'));
   const quarantine = path.join(root, '.quarantine');
   try {
     const orphan = path.join(root, 'ghost', 'content');
@@ -327,7 +327,7 @@ test('a config written by an older version ports without losing anything', async
    * Modelled on the real file this was verified against: nine profiles across
    * seven games, two mods, one non-vanilla profile carrying an order.
    */
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-port-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-port-'));
   try {
     const old = {
       version: 1,
@@ -374,7 +374,7 @@ test('a config written by an older version ports without losing anything', async
         speedrunMode: false,
       },
     };
-    await writeJson(path.join(dir, 'swapmeet.config.json'), old);
+    await writeJson(path.join(dir, 'gtarage.config.json'), old);
 
     initConfig(dir);
     const loaded = await loadConfig(dir);
@@ -406,9 +406,9 @@ test('a config written by an older version ports without losing anything', async
 });
 
 test('a deliberately chosen dark theme survives the retirement', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-theme-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-theme-'));
   try {
-    await writeJson(path.join(dir, 'swapmeet.config.json'), {
+    await writeJson(path.join(dir, 'gtarage.config.json'), {
       ...defaultConfig(dir),
       settings: { ...defaultConfig(dir).settings, theme: 'dark', themeChosen: true },
     });

@@ -1,5 +1,5 @@
 /*
- * Swapmeet - dark control room.
+ * GTArage - dark control room.
  *
  * The palette and density come from the "dark control room" direction: a
  * near-black ground, hairline borders instead of shadows, monospace for
@@ -1865,7 +1865,7 @@ button:disabled {
  * The two ideas the design is built on, both stated in its own panel titles:
  * settings show their weight (the three that prevent a lost save or a ban do
  * not look like the cosmetic ones), and the three ways to get a mod look as
- * different as they behave — Swapmeet installs Essentials itself, and a
+ * different as they behave — GTArage installs Essentials itself, and a
  * community site is a handoff where it can only catch what you download.
  * ======================================================================== */
 
@@ -2257,7 +2257,7 @@ button:disabled {
  * The handoff band.
  *
  * Deliberately a different surface from the Essentials card: these have no
- * install button because Swapmeet cannot fetch them, and the design's whole
+ * install button because GTArage cannot fetch them, and the design's whole
  * argument is that this difference should be visible before you read a word.
  */
 .handoff {
@@ -2407,15 +2407,22 @@ button:disabled {
 
 /* A search box earns its place here: a library holds hundreds of mods, where
    the Essentials list holds eight. */
+/*
+ * Sized by its padding, not by a fixed height.
+ *
+ * height:34px plus the `font` shorthand - which resets line-height to normal -
+ * left the text sitting against the bottom of the box and clipping. Letting
+ * the padding set the height means the field always fits whatever the font
+ * does, and a min-width keeps "Search 128 mods" from being squeezed.
+ */
 .lib-search {
-  flex: none;
-  width: 210px;
-  height: 34px;
-  padding: 0 12px;
+  flex: 0 1 220px;
+  min-width: 160px;
+  padding: 9px 12px;
   background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  font: 400 12.5px var(--sans);
+  font: 400 12.5px/1.3 var(--sans);
   color: var(--text);
 }
 
@@ -2880,4 +2887,15 @@ button:disabled {
   flex: none;
   font: 400 10.5px var(--mono);
   color: var(--orange);
+}
+
+/* The one irreversible action in the app. */
+.btn.is-danger {
+  border-color: var(--red);
+  color: var(--red);
+  background: none;
+}
+
+.btn.is-danger:hover {
+  background: color-mix(in oklab, var(--red) 12%, transparent);
 }

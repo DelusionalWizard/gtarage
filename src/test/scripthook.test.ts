@@ -20,7 +20,7 @@ import type { AppConfig, GameId } from '../shared/types';
 
 /** A fake GTA V folder: ScriptHookV plus a lot of game we must not touch. */
 async function gameFolderWithHook(): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-shv-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-shv-'));
   const files = [
     // ScriptHookV's own files.
     'ScriptHookV.dll',
@@ -44,7 +44,7 @@ async function gameFolderWithHook(): Promise<string> {
 }
 
 function configWith(gamePath: string): AppConfig {
-  const cfg = defaultConfig(path.join(os.tmpdir(), 'swapmeet-shv-cfg'));
+  const cfg = defaultConfig(path.join(os.tmpdir(), 'gtarage-shv-cfg'));
   cfg.installs.push({ gameId: 'gta5' as GameId, path: gamePath, source: 'manual' });
   return cfg;
 }
@@ -83,7 +83,7 @@ test('only ScriptHookV files are taken, not the game around them', async () => {
 });
 
 test('a game folder without ScriptHookV offers nothing', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-shv-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-shv-'));
   try {
     await fs.writeFile(path.join(dir, 'GTA5.exe'), 'x');
     assert.deepEqual(await findInstalledHook(configWith(dir)), []);
@@ -93,7 +93,7 @@ test('a game folder without ScriptHookV offers nothing', async () => {
 });
 
 test('coverage splits games into those that have the hook and those that do not', () => {
-  const cfg = defaultConfig(path.join(os.tmpdir(), 'swapmeet-shv-cfg'));
+  const cfg = defaultConfig(path.join(os.tmpdir(), 'gtarage-shv-cfg'));
   cfg.installs.push(
     { gameId: 'gta5' as GameId, path: 'C:/gta5', source: 'manual' },
     { gameId: 'gta5e' as GameId, path: 'C:/gta5e', source: 'manual' },

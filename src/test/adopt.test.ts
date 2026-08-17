@@ -21,7 +21,7 @@ import type { AppConfig, GameId } from '../shared/types';
 
 /** A fake game folder containing the given relative files. */
 async function gameFolder(files: string[]): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-adopt-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-adopt-'));
   for (const rel of files) {
     const abs = path.join(dir, rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
@@ -31,7 +31,7 @@ async function gameFolder(files: string[]): Promise<string> {
 }
 
 function config(): AppConfig {
-  return defaultConfig(path.join(os.tmpdir(), 'swapmeet-adopt-cfg'));
+  return defaultConfig(path.join(os.tmpdir(), 'gtarage-adopt-cfg'));
 }
 
 /** The vendor DLLs GTA V and Enhanced actually ship at their root. */

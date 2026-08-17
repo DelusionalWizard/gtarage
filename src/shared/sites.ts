@@ -3,14 +3,14 @@
  *
  * The big community sites -- GTA5-Mods, GTAinside, LibertyCity -- have no
  * public API, and scraping them would be brittle, rude and against their
- * terms. So Swapmeet does not pretend to index them. It opens a real browser
+ * terms. So GTArage does not pretend to index them. It opens a real browser
  * window instead.
  *
  * You log in with your own account, on the real site, seeing the real page.
- * Swapmeet's only involvement is at the very end: it listens for a download
+ * GTArage's only involvement is at the very end: it listens for a download
  * starting and catches the file into the mod library instead of dumping it in
  * your Downloads folder. The site keeps its traffic, its ads and its
- * attribution; Swapmeet never sees your password and never automates a click.
+ * attribution; GTArage never sees your password and never automates a click.
  *
  * The GTAMods wiki is listed here too, but only as documentation -- it hosts
  * no mod files at all.

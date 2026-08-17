@@ -2,7 +2,7 @@
  * The mod library: importing mods and working out how they want to be laid
  * down.
  *
- * Swapmeet never installs a mod into the game folder at import time. Files are
+ * GTArage never installs a mod into the game folder at import time. Files are
  * copied into a per-game library folder and indexed; deployment happens later
  * and is fully reversible. That separation is the whole reason profiles can
  * be swapped safely.

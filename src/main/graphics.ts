@@ -8,7 +8,7 @@
  * single settings file and overwrite each other. The result is reconfiguring
  * the graphics options by hand after every switch.
  *
- * Swapmeet fixes that by treating those files as part of the profile:
+ * GTArage fixes that by treating those files as part of the profile:
  *
  *  - **Capture** copies the live settings into the profile's own folder.
  *  - **Restore** puts that profile's copy back when it is applied.

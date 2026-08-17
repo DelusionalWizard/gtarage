@@ -3,11 +3,11 @@
  *
  * Almost nobody arrives at a mod manager with a clean install. ScriptHookV in
  * particular is installed by unzipping it straight into the game directory,
- * so a first-time user opens Swapmeet, sees an empty library, and reasonably
+ * so a first-time user opens GTArage, sees an empty library, and reasonably
  * concludes it cannot see the mods they already have.
  *
  * This scans the places mods actually land, ignores everything the base game
- * ships and everything Swapmeet deployed itself, and groups what is left into
+ * ships and everything GTArage deployed itself, and groups what is left into
  * recognisable tools. Adopting one copies the files into the library and
  * enables it — after which the normal deploy diff owns them, so they can be
  * disabled, reordered and undone like anything else.
@@ -170,7 +170,7 @@ function isModEvidence(rel: string): boolean {
 }
 
 /**
- * Find mod files in the game folder that Swapmeet did not put there.
+ * Find mod files in the game folder that GTArage did not put there.
  *
  * Scanning is limited to the game root and the folders mods deploy into.
  * Walking a 100 GB install would be pointless, and the base game's own

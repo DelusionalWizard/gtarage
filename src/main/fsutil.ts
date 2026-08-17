@@ -125,7 +125,7 @@ export async function ensureDir(p: string): Promise<void> {
 /**
  * Place `src` at `dest`, preferring a hard link.
  *
- * Hard links are why Swapmeet can hold a dozen profiles of a 100 GB game
+ * Hard links are why GTArage can hold a dozen profiles of a 100 GB game
  * without a dozen copies: the link is a second directory entry pointing at
  * bytes that already exist. They only work within a single volume, so we fall
  * back to copying when the library and the game sit on different drives.

@@ -81,11 +81,28 @@ app.whenReady().then(async () => {
   // The app was renamed from Rigging, which moves userData. Bring an existing
   // library across before anything reads config, or it looks like a fresh
   // install to someone who already had mods set up.
-  const migrated = await migrateLegacyUserData(
-    userDataDir,
-    path.join(path.dirname(userDataDir), 'rigging'),
-  );
-  if (migrated) console.log(`[swapmeet] migrated previous data from ${migrated}`);
+  /*
+   * Every name this app has had, oldest first.
+   *
+   * Electron derives userData from productName, so each rename left a folder
+   * behind. Walking them in order means someone who skipped a version still
+   * ends up with their library, and the newest match wins because it is
+   * applied last.
+   */
+  const LEGACY_APPS: Array<[folder: string, config: string]> = [
+    ['rigging', 'rigging.config.json'],
+    ['Swapmeet', 'swapmeet.config.json'],
+  ];
+  let migrated: string | null = null;
+  for (const [folder, configName] of LEGACY_APPS) {
+    const from = await migrateLegacyUserData(
+      userDataDir,
+      path.join(path.dirname(userDataDir), folder),
+      configName,
+    );
+    if (from) migrated = from;
+  }
+  if (migrated) console.log(`[gtarage] migrated previous data from ${migrated}`);
 
   initConfig(userDataDir);
 
@@ -101,7 +118,7 @@ app.whenReady().then(async () => {
   if (migrated) {
     const repointed = repointPaths(config, migrated, userDataDir);
     if (repointed > 0) {
-      console.log(`[swapmeet] repointed ${repointed} stored path(s) to the new data folder`);
+      console.log(`[gtarage] repointed ${repointed} stored path(s) to the new data folder`);
       await saveConfig(config);
     }
   }
@@ -113,7 +130,7 @@ app.whenReady().then(async () => {
   const repairs = await repairLibrary(config.mods);
   if (repairs.length > 0) {
     for (const { name, change } of repairs) {
-      console.log(`[swapmeet] repaired ${name}: ${change}`);
+      console.log(`[gtarage] repaired ${name}: ${change}`);
     }
     await saveConfig(config);
   }
@@ -134,7 +151,7 @@ app.whenReady().then(async () => {
    * remove everything".
    */
   if (config.mods.length === 0) {
-    console.log('[swapmeet] no mods in the config — leaving the library untouched');
+    console.log('[gtarage] no mods in the config — leaving the library untouched');
   } else {
     for (const gameId of GAME_ORDER) {
       const orphans = await sweepOrphanedModFolders(
@@ -145,8 +162,8 @@ app.whenReady().then(async () => {
       for (const { id, bytes, quarantined } of orphans) {
         console.log(
           quarantined
-            ? `[swapmeet] quarantined unreferenced library folder ${id} (${(bytes / 1048576).toFixed(2)} MB) — recoverable from the shelf`
-            : `[swapmeet] removed empty library folder ${id}`,
+            ? `[gtarage] quarantined unreferenced library folder ${id} (${(bytes / 1048576).toFixed(2)} MB) — recoverable from the shelf`
+            : `[gtarage] removed empty library folder ${id}`,
         );
       }
     }
@@ -179,7 +196,7 @@ app.whenReady().then(async () => {
       return await fn(...(args ?? []));
     } catch (err) {
       // Surface a clean message; the stack is only useful in the main log.
-      console.error(`[swapmeet] ${String(method)} failed:`, err);
+      console.error(`[gtarage] ${String(method)} failed:`, err);
       throw new Error((err as Error).message);
     }
   });

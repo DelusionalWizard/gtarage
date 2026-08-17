@@ -40,14 +40,14 @@ import type {
   DlcReport,
   GameView,
   ImportReport,
-  SwapmeetApi,
+  GTArageApi,
   HookCandidateView,
   SaveSnapshotView,
   UpdateView,
   SiteEvent,
   VerifyView,
 } from '../shared/api';
-import { SITE_CHANNEL } from '../shared/api';
+import { PROGRESS_CHANNEL, SITE_CHANNEL } from '../shared/api';
 import {
   browse as runBrowse,
   catalogFiles as runCatalogFiles,
@@ -130,7 +130,7 @@ export function initApi(dir: string, win: BrowserWindow): void {
 }
 
 function emitProgress(done: number, total: number, label: string): void {
-  mainWindow?.webContents.send('swapmeet:progress', { done, total, label });
+  mainWindow?.webContents.send(PROGRESS_CHANNEL, { done, total, label });
 }
 
 // --- state ------------------------------------------------------------------
@@ -384,7 +384,7 @@ export function modSiteHooks() {
         emitSite({
           kind: 'staged',
           fileName: capture.fileName,
-          message: `${capture.fileName} is an installer, so Swapmeet saved it without importing or running it. Open the downloads folder to use it.`,
+          message: `${capture.fileName} is an installer, so GTArage saved it without importing or running it. Open the downloads folder to use it.`,
         });
         return;
       }
@@ -452,7 +452,7 @@ function requireInstall(config: AppConfig, gameId: GameId): string {
 
 // --- implementation ---------------------------------------------------------
 
-export const handlers: SwapmeetApi = {
+export const handlers: GTArageApi = {
   async getState() {
     return state();
   },
@@ -895,6 +895,48 @@ export const handlers: SwapmeetApi = {
     });
   },
 
+  /**
+   * Remove everything GTArage has put on this machine, then quit.
+   *
+   * Order matters and is the whole safety story. Every game is undeployed
+   * first, so mod files come back out of the game folders and anything they
+   * displaced is restored from the shelf. Doing it the other way round would
+   * delete the shelf while game folders still held mod files, leaving
+   * displaced originals with nowhere to come back from and installs broken
+   * with no record of how.
+   *
+   * Game folders themselves are never touched beyond that undeploy, and
+   * neither are the archives the user originally installed from.
+   */
+  async purgeEverything() {
+    const config = await loadConfig(userDataDir);
+    const removed: string[] = [];
+    const problems: string[] = [];
+
+    for (const install of config.installs) {
+      try {
+        problems.push(...(await undeployAll(config, install.gameId, install.path)));
+      } catch (err) {
+        problems.push(`${install.gameId}: ${(err as Error).message}`);
+      }
+    }
+
+    // Only once the game folders are clean.
+    for (const target of [config.libraryPath, config.shelfPath, getConfigPath()]) {
+      try {
+        await fs.rm(target, { recursive: true, force: true });
+        removed.push(target);
+      } catch (err) {
+        problems.push(`${target}: ${(err as Error).message}`);
+      }
+    }
+
+    // Quit rather than carry on against state that no longer exists. Delayed
+    // so the reply reaches the renderer and the user sees what happened.
+    setTimeout(() => app.quit(), 1500);
+    return { removed, problems };
+  },
+
   async scanAdoptable(gameId) {
     const config = await loadConfig(userDataDir);
     const install = installFor(config, gameId);
@@ -981,7 +1023,7 @@ export const handlers: SwapmeetApi = {
     const info = await checkForUpdate();
 
     if (!info.newer) {
-      return { started: false, message: 'Swapmeet is already up to date.' };
+      return { started: false, message: 'GTArage is already up to date.' };
     }
     if (info.cannotSelfUpdate) {
       await shell.openExternal(info.url);
@@ -1009,13 +1051,13 @@ export const handlers: SwapmeetApi = {
 
     const dir = path.join(config.shelfPath, 'updates');
     const file = await downloadUpdate(info, dir, (received, total) =>
-      emitProgress(received, total, `Downloading Swapmeet ${info.version}`),
+      emitProgress(received, total, `Downloading GTArage ${info.version}`),
     );
 
     installUpdate(file);
     return {
       started: true,
-      message: `Installing Swapmeet ${info.version}. Swapmeet will close.`,
+      message: `Installing GTArage ${info.version}. GTArage will close.`,
     };
   },
 
@@ -1216,7 +1258,7 @@ export const handlers: SwapmeetApi = {
       const full = path.join(gamePath, exe);
       if (!(await exists(full))) continue;
       try {
-        // detached + unref so closing Swapmeet does not kill the game.
+        // detached + unref so closing GTArage does not kill the game.
         const child = execFile(full, { cwd: path.dirname(full) });
         child.unref();
         return { ok: true };
@@ -1240,7 +1282,7 @@ export const handlers: SwapmeetApi = {
         break;
       case 'saves': {
         if (!gameId) throw new Error('No game selected.');
-        // The game's own save folder, not Swapmeet's snapshots of it.
+        // The game's own save folder, not GTArage's snapshots of it.
         const folders = await saveFolders(gameId);
         const first = folders[0];
         if (!first) {
@@ -1302,7 +1344,7 @@ export const handlers: SwapmeetApi = {
       return {
         state: await state(),
         imported: false,
-        message: `${fetched.fileName} is an installer. Swapmeet saved it to the downloads folder but will not run it — install it yourself, then import what it produces.`,
+        message: `${fetched.fileName} is an installer. GTArage saved it to the downloads folder but will not run it — install it yourself, then import what it produces.`,
       };
     }
 
@@ -1328,7 +1370,7 @@ export const handlers: SwapmeetApi = {
     const catalog = await browseEssentials(gameId, '');
     const mod = catalog.find((m) => m.id === essentialId);
     if (!mod) {
-      throw new Error('Swapmeet does not know how to fetch that prerequisite automatically.');
+      throw new Error('GTArage does not know how to fetch that prerequisite automatically.');
     }
     if (mod.manualOnly) {
       await shell.openExternal(mod.url);

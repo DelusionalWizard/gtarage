@@ -12,7 +12,7 @@
  * strict CSP to object to.
  */
 
-const api = window.swapmeet;
+const api = window.gtarage;
 
 // --- local view state -------------------------------------------------------
 
@@ -57,9 +57,6 @@ let hookPromptSettled = false;
  * and 'Running'.
  */
 let gameRunning = false;
-/** Essentials for the current game, fetched when Browse is opened. */
-let essentials: CatalogMod[] = [];
-let browseLoading = false;
 let sites: ModSite[] = [];
 let runningTimer: number | null = null;
 
@@ -184,7 +181,7 @@ function hideOverlay(): void {
   byId('overlay').hidden = true;
 }
 
-window.swapmeetEvents.onProgress(({ done, total, label }) => {
+window.gtarageEvents.onProgress(({ done, total, label }) => {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   byId('overlay-fill').style.width = `${pct}%`;
   byId('overlay-detail').textContent = `${done}/${total} · ${label}`;
@@ -320,7 +317,7 @@ function profileMenu(profile: Profile): void {
         clear(gfxActions);
 
         if (!view.supported) {
-          summary.textContent = 'Swapmeet does not track settings files for this game yet.';
+          summary.textContent = 'GTArage does not track settings files for this game yet.';
           return;
         }
 
@@ -485,7 +482,7 @@ function renderModsTable(s: AppState, view: HTMLElement): void {
     view.appendChild(
       emptyState(
         'No mods yet',
-        'Drag a mod in anywhere \u2014 a .zip, .rar or .oiv archive, a folder, or a loose file. Or open the Browse tab, where Swapmeet can fetch the essential tools straight from their official release pages. Mods are kept in Swapmeet\u2019s own folder, so your game is not touched until you apply a profile.',
+        'Drag a mod in anywhere \u2014 a .zip, .rar or .oiv archive, a folder, or a loose file. Or open the Browse tab, where GTArage can fetch the essential tools straight from their official release pages. Mods are kept in GTArage\u2019s own folder, so your game is not touched until you apply a profile.',
         'Add mod files',
         () => installMod('files'),
       ),
@@ -756,7 +753,7 @@ function fileList(
 /**
  * The breadcrumb, which is the whole of this design's navigation state.
  *
- * Design 2a shows a dot and the app name; 2b shows "Swapmeet › <setup>". That
+ * Design 2a shows a dot and the app name; 2b shows "GTArage › <setup>". That
  * is the entire model - one level of drill-down - so there is no tab strip and
  * no profile rail to keep in step with it.
  */
@@ -766,11 +763,11 @@ function renderCrumbs(s: AppState): void {
 
   if (tab === 'home') {
     host.appendChild(el('div', 'crumb-dot'));
-    host.appendChild(el('div', 'crumb is-current', 'Swapmeet'));
+    host.appendChild(el('div', 'crumb is-current', 'GTArage'));
     return;
   }
 
-  const back = el('button', 'crumb', 'Swapmeet');
+  const back = el('button', 'crumb', 'GTArage');
   back.addEventListener('click', () => {
     tab = 'home';
     render();
@@ -809,7 +806,6 @@ function renderTopnav(s: AppState): void {
       tab = id;
       render();
       if (id === 'speedrun') void loadSpeedrun();
-      if (id === 'browse') void loadEssentials();
     });
     host.appendChild(btn);
   }
@@ -853,7 +849,7 @@ function renderNotices(s: AppState, host: HTMLElement): void {
       notice(
         'warn',
         'Your settings file could not be read',
-        `Swapmeet started with default settings so it could open at all. Your original file has been kept at ${s.configError.backupPath} — nothing was overwritten. (${s.configError.message})`,
+        `GTArage started with default settings so it could open at all. Your original file has been kept at ${s.configError.backupPath} — nothing was overwritten. (${s.configError.message})`,
         [
           {
             label: 'Show me the file',
@@ -878,7 +874,7 @@ function renderNotices(s: AppState, host: HTMLElement): void {
         ? ` The Script Hook V you have is built for ${alert.hook.builds.join(' / ')}, so it will not load until you update it.`
         : alert.hook.state === 'match'
           ? ' Your Script Hook V already names this build, so it should still work.'
-          : ' Swapmeet cannot tell which build your Script Hook V was made for, so it may or may not still work.';
+          : ' GTArage cannot tell which build your Script Hook V was made for, so it may or may not still work.';
 
     host.appendChild(
       notice(
@@ -915,7 +911,7 @@ function renderNotices(s: AppState, host: HTMLElement): void {
         s.brokenMods.length === 1
           ? `${first.name} is missing some of its files`
           : `${s.brokenMods.length} mods are missing files`,
-        `Files that should be in the library are not there any more — ${first.name} is missing ${first.missing}. Something outside Swapmeet deleted them. Installing again is the fix; the mods will not deploy correctly as they are.`,
+        `Files that should be in the library are not there any more — ${first.name} is missing ${first.missing}. Something outside GTArage deleted them. Installing again is the fix; the mods will not deploy correctly as they are.`,
         [
           {
             label: 'Open Library',
@@ -929,7 +925,7 @@ function renderNotices(s: AppState, host: HTMLElement): void {
     );
   }
 
-  // Mods sitting in the game folder that Swapmeet did not put there. The scan
+  // Mods sitting in the game folder that GTArage did not put there. The scan
   // already ran on every refresh; until now its result was thrown away.
   const fresh = adoptable.filter((g) => !g.alreadyInLibrary);
   if (fresh.length > 0) {
@@ -938,7 +934,7 @@ function renderNotices(s: AppState, host: HTMLElement): void {
       notice(
         'info',
         `${fresh.length} mod${fresh.length === 1 ? '' : 's'} already in your game folder`,
-        `${fresh.map((g) => g.name).slice(0, 4).join(', ')}${fresh.length > 4 ? ` and ${fresh.length - 4} more` : ''} — ${formatBytes(bytes)} installed by hand rather than by Swapmeet. Taking them in moves them to the library so setups can switch them on and off. Nothing is deleted.`,
+        `${fresh.map((g) => g.name).slice(0, 4).join(', ')}${fresh.length > 4 ? ` and ${fresh.length - 4} more` : ''} — ${formatBytes(bytes)} installed by hand rather than by GTArage. Taking them in moves them to the library so setups can switch them on and off. Nothing is deleted.`,
         [
           {
             label: `Take ${fresh.length === 1 ? 'it' : 'them'} in`,
@@ -976,7 +972,7 @@ function renderDlcNotices(s: AppState, host: HTMLElement): void {
         `${
           dlc.confirmed
             ? 'This line is not in your dlclist.xml'
-            : 'Swapmeet cannot read your dlclist.xml, because it lives inside update.rpf'
+            : 'GTArage cannot read your dlclist.xml, because it lives inside update.rpf'
         }. Without the entry the pack installs perfectly and the game ignores it completely. Add it with OpenIV or CodeWalker: ${first.line}`,
         dlc.gaps.length > 1
           ? [
@@ -1015,8 +1011,7 @@ function renderDlcNotices(s: AppState, host: HTMLElement): void {
             onClick: () => {
               tab = 'browse';
               render();
-              void loadEssentials();
-            },
+                      },
           },
         ],
       ),
@@ -1106,7 +1101,7 @@ function renderHome(s: AppState, view: HTMLElement): void {
     el(
       'p',
       'lede',
-      'Pick a setup and press Play. Swapmeet swaps the mods and your save files for you, and keeps a backup of everything it touches.',
+      'Pick a setup and press Play. GTArage swaps the mods and your save files for you, and keeps a backup of everything it touches.',
     ),
   );
   home.appendChild(head);
@@ -1339,7 +1334,7 @@ function renderProfile(s: AppState, view: HTMLElement): void {
         bits.push(`put back ${report.restored} original game file(s)`);
       }
       if (report.orphans > 0) {
-        bits.push(`found ${report.orphans} file(s) Swapmeet did not install`);
+        bits.push(`found ${report.orphans} file(s) GTArage did not install`);
       }
       toast(bits.join(' · '), 'warn');
     }
@@ -1771,18 +1766,6 @@ function readyPanel(s: AppState, profile: Profile): HTMLElement {
     }
   }
 
-  const ticks = el('div', 'ticks');
-  for (const line of [
-    s.settings.backupSavesOnSwap
-      ? 'Your save file is copied before every switch'
-      : 'Save snapshots are off — turn them on in Settings',
-    'Mods are moved, never deleted',
-    'You can put the game back to vanilla any time',
-  ]) {
-    ticks.appendChild(el('div', 'tick', line));
-  }
-  panel.appendChild(ticks);
-
   panel.appendChild(el('div', 'ready-grow'));
 
   const live = s.deployed?.profileId === profile.id;
@@ -1979,15 +1962,28 @@ function renderSettings(s: AppState, view: HTMLElement): void {
         game.path ?? 'No folder found — choose it yourself if the game is installed',
       ),
     );
-    // Only offered where there is something to forget. Forgetting drops the
-    // folder from Swapmeet; it does not touch the game or the library.
+    // Per game, because every one of these acts on a single folder and doing
+    // them from a shared row at the bottom meant they silently applied to
+    // whichever game happened to be selected.
+    const pick = el('button', 'btn', 'Choose folder');
+    pick.title = `Point GTArage at the ${game.shortName} folder yourself`;
+    pick.addEventListener('click', () => void chooseFolderFor(game.id));
+    row.appendChild(pick);
+
     if (game.installed) {
+      const strip = el('button', 'btn', 'Remove all mods');
+      strip.title = 'Put this game folder back to how it was, without deleting anything';
+      strip.addEventListener('click', () => void removeAllMods(game.id, game.shortName));
+      row.appendChild(strip);
+
+      // Forgetting drops the folder from GTArage; it touches neither the game
+      // nor the library.
       const forget = el('button', 'btn', 'Forget');
       forget.title = `Stop managing ${game.shortName}. Nothing is deleted.`;
       forget.addEventListener('click', async () => {
         const ok = await confirmModal(
           `Forget ${game.shortName}?`,
-          'Swapmeet stops managing this folder. Your game, your mods and your library are all left exactly as they are, and you can point it back at the folder any time.',
+          'GTArage stops managing this folder. Your game, your mods and your library are all left exactly as they are, and you can point it back at the folder any time.',
           'Forget it',
         );
         if (!ok) return;
@@ -2002,29 +1998,7 @@ function renderSettings(s: AppState, view: HTMLElement): void {
   const folderActs = el('div', 'notice-acts');
   const again = el('button', 'btn', 'Search again');
   again.addEventListener('click', () => detect_());
-  const choose = el('button', 'btn', 'Choose folder');
-  choose.addEventListener('click', () => browseForGame());
-  folderActs.append(again, choose);
-
-  // The escape hatch. Applying the vanilla setup does the same thing, but
-  // someone looking for "undo everything" looks in Settings, not in a setup.
-  const strip = el('button', 'btn', 'Remove all mods from my game folder');
-  strip.title = 'Put the game folder back to how it was, without deleting anything';
-  strip.addEventListener('click', async () => {
-    if (!s.currentGameId) return;
-    const ok = await confirmModal(
-      'Put your game back to unmodded?',
-      'Every file Swapmeet installed comes out, and anything it displaced goes back. Your library keeps all the mods, so you can put a setup back whenever you like.',
-      'Remove them',
-    );
-    if (!ok) return;
-    const result = await guard('Removing…', () => api.undeployAll(s.currentGameId!));
-    if (!result) return;
-    apply(result.state);
-    for (const problem of result.problems) toast(problem, 'warn');
-    if (result.problems.length === 0) toast('Your game folder is back to unmodded.', 'ok');
-  });
-  folderActs.appendChild(strip);
+  folderActs.appendChild(again);
   folders.appendChild(folderActs);
 
   // --- how files are placed -------------------------------------------------
@@ -2147,6 +2121,29 @@ function renderSettings(s: AppState, view: HTMLElement): void {
   }
   where.appendChild(whereRows);
 
+  // --- start over -----------------------------------------------------------
+  const purge = section('s-purge', 'Start over', {
+    blurb:
+      'Every game is put back to unmodded first, then the library, the shelf and this settings file are deleted. Your games, and the archives you installed mods from, are left alone — but everything GTArage made is gone, and the shelf that makes the rest of the app undoable goes with it.',
+  });
+  const purgeRows = el('div', 'rows');
+  const purgeRow = el('div', 'srow');
+  const purgeMain = el('div', 'srow-main');
+  purgeMain.appendChild(el('div', 'srow-name', 'Remove GTArage from this PC'));
+  purgeMain.appendChild(
+    el(
+      'div',
+      'srow-desc',
+      'The app closes afterwards. This one genuinely cannot be undone.',
+    ),
+  );
+  purgeRow.appendChild(purgeMain);
+  const purgeBtn = el('button', 'btn is-danger', 'Remove everything…');
+  purgeBtn.addEventListener('click', () => void purgeEverything(s));
+  purgeRow.appendChild(purgeBtn);
+  purgeRows.appendChild(purgeRow);
+  purge.appendChild(purgeRows);
+
   // The rail is built last, from the sections that actually exist.
   const rail = el('div', 'onpage');
   rail.appendChild(el('div', 'onpage-label', 'ON THIS PAGE'));
@@ -2169,66 +2166,21 @@ function renderSettings(s: AppState, view: HTMLElement): void {
  *
  * Three ways a mod arrives, and the design's argument is that they should look
  * as different as they behave: a file you already have is a drop target, the
- * Essentials are things Swapmeet installs itself, and a community site is a
+ * Essentials are things GTArage installs itself, and a community site is a
  * handoff where all it can do is catch what you download. The old version gave
  * all three the same card and a search box, which implied a catalogue that
  * does not exist.
  */
+/**
+ * Browse: the community sites, and nothing else for now.
+ *
+ * The Essentials list, the drop target and the page heading are gone pending
+ * a rebuild. What remains is the one thing that was never in question - the
+ * handoff, where GTArage opens a site, you download as you normally would,
+ * and it catches the file.
+ */
 function renderBrowse(s: AppState, view: HTMLElement): void {
   const page = el('div', 'browse');
-
-  const head = el('div', 'home-head');
-  head.appendChild(el('h1', 'ask', 'Add mods to your library'));
-  head.appendChild(
-    el(
-      'p',
-      'lede',
-      'Nothing here touches your game. Anything added lands in the library, and you put it in a setup afterwards.',
-    ),
-  );
-  page.appendChild(head);
-
-  // 1. A file you already have.
-  const drop = el('button', 'drop');
-  drop.appendChild(el('div', 'drop-plus', '+'));
-  const dropMain = el('div', 'note-main');
-  dropMain.appendChild(el('div', 'note-title', 'Drop a file you already downloaded'));
-  dropMain.appendChild(
-    el(
-      'div',
-      'note-body',
-      '.zip, .rar, .7z, .oiv or a folder. This is how most mods arrive — Swapmeet works out what kind it is and where its files belong.',
-    ),
-  );
-  drop.appendChild(dropMain);
-  drop.appendChild(el('div', 'site-go', 'Choose a file'));
-  drop.addEventListener('click', () => installMod('files'));
-  wireDropzone(drop);
-  page.appendChild(drop);
-
-  // 2. Essentials.
-  const essHead = el('div', 'group-head');
-  essHead.appendChild(el('div', 'group-title', 'Essentials'));
-  essHead.appendChild(el('div', 'group-badge', 'INSTALLED BY SWAPMEET'));
-  page.appendChild(essHead);
-  page.appendChild(
-    el(
-      'div',
-      'group-blurb',
-      'The pieces that let other mods run. Swapmeet installs these itself, from the official release pages.',
-    ),
-  );
-
-  const ess = el('div', 'ess');
-  if (browseLoading) {
-    ess.appendChild(el('div', 'ess-row', 'Checking the release pages…'));
-  } else if (essentials.length === 0) {
-    ess.appendChild(el('div', 'ess-row', 'Nothing to show for this game.'));
-  } else {
-    for (const mod of essentials) ess.appendChild(essentialRow(s, mod));
-  }
-  page.appendChild(ess);
-
   // 3. The handoff.
   const handoff = el('div', 'handoff');
   const hHead = el('div', 'group-head');
@@ -2238,11 +2190,11 @@ function renderBrowse(s: AppState, view: HTMLElement): void {
     el(
       'div',
       'group-blurb',
-      'These have no install button. Swapmeet opens the site, you download the way you normally would, and it catches the file.',
+      'These have no install button. GTArage opens the site, you download the way you normally would, and it catches the file.',
     ),
   );
   const steps = el('div', 'steps');
-  const labels = ['1 OPENS IN A WINDOW', '2 YOU LOG IN AND DOWNLOAD', '3 SWAPMEET CATCHES IT'];
+  const labels = ['1 OPENS IN A WINDOW', '2 YOU LOG IN AND DOWNLOAD', '3 GTARAGE CATCHES IT'];
   labels.forEach((label, i) => {
     steps.appendChild(el('div', 'step', label));
     if (i < labels.length - 1) steps.appendChild(el('div', 'step-arrow', '→'));
@@ -2268,46 +2220,6 @@ function renderBrowse(s: AppState, view: HTMLElement): void {
   view.appendChild(page);
 }
 
-function essentialRow(s: AppState, mod: CatalogMod): HTMLElement {
-  const row = el('div', 'ess-row');
-  const main = el('div', 'ess-main');
-
-  const name = el('div', 'ess-name');
-  name.appendChild(document.createTextNode(mod.name));
-
-  // One badge, saying the most useful thing about this row's state. The
-  // provider already resolves what is installed, so no name matching here.
-  const installed = Boolean(mod.installedModId);
-  const outdated = installed && mod.installedVersion !== undefined && mod.installedVersion !== mod.version;
-  const neededBy = s.missingDeps.find((d) =>
-    d.deps.some((dep) => mod.name.toLowerCase().includes(dep.capability.toLowerCase().slice(0, 6))),
-  );
-  if (neededBy) {
-    name.appendChild(el('span', 'tag is-warn', `NEEDED BY ${neededBy.modName.toUpperCase()}`));
-  } else if (outdated) {
-    name.appendChild(el('span', 'tag is-warn', `UPDATE ${mod.version}`));
-  } else if (installed) {
-    name.appendChild(el('span', 'tag is-ok', 'INSTALLED'));
-  }
-  main.appendChild(name);
-
-  if (mod.summary) main.appendChild(el('div', 'ess-blurb', mod.summary));
-  const meta: string[] = [];
-  if (mod.version) meta.push(mod.version);
-  if (mod.installedVersion) meta.push(`you have ${mod.installedVersion}`);
-  if (mod.manualOnly) meta.push(mod.manualReason ?? 'download it yourself');
-  if (meta.length > 0) main.appendChild(el('div', 'ess-meta', meta.join(' · ')));
-  row.appendChild(main);
-
-  const act = el(
-    'button',
-    installed && !outdated ? 'btn' : 'btn is-blue',
-    outdated ? 'Update' : installed ? 'Reinstall' : 'Install',
-  );
-  act.addEventListener('click', () => void installEssential(mod));
-  row.appendChild(act);
-  return row;
-}
 
 // --- Library ------------------------------------------------------------------
 
@@ -2387,16 +2299,13 @@ function renderLibrary(s: AppState, view: HTMLElement): void {
   const pills = el('div', 'lib-pills');
   const filters: Array<[string, string]> = [
     ['all', 'Everything'],
-    ...(unused.length > 0
-      ? ([['unused', `In no setup · ${unused.length}`]] as Array<[string, string]>)
-      : []),
     ['plays', 'Installed'],
     ['looks', 'How it looks'],
     ['files', 'Game files'],
     ['core', 'Required'],
   ];
   for (const [id, label] of filters) {
-    if (id !== 'all' && id !== 'unused' && libraryMods(s, id, '').length === 0) continue;
+    if (id !== 'all' && libraryMods(s, id, '').length === 0) continue;
     const pill = el('button', `pill${libraryFilter === id ? ' is-active' : ''}`, label);
     pill.addEventListener('click', () => {
       libraryFilter = id;
@@ -2434,8 +2343,6 @@ function libraryMods(s: AppState, which: string, needle: string): Mod[] {
   return s.mods.filter((mod) => {
     if (q && !mod.name.toLowerCase().includes(q)) return false;
     switch (which) {
-      case 'unused':
-        return setupsUsing(s, mod.id).length === 0;
       case 'core':
         return mod.core || mod.kind === 'modloader';
       case 'looks':
@@ -2483,7 +2390,7 @@ function renderLibraryRows(s: AppState, host: HTMLElement): void {
 
     const usedCell = el(
       'div',
-      `lib-col-used${used.length === 0 ? ' is-unused' : ''}`,
+      'lib-col-used',
       used.length === 0
         ? 'In no setup'
         : used.length <= 2
@@ -2621,16 +2528,15 @@ function emptyLibrary(): HTMLElement {
 
   const first = el('div', 'note-card lib-empty-card');
   const firstMain = el('div', 'note-main');
-  firstMain.appendChild(el('div', 'note-title', 'Start with the essentials'));
+  firstMain.appendChild(el('div', 'note-title', 'Find one on a mod site'));
   firstMain.appendChild(
-    el('div', 'note-body', 'The few pieces that let other mods run. Swapmeet installs these itself.'),
+    el('div', 'note-body', 'Browse opens the site, you download as usual, and the file is caught.'),
   );
   first.appendChild(firstMain);
   const openBrowse = el('button', 'btn is-blue btn-wide', 'Open Browse');
   openBrowse.addEventListener('click', () => {
     tab = 'browse';
     render();
-    void loadEssentials();
   });
   first.appendChild(openBrowse);
   cards.appendChild(first);
@@ -2658,7 +2564,7 @@ function emptyLibrary(): HTMLElement {
 /**
  * The speedrunning tab.
  *
- * A launcher and a directory, not a wrapper: Swapmeet does not reimplement
+ * A launcher and a directory, not a wrapper: GTArage does not reimplement
  * LiveSplit or install anything on your behalf - it finds what you already
  * have, starts it, and links what it cannot install.
  *
@@ -2674,7 +2580,7 @@ function renderSpeedrun(s: AppState, view: HTMLElement): void {
     el(
       'p',
       'lede',
-      'The timers, launchers and routing resources runners use. Swapmeet starts what you already have and links the rest — it does not install these for you.',
+      'The timers, launchers and routing resources runners use. GTArage starts what you already have and links the rest — it does not install these for you.',
     ),
   );
   page.appendChild(head);
@@ -2723,7 +2629,7 @@ function renderSpeedrun(s: AppState, view: HTMLElement): void {
       // extracted them, so probing install directories finds them for almost
       // nobody.
       const locate = el('button', 'btn', 'Locate…');
-      locate.title = 'Point Swapmeet at it if you already have it';
+      locate.title = 'Point GTArage at it if you already have it';
       locate.addEventListener('click', async () => {
         if (!s.currentGameId) return;
         const list = await guard('Looking…', () =>
@@ -2771,7 +2677,7 @@ function renderSpeedrun(s: AppState, view: HTMLElement): void {
       'srow-desc',
       hasPractice
         ? 'Ready. Install practice mods into it, and switch to the vanilla setup before a real attempt.'
-        : 'Not made yet. Swapmeet can create an empty one to keep practice mods separate.',
+        : 'Not made yet. GTArage can create an empty one to keep practice mods separate.',
     ),
   );
   pRow.appendChild(pMain);
@@ -2869,7 +2775,7 @@ function renderSaves(s: AppState, view: HTMLElement): void {
     page.appendChild(
       emptyState(
         'No snapshots yet',
-        'Swapmeet takes one before every switch. Until then there is nothing here to restore.',
+        'GTArage takes one before every switch. Until then there is nothing here to restore.',
       ),
     );
     view.appendChild(page);
@@ -2947,7 +2853,7 @@ function renderSaves(s: AppState, view: HTMLElement): void {
 let updateOffered = false;
 
 /**
- * Check for a newer Swapmeet.
+ * Check for a newer GTArage.
  *
  * `manual` means the user pressed the button, so silence is not an acceptable
  * answer — they get told either way. The automatic check stays quiet when
@@ -2971,7 +2877,7 @@ async function checkForUpdate(manual = false): Promise<void> {
   }
 
   if (!info.newer) {
-    if (manual) toast(`Swapmeet ${info.current} is the latest version.`, 'ok');
+    if (manual) toast(`GTArage ${info.current} is the latest version.`, 'ok');
     return;
   }
 
@@ -2989,7 +2895,7 @@ async function checkForUpdate(manual = false): Promise<void> {
 
 function showUpdatePrompt(info: UpdateView): void {
   openModal({
-    title: `Swapmeet ${info.version} is available`,
+    title: `GTArage ${info.version} is available`,
     subtitle: `You are on ${info.current}.`,
     build: (body) => {
       if (info.cannotSelfUpdate) {
@@ -3040,7 +2946,7 @@ function showUpdatePrompt(info: UpdateView): void {
 }
 
 async function runUpdate(info: UpdateView): Promise<void> {
-  const result = await guard(`Downloading Swapmeet ${info.version}…`, () =>
+  const result = await guard(`Downloading GTArage ${info.version}…`, () =>
     api.installUpdate(),
   );
   if (!result) return;
@@ -3157,7 +3063,7 @@ async function installDependency(dep: ModDependency, s: AppState): Promise<void>
 /**
  * Everything the library is missing, with the evidence for each.
  *
- * Showing *why* Swapmeet thinks a dependency exists matters: the detection is
+ * Showing *why* GTArage thinks a dependency exists matters: the detection is
  * good but not infallible, and a user who can see "imports ScriptHookV.dll"
  * can tell that apart from "the readme mentions it".
  */
@@ -3165,7 +3071,7 @@ function showDependencies(s: AppState): void {
   openModal({
     title: 'Mods that need something else first',
     subtitle:
-      'Some mods only work if another tool is installed first \u2014 without it they simply do nothing. Swapmeet works these out by reading the mod files themselves, and shows you the evidence for each so you can judge it.',
+      'Some mods only work if another tool is installed first \u2014 without it they simply do nothing. GTArage works these out by reading the mod files themselves, and shows you the evidence for each so you can judge it.',
     build: (body) => {
       for (const entry of s.missingDeps) {
         body.appendChild(el('div', 'field-label', entry.modName));
@@ -3234,7 +3140,7 @@ function showConflicts(s: AppState): void {
  * This replaces a bare "not set up" message. Someone opening a mod manager for
  * the first time needs three things: to know nothing has been changed yet, to
  * know what the whole process is going to be, and to have one obvious button.
- * The steps double as the explanation of how Swapmeet works, which is where the
+ * The steps double as the explanation of how GTArage works, which is where the
  * words "library" and "profile" get introduced -- in context, before they turn
  * up as bare labels elsewhere in the UI.
  */
@@ -3246,26 +3152,26 @@ function renderSetup(s: AppState, view: HTMLElement): void {
   const card = el('div', 'setup-card');
 
   card.appendChild(
-    el('div', 'ask', anyInstalled ? `Set up ${name}` : 'Welcome to Swapmeet'),
+    el('div', 'ask', anyInstalled ? `Set up ${name}` : 'Welcome to GTArage'),
   );
   card.appendChild(
     el(
       'div',
       'setup-lead',
       anyInstalled
-        ? `Swapmeet has not found ${name} yet. Point it at the folder and it will take care of the rest.`
-        : "Swapmeet keeps your mods in its own folder and only copies them into the game when you ask. Your game folder is not touched until you press Apply, and nothing is ever deleted — so it is safe to experiment.",
+        ? `GTArage has not found ${name} yet. Point it at the folder and it will take care of the rest.`
+        : "GTArage keeps your mods in its own folder and only copies them into the game when you ask. Your game folder is not touched until you press Apply, and nothing is ever deleted — so it is safe to experiment.",
     ),
   );
 
   const steps: Array<[string, string]> = [
     [
       'Find your game',
-      'Swapmeet checks Steam, Epic, the Rockstar launcher and your drives. If it comes up empty, you can point it at the folder yourself.',
+      'GTArage checks Steam, Epic, the Rockstar launcher and your drives. If it comes up empty, you can point it at the folder yourself.',
     ],
     [
       'Add some mods',
-      'Drag in a .zip or a folder, or use the Browse tab to get the essential tools straight from their official release pages. Mods go into Swapmeet\u2019s own library, not into the game.',
+      'Drag in a .zip or a folder, or use the Browse tab to get the essential tools straight from their official release pages. Mods go into GTArage\u2019s own library, not into the game.',
     ],
     [
       'Turn them on and press Apply',
@@ -3367,7 +3273,7 @@ async function boot(): Promise<void> {
     clear(view);
     view.appendChild(
       emptyState(
-        'Swapmeet could not start up',
+        'GTArage could not start up',
         `Something went wrong while loading your settings: ${(err as Error).message}`,
         'Try again',
         () => void boot(),
@@ -3380,7 +3286,7 @@ async function boot(): Promise<void> {
  * Downloads captured by the embedded mod-site browser arrive here, not
  * through a call the UI made, so they get their own listener.
  */
-window.swapmeetEvents.onSiteEvent((event) => {
+window.gtarageEvents.onSiteEvent((event) => {
   if (event.kind === 'progress') {
     // Progress used to go to the action bar, which this shell does not have.
     // Deliberately silent: a toast per chunk would be a stream of noise, and
@@ -3401,6 +3307,58 @@ async function detect_(): Promise<void> {
     const found = next.games.filter((g) => g.installed).length;
     toast(found ? `Found ${found} game${found === 1 ? '' : 's'}.` : 'No installs found.', found ? 'ok' : 'warn');
   }
+}
+
+/**
+ * Delete everything GTArage has put on this PC.
+ *
+ * Gated behind typing the word rather than a plain confirm. Every other
+ * destructive action in the app is recoverable from the shelf, and this is the
+ * one that removes the shelf - so it should be impossible to reach by
+ * clicking through a dialog out of habit.
+ */
+async function purgeEverything(s: AppState): Promise<void> {
+  const typed = await promptModal(
+    'Remove GTArage from this PC?',
+    'Type REMOVE to confirm',
+    '',
+  );
+  if (typed?.trim().toUpperCase() !== 'REMOVE') {
+    if (typed !== null) toast('Nothing was removed.', 'ok');
+    return;
+  }
+
+  const result = await guard('Removing everything…', () => api.purgeEverything());
+  if (!result) return;
+  for (const problem of result.problems) toast(problem, 'warn');
+  toast(
+    `Removed ${result.removed.length} folder(s). GTArage will close.`,
+    result.problems.length > 0 ? 'warn' : 'ok',
+  );
+}
+
+/** Point GTArage at one game folder, whichever game the row is for. */
+async function chooseFolderFor(gameId: GameId): Promise<void> {
+  const next = await guard('Checking folder…', () => api.browseForGame(gameId));
+  if (next) {
+    apply(next);
+    toast('Game folder set.', 'ok');
+  }
+}
+
+/** Take every mod back out of one game folder, leaving the library intact. */
+async function removeAllMods(gameId: GameId, name: string): Promise<void> {
+  const ok = await confirmModal(
+    `Put ${name} back to unmodded?`,
+    'Every file GTArage installed comes out, and anything it displaced goes back. Your library keeps all the mods, so you can put a setup back whenever you like.',
+    'Remove them',
+  );
+  if (!ok) return;
+  const result = await guard('Removing…', () => api.undeployAll(gameId));
+  if (!result) return;
+  apply(result.state);
+  for (const problem of result.problems) toast(problem, 'warn');
+  if (result.problems.length === 0) toast(`${name} is back to unmodded.`, 'ok');
 }
 
 async function browseForGame(): Promise<void> {
@@ -3427,7 +3385,7 @@ function requireGame(action: string): boolean {
   }
   if (!current?.installed) {
     toast(
-      `Swapmeet needs to know where ${current?.shortName ?? 'the game'} is installed before it can ${action}. Use "Find my game" to set it up.`,
+      `GTArage needs to know where ${current?.shortName ?? 'the game'} is installed before it can ${action}. Use "Find my game" to set it up.`,
       'warn',
     );
     return false;
@@ -3533,32 +3491,32 @@ async function verify(): Promise<void> {
   openModal({
     title: report.clean ? 'Your game folder looks right' : 'Your game folder has surprises in it',
     subtitle: report.clean
-      ? 'Everything Swapmeet put in the game folder is still there, and nothing else has appeared.'
-      : 'This compares what Swapmeet put in the game folder against what is actually there now.',
+      ? 'Everything GTArage put in the game folder is still there, and nothing else has appeared.'
+      : 'This compares what GTArage put in the game folder against what is actually there now.',
     build: (body) => {
       if (report.missing.length > 0) {
         body.appendChild(
-          el('div', 'field-label', 'Gone missing (Swapmeet installed these, but they are no longer there)'),
+          el('div', 'field-label', 'Gone missing (GTArage installed these, but they are no longer there)'),
         );
         body.appendChild(el('div', 'mono-list', report.missing.join('\n')));
         body.appendChild(
           el(
             'div',
             'alert-body',
-            'Something outside Swapmeet removed these — often a game update or an anti-cheat sweep. Applying your profile again will put them back.',
+            'Something outside GTArage removed these — often a game update or an anti-cheat sweep. Applying your profile again will put them back.',
           ),
         );
       }
       if (report.orphans.length > 0) {
         body.appendChild(
-          el('div', 'field-label', 'Mod files Swapmeet did not put there'),
+          el('div', 'field-label', 'Mod files GTArage did not put there'),
         );
         body.appendChild(el('div', 'mono-list', report.orphans.join('\n')));
         body.appendChild(
           el(
             'div',
             'alert-body',
-            'These are usually left over from installing a mod by hand, before you started using Swapmeet. Swapmeet will not touch them, so remove them yourself before playing online.',
+            'These are usually left over from installing a mod by hand, before you started using GTArage. GTArage will not touch them, so remove them yourself before playing online.',
           ),
         );
       }
@@ -3703,7 +3661,7 @@ function newProfile(): void {
 function pathsFromDrop(event: DragEvent): string[] {
   const files = [...(event.dataTransfer?.files ?? [])];
   return files
-    .map((file) => window.swapmeetFiles.getPathForFile(file))
+    .map((file) => window.gtarageFiles.getPathForFile(file))
     .filter((p) => Boolean(p));
 }
 
@@ -3833,50 +3791,4 @@ document.addEventListener('keydown', (event) => {
 
 void boot();
 
-/**
- * Fetch the Essentials for the current game.
- *
- * Only when Browse is on screen: this is a network round trip to the release
- * pages, and doing it on every launch would be a cost nobody asked for.
- */
-async function loadEssentials(): Promise<void> {
-  const s = state;
-  if (!s?.currentGameId) return;
-  browseLoading = true;
-  render();
-  try {
-    const result = await api.browse({
-      gameId: s.currentGameId,
-      providerId: 'essentials',
-      sort: 'trending',
-      search: '',
-    });
-    essentials = result.mods;
-    sites = await api.listSites(s.currentGameId);
-  } catch (err) {
-    toast((err as Error).message, 'error');
-  } finally {
-    browseLoading = false;
-    render();
-  }
-}
 
-/** Install one Essential, picking its file for the current game. */
-async function installEssential(mod: CatalogMod): Promise<void> {
-  const s = state;
-  if (!s?.currentGameId) return;
-  const files = await guard('Finding the download…', () =>
-    api.catalogFiles(mod, s.currentGameId!),
-  );
-  const chosen = files?.[0];
-  if (!chosen) {
-    toast('No download is published for this game.', 'warn');
-    return;
-  }
-  const result = await guard(`Installing ${mod.name}…`, () =>
-    api.installCatalogFile(mod, chosen, s.currentGameId!),
-  );
-  if (!result) return;
-  apply(result.state);
-  toast(result.message, result.imported ? 'ok' : 'warn');
-}

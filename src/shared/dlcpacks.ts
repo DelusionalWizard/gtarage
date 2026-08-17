@@ -11,7 +11,7 @@
  * ASI - the file lands somewhere plausible and the game simply never reads it -
  * which this project treats as a bug rather than as the user's mistake.
  *
- * Swapmeet does not write the entry. `dlclist.xml` sits inside an encrypted
+ * GTArage does not write the entry. `dlclist.xml` sits inside an encrypted
  * archive, and shipping the means to decrypt it is a legal question rather than
  * an engineering one (see ROADMAP item 12). Detecting the gap needs none of
  * that, and detecting it is most of the value: the difference between "nothing

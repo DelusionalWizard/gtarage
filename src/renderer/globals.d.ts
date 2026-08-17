@@ -14,7 +14,7 @@
 type AppState = import('../shared/api').AppState;
 type GameView = import('../shared/api').GameView;
 type ProgressEvent_ = import('../shared/api').ProgressEvent;
-type SwapmeetApi = import('../shared/api').SwapmeetApi;
+type GTArageApi = import('../shared/api').GTArageApi;
 type SaveSnapshotView = import('../shared/api').SaveSnapshotView;
 type ImportReport = import('../shared/api').ImportReport;
 type GraphicsView = import('../shared/api').GraphicsView;
@@ -41,13 +41,13 @@ type ModDependency = import('../shared/types').ModDependency;
 type MissingDeps = import('../shared/api').MissingDeps;
 
 interface Window {
-  swapmeet: SwapmeetApi;
+  gtarage: GTArageApi;
   /**
    * Electron 32 removed `File.path`, so a dropped file's real location has to
    * come back through the preload.
    */
-  swapmeetFiles: { getPathForFile(file: File): string };
-  swapmeetEvents: {
+  gtarageFiles: { getPathForFile(file: File): string };
+  gtarageEvents: {
     onProgress(handler: (event: ProgressEvent_) => void): () => void;
     onSiteEvent(handler: (event: SiteEvent) => void): () => void;
   };

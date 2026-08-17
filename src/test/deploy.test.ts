@@ -1,7 +1,7 @@
 /**
  * The filesystem half of deployment, against a real temp game folder.
  *
- * The planner tests cover what Swapmeet *decides*; these cover what it
+ * The planner tests cover what GTArage *decides*; these cover what it
  * actually does to a disk. The invariants under test are the ones that make
  * the tool safe to try: a displaced game file is never lost, a swap only
  * moves the difference, and undeploy puts the folder back byte for byte.
@@ -32,7 +32,7 @@ interface Harness {
 }
 
 async function makeHarness(): Promise<Harness> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-deploy-'));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-deploy-'));
   initConfig(root);
   const config = defaultConfig(root);
   const gamePath = path.join(root, 'game');
@@ -331,7 +331,7 @@ test('verify finds a hand-installed stray file but not deployed ones', async (t)
   const p = profile({ order: [m.id], enabled: [m.id] });
   await deployProfile(h.config, 'gta5', h.gamePath, p, [m]);
 
-  // Something the user dropped in by hand, which Swapmeet did not deploy.
+  // Something the user dropped in by hand, which GTArage did not deploy.
   await put(path.join(h.gamePath, 'stray.asi'), 'STRAY');
 
   const report = await verifyGameFolder(h.config, 'gta5', h.gamePath);
@@ -510,7 +510,7 @@ test('a companion folder comes back when the profile is applied again', async (t
 // only ever put back exactly the files the deploy placed, so pruneEmptyDirs
 // always found an empty directory and tidied it. Real mods do not behave that
 // way: ChaosMod writes a log, Menyoo saves a spooner preset, and the moment
-// anything lands in the companion folder that Swapmeet did not place there,
+// anything lands in the companion folder that GTArage did not place there,
 // pruning stops and the whole folder is stranded in the game folder forever.
 
 test('a companion folder is shelved whole when the mod wrote into it', async (t) => {

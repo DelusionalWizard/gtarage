@@ -5,7 +5,7 @@
  * files, and being able to put it back exactly as it was. Three invariants
  * hold that together:
  *
- *  1. **Every write is recorded.** The manifest lists each path Swapmeet
+ *  1. **Every write is recorded.** The manifest lists each path GTArage
  *     created and, when it displaced a real game file, where the original was
  *     parked. Undeploy replays it in reverse.
  *  2. **Nothing outside the game folder is touched**, and nothing inside a
@@ -562,7 +562,7 @@ export async function deployProfile(
 export interface VerifyReport {
   /** Files the manifest expects but which are missing from the game folder. */
   missing: string[];
-  /** Files present in the game folder that Swapmeet did not put there. */
+  /** Files present in the game folder that GTArage did not put there. */
   orphans: string[];
   /** True when the folder matches the manifest exactly. */
   clean: boolean;
@@ -572,7 +572,7 @@ export interface VerifyReport {
  * Check the game folder against the manifest.
  *
  * For the vanilla-locked profile this is the online-safety check: it answers
- * "is this install actually unmodded right now?" rather than "does Swapmeet
+ * "is this install actually unmodded right now?" rather than "does GTArage
  * think it is?". Orphan detection looks for the tell-tale loose files that
  * mods leave behind even when a manager believes it removed them.
  */

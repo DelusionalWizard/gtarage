@@ -78,7 +78,7 @@ test('non-PE input yields no imports rather than throwing', () => {
 });
 
 test('an .asi implies an ASI loader', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dep-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dep-'));
   await fs.writeFile(path.join(dir, 'trainer.asi'), 'not really a binary');
 
   const deps = await scanDependencies(dir, ['trainer.asi'], 'gta5');
@@ -87,7 +87,7 @@ test('an .asi implies an ASI loader', async () => {
 });
 
 test('a managed assembly referencing SHVDN implies SHVDN and ScriptHookV', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dep-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dep-'));
   // The assembly-reference name appears as ASCII in the metadata heap.
   await fs.writeFile(path.join(dir, 'MyScript.dll'), 'padding ScriptHookVDotNet3 padding');
 
@@ -98,7 +98,7 @@ test('a managed assembly referencing SHVDN implies SHVDN and ScriptHookV', async
 });
 
 test('CLEO scripts imply CLEO, and only on games that have it', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dep-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dep-'));
   await fs.writeFile(path.join(dir, 'script.cs'), 'cleo script');
 
   const sa = await scanDependencies(dir, ['script.cs'], 'gtasa');
@@ -117,7 +117,7 @@ test('CLEO scripts imply CLEO, and only on games that have it', async () => {
 });
 
 test('Lua in a Definitive Edition mod implies UE4SS', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dep-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dep-'));
   await fs.writeFile(path.join(dir, 'main.lua'), 'print("hi")');
 
   const de = await scanDependencies(dir, ['main.lua'], 'gtasade');
@@ -130,7 +130,7 @@ test('Lua in a Definitive Edition mod implies UE4SS', async () => {
 });
 
 test('a readme naming a requirement is picked up', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dep-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dep-'));
   await fs.writeFile(
     path.join(dir, 'readme.txt'),
     'Installation: you must have ScriptHookV installed first.',
@@ -148,7 +148,7 @@ test('a tool does not depend on itself', async () => {
   // ScriptHookVDotNet ships ScriptHookVDotNet.asi, whose metadata naturally
   // references the ScriptHookVDotNet assembly. Reporting that as a missing
   // prerequisite told the user to install the thing they had just installed.
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dep-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dep-'));
   await fs.writeFile(path.join(dir, 'ScriptHookVDotNet.asi'), 'x ScriptHookVDotNet3 x');
 
   const deps = await scanDependencies(dir, ['ScriptHookVDotNet.asi'], 'gta5');
@@ -160,7 +160,7 @@ test('a tool does not depend on itself', async () => {
 });
 
 test('the ASI loader does not require an ASI loader', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'swapmeet-dep-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gtarage-dep-'));
   await fs.writeFile(path.join(dir, 'dinput8.dll'), 'proxy loader');
 
   const deps = await scanDependencies(dir, ['dinput8.dll'], 'gta5');

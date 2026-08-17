@@ -95,7 +95,7 @@ export interface BuildChange {
  * Compare the versions detected now against the ones recorded last run.
  *
  * A game with no recorded build is not a change: that is a first sighting, and
- * announcing "the game updated" the first time someone points Swapmeet at an
+ * announcing "the game updated" the first time someone points GTArage at an
  * install would be both wrong and alarming.
  */
 export function changedBuilds(

@@ -2,7 +2,7 @@
  * Getting ScriptHookV installed without making the user work it out.
  *
  * ScriptHookV is the one thing nearly every GTA V mod needs, and it is the
- * one thing Swapmeet cannot fetch: Alexander Blade distributes it from his
+ * one thing GTArage cannot fetch: Alexander Blade distributes it from his
  * own site with no API, and guessing a download URL would be both fragile and
  * rude. So the flow is:
  *

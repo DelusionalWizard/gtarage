@@ -1,7 +1,7 @@
 /**
  * The mod browser's data model.
  *
- * Swapmeet does not host mods and does not scrape sites that do not want to be
+ * GTArage does not host mods and does not scrape sites that do not want to be
  * scraped. It talks to two sources, both of which are meant to be talked to:
  *
  *  - **Essentials** - a curated catalog of the load-bearing tools the whole
@@ -11,7 +11,7 @@
  *
  * A few essential tools are not distributed through either (ScriptHookV and
  * OpenIV are hosted on their authors' own sites). Those appear in the catalog
- * as link-outs: Swapmeet shows what they are and opens the official page, and
+ * as link-outs: GTArage shows what they are and opens the official page, and
  * never invents a download URL for them.
  */
 
@@ -32,7 +32,7 @@ export interface CatalogFile {
   /** Direct download URL when the provider gives one without a handshake. */
   url?: string;
   /**
-   * True for installers and loose executables. Swapmeet will download them
+   * True for installers and loose executables. GTArage will download them
    * only on an explicit second confirmation and never imports or runs them.
    */
   executable: boolean;
@@ -58,7 +58,7 @@ export interface CatalogMod {
   endorsements?: number;
   /**
    * Set when the mod cannot be fetched automatically - either the provider
-   * requires a handshake Swapmeet cannot perform, or the author distributes it
+   * requires a handshake GTArage cannot perform, or the author distributes it
    * from their own site.
    */
   manualOnly?: boolean;
@@ -260,7 +260,7 @@ export const ESSENTIALS: EssentialDef[] = [
     games: ['gta5', 'gta5e'],
     homepage: 'http://www.dev-c.com/gtav/scripthookv/',
     manualReason:
-      'ScriptHookV is released only from the author’s own site, which has no download API. Swapmeet will open the page so you can fetch it, then you can drag the archive straight in.',
+      'ScriptHookV is released only from the author’s own site, which has no download API. GTArage will open the page so you can fetch it, then you can drag the archive straight in.',
   },
   {
     id: 'openiv',
@@ -272,7 +272,7 @@ export const ESSENTIALS: EssentialDef[] = [
     games: ['gta4', 'gta5', 'gta5e'],
     homepage: 'https://openiv.com/',
     manualReason:
-      'OpenIV is distributed from openiv.com with its own installer. Swapmeet will open the page rather than guess at a download link.',
+      'OpenIV is distributed from openiv.com with its own installer. GTArage will open the page rather than guess at a download link.',
   },
   {
     id: 'cleo-redux',
