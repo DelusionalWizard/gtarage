@@ -374,24 +374,6 @@ select {
   color: var(--dim);
 }
 
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex: none;
-  background: var(--faint);
-}
-
-.dot-ok {
-  background: var(--green);
-}
-.dot-warn {
-  background: var(--orange);
-}
-.dot-off {
-  background: var(--faint);
-}
-
 .link-btn {
   background: none;
   border: 0;
@@ -558,74 +540,7 @@ select {
   opacity: 0.55;
 }
 
-/* --- load-order stack --------------------------------------------------- */
-
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px 18px;
-}
-
-.stack-hint {
-  font: 400 10.5px var(--mono);
-  color: var(--faint);
-  padding-bottom: 4px;
-}
-
-.stack-item {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 11px 12px;
-  border-radius: 7px;
-  background: var(--panel-2);
-  border: 1px solid var(--line-strong);
-  cursor: grab;
-}
-
-.stack-item.is-dragging {
-  opacity: 0.4;
-}
-
-.stack-item.is-over {
-  border-color: var(--amber);
-}
-
-.stack-item.is-core {
-  background: var(--panel);
-}
-
-.grip {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: none;
-}
-
-.grip span {
-  width: 11px;
-  height: 1.5px;
-  background: #54504a;
-  display: block;
-}
-
-.stack-index {
-  font: 500 10.5px var(--mono);
-  color: var(--dim);
-  width: 18px;
-  flex: none;
-}
-
-.stack-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.stack-name {
-  font: 500 13px var(--sans);
-  color: var(--text-2);
-}
+/* .stack-meta is still used by the ScriptHookV prompt's candidate rows. */
 
 .stack-meta {
   font: 400 10.5px var(--mono);
@@ -1928,6 +1843,17 @@ button:disabled {
   gap: 10px;
 }
 
+/*
+ * Load order used to be a separate screen holding a near-identical list.
+ * This hint is what that screen's stack opened with, moved to sit above the
+ * same rows now that dragging them does the same job.
+ */
+.things-hint {
+  font: 400 10.5px var(--mono);
+  color: var(--faint);
+  padding: 0 2px 2px;
+}
+
 .thing {
   display: flex;
   align-items: center;
@@ -1936,6 +1862,34 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 11px;
   padding: 16px 18px;
+}
+
+.thing.is-draggable {
+  cursor: grab;
+}
+
+.thing.is-dragging {
+  opacity: 0.4;
+}
+
+.thing.is-over {
+  border-color: var(--amber);
+}
+
+.thing-grip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  cursor: grab;
+  padding: 4px 2px;
+}
+
+.thing-grip span {
+  width: 11px;
+  height: 1.5px;
+  background: var(--faint);
+  display: block;
 }
 
 .thing-icon {
@@ -2892,14 +2846,24 @@ button:disabled {
   min-width: 0;
 }
 
+/*
+ * Shrinks before it truncates, and wraps rather than clips.
+ *
+ * A fixed 212px with nowrap+ellipsis looked fine at the width this was built
+ * at and cut real text off at anything narrower - a name like "Chaos" was
+ * clipped mid-word with no ellipsis showing, because overflow:hidden on the
+ * ancestor table clipped it before the ellipsis had room to draw. Letting the
+ * column shrink and wrap means there is never a width where it has nowhere
+ * to put the text.
+ */
 .lib-col-used {
-  flex: none;
-  width: 212px;
-  font: 400 12.5px var(--sans);
+  flex: 1 1 140px;
+  min-width: 70px;
+  max-width: 220px;
+  font: 400 12.5px/1.4 var(--sans);
   color: var(--text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 /* Nothing uses it, which is the one row state worth colouring. */
@@ -2914,6 +2878,24 @@ button:disabled {
   font: 500 12.5px var(--mono);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* Below this the mod column, used-by and size no longer all fit on one line
+   without squeezing the mod name unreadably thin - stack instead. */
+@container view (max-width: 620px) {
+  .lib-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .lib-col-used {
+    flex: 1 1 auto;
+    max-width: none;
+    order: 3;
+  }
+  .lib-col-size {
+    order: 2;
+    margin-left: auto;
+  }
 }
 
 .lib-row-title {
@@ -2956,6 +2938,13 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 20px;
+}
+
+.lib-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .lib-detail-name {
@@ -3073,53 +3062,9 @@ button:disabled {
   min-height: 8px;
 }
 
-/* --- the irreversible one ------------------------------------------------- */
-
-.lib-danger {
-  flex: none;
-  border: 1px solid var(--orange-line);
-  background: var(--orange-soft);
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.lib-danger-h {
-  font: 600 13.5px var(--sans);
-  color: var(--text-2);
-}
-
-.lib-danger-body {
-  font: 400 12.5px/1.6 var(--sans);
-  color: var(--muted);
-  margin-top: 5px;
-  overflow-wrap: anywhere;
-}
-
-.lib-danger-body b {
-  font-weight: 600;
-  color: var(--text-2);
-}
-
-.lib-danger-acts {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-
-.lib-delete {
-  padding: 9px 13px;
-  border: 1px solid var(--red);
-  background: none;
-  border-radius: 7px;
-  font: 600 12.5px var(--sans);
-  color: var(--red);
-  cursor: pointer;
-}
-
-.lib-delete:hover {
-  background: color-mix(in oklab, var(--red) 12%, transparent);
-}
+/* Deleting moved into the "⋯" menu (see .lib-detail-head), the same one used
+   for a setup and for a mod row inside a setup, so there is one place in the
+   app that means "more actions" rather than a second, standing warning card. */
 
 /* --- empty state (2c) ----------------------------------------------------- */
 

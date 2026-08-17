@@ -24,7 +24,6 @@ const api = window.swapmeet;
 type TabId =
   | 'home'
   | 'profile'
-  | 'order'
   | 'library'
   | 'browse'
   | 'settings'
@@ -583,95 +582,6 @@ function modMenu(mod: Mod): void {
   });
 }
 
-// --- rendering: load-order stack -------------------------------------------
-
-function renderOrder(s: AppState, view: HTMLElement): void {
-  const profile = s.profiles.find((p) => p.id === s.activeProfileId);
-  if (!profile) {
-    view.appendChild(emptyState('No profile selected', 'Pick a profile from the list on the left.'));
-    return;
-  }
-  if (profile.vanillaLock) {
-    view.appendChild(
-      emptyState(
-        'Vanilla profile',
-        'This profile installs no mods at all, which is what makes it safe to play online from. It has no load order because there is nothing to order.',
-      ),
-    );
-    return;
-  }
-
-  const stack = el('div', 'stack');
-  stack.appendChild(
-    el('div', 'stack-hint', 'Drag to reorder. When two mods change the same file, the one lower in this list wins.'),
-  );
-
-  const byId2 = new Map(s.mods.map((m) => [m.id, m]));
-  const conflicts = conflictMap(s.conflicts);
-  let dragging: string | null = null;
-
-  profile.order.forEach((modId, index) => {
-    const mod = byId2.get(modId);
-    if (!mod) return;
-    const enabled = profile.enabled.includes(modId);
-
-    const item = el('div', `stack-item${mod.core ? ' is-core' : ''}`);
-    item.draggable = true;
-    item.dataset.modId = modId;
-
-    const grip = el('div', 'grip');
-    grip.appendChild(el('span'));
-    grip.appendChild(el('span'));
-    grip.appendChild(el('span'));
-    item.appendChild(grip);
-
-    item.appendChild(el('div', 'stack-index', String(index + 1).padStart(2, '0')));
-
-    const main = el('div', 'stack-main');
-    main.appendChild(el('div', 'stack-name', mod.name));
-    const bits: string[] = [mod.kind];
-    if (mod.core) bits.push('core · pinned to top');
-    if (!enabled) bits.push('disabled');
-    const conflictCount = conflicts.get(modId) ?? 0;
-    if (conflictCount > 0) bits.push(`${conflictCount} conflict(s)`);
-    main.appendChild(el('div', 'stack-meta', bits.join(' · ')));
-    item.appendChild(main);
-
-    const dot = el('div', 'dot');
-    dot.classList.add(!enabled ? 'dot-off' : conflicts.has(modId) ? 'dot-warn' : 'dot-ok');
-    item.appendChild(dot);
-
-    item.addEventListener('dragstart', () => {
-      dragging = modId;
-      item.classList.add('is-dragging');
-    });
-    item.addEventListener('dragend', () => {
-      dragging = null;
-      item.classList.remove('is-dragging');
-    });
-    item.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      item.classList.add('is-over');
-    });
-    item.addEventListener('dragleave', () => item.classList.remove('is-over'));
-    item.addEventListener('drop', async (event) => {
-      event.preventDefault();
-      item.classList.remove('is-over');
-      if (!dragging || dragging === modId) return;
-      const next = await guard('Reordering…', () =>
-        api.moveMod(profile.id, dragging!, index),
-      );
-      if (next) apply(next);
-    });
-
-    stack.appendChild(item);
-  });
-
-  view.appendChild(stack);
-  // No drop target here: installing belongs on the Mods tab, and having two
-  // places that accept mods made it unclear which one was "the" way in.
-}
-
 // --- shell: breadcrumb + secondary nav --------------------------------------
 
 /**
@@ -700,12 +610,7 @@ function renderCrumbs(s: AppState): void {
   host.appendChild(el('div', 'crumb-sep', '›'));
 
   const profile = s.profiles.find((p) => p.id === s.activeProfileId);
-  const label =
-    tab === 'profile'
-      ? (profile?.name ?? 'Setup')
-      : tab === 'order'
-        ? `${profile?.name ?? 'Setup'} · load order`
-        : TAB_LABELS[tab];
+  const label = tab === 'profile' ? (profile?.name ?? 'Setup') : TAB_LABELS[tab];
   host.appendChild(el('div', 'crumb is-current', label));
 }
 
@@ -715,7 +620,6 @@ const TAB_LABELS: Record<string, string> = {
   browse: 'Browse',
   settings: 'Settings',
   profile: 'Setup',
-  order: 'Load order',
   saves: 'Backups',
   speedrun: 'Speedrun',
 };
@@ -729,9 +633,6 @@ function renderTopnav(s: AppState): void {
   if (s.settings.speedrunMode) items.push('speedrun');
   items.push('saves');
   items.push('settings');
-
-  // Load order only makes sense once you are inside a setup that has one.
-  if (tab === 'profile' || tab === 'order') items.unshift('order');
 
   for (const id of items) {
     const btn = el('button', tab === id ? 'is-active' : undefined, TAB_LABELS[id]);
@@ -1050,9 +951,7 @@ function renderProfile(s: AppState, view: HTMLElement): void {
       ),
     );
   } else {
-    const list = el('div', 'things');
-    for (const mod of mods) list.appendChild(thingRow(s, profile, mod));
-    main.appendChild(list);
+    main.appendChild(renderThings(s, profile, mods));
   }
   wrap.appendChild(main);
 
@@ -1099,10 +998,98 @@ function thingsFor(s: AppState, profile: Profile, which = filter): Mod[] {
   return inProfile;
 }
 
-function thingRow(s: AppState, profile: Profile, mod: Mod): HTMLElement {
+/**
+ * The mod list, with load order folded in.
+ *
+ * There used to be a separate "Load order" screen holding exactly this same
+ * information as a drag list. Splitting it out asked people to keep two
+ * screens in their head - which mods are on, and what order they load in -
+ * when both questions are answered by the same list of rows. Dragging a row
+ * here does the same thing the old screen's stack did: it moves the mod
+ * within `profile.order`, and later still wins a shared file.
+ *
+ * Reordering only makes sense against the whole profile, and only the
+ * "Everything" pill shows every mod in that real order - "Installed" and
+ * "Required" are subsets, so a row's position in a filtered list does not
+ * correspond to a real index to drop it at. Dragging is switched off outside
+ * "Everything" rather than silently computing the wrong index.
+ */
+function renderThings(s: AppState, profile: Profile, mods: Mod[]): HTMLElement {
+  const list = el('div', 'things');
+  const draggable = filter === 'all' && !profile.vanillaLock && mods.length > 1;
+
+  if (draggable) {
+    list.appendChild(
+      el(
+        'div',
+        'things-hint',
+        'Drag the grip to reorder. When two mods change the same file, the one lower in this list wins.',
+      ),
+    );
+  }
+
+  // Shared by every row drawn in this pass, so a drop handler on row B can
+  // see what row A's dragstart put down.
+  const dragState: { id: string | null } = { id: null };
+  mods.forEach((mod, index) => {
+    list.appendChild(thingRow(s, profile, mod, draggable ? { index, dragState } : null));
+  });
+  return list;
+}
+
+function thingRow(
+  s: AppState,
+  profile: Profile,
+  mod: Mod,
+  drag: { index: number; dragState: { id: string | null } } | null,
+): HTMLElement {
   const on = profile.enabled.includes(mod.id);
   const conflicts = conflictMap(s.conflicts).get(mod.id) ?? 0;
   const row = el('div', 'thing');
+
+  if (drag) {
+    row.draggable = true;
+    row.classList.add('is-draggable');
+
+    const grip = el('div', 'thing-grip');
+    grip.appendChild(el('span'));
+    grip.appendChild(el('span'));
+    grip.appendChild(el('span'));
+    grip.title = `Drag to move ${mod.name}`;
+    row.appendChild(grip);
+
+    // A native drag can start from anywhere the `draggable` attribute
+    // applies, which is the whole row - the switch and the "⋯" button are
+    // inside it. Only honour a drag that actually began on the grip, or
+    // clicking the switch would occasionally yank the row instead of
+    // toggling it.
+    row.addEventListener('dragstart', (event) => {
+      if (!(event.target instanceof HTMLElement) || !event.target.closest('.thing-grip')) {
+        event.preventDefault();
+        return;
+      }
+      drag.dragState.id = mod.id;
+      row.classList.add('is-dragging');
+    });
+    row.addEventListener('dragend', () => {
+      drag.dragState.id = null;
+      row.classList.remove('is-dragging');
+    });
+    row.addEventListener('dragover', (event) => {
+      if (!drag.dragState.id) return;
+      event.preventDefault();
+      row.classList.add('is-over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('is-over'));
+    row.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      row.classList.remove('is-over');
+      const draggedId = drag.dragState.id;
+      if (!draggedId || draggedId === mod.id) return;
+      const next = await guard('Reordering…', () => api.moveMod(profile.id, draggedId, drag.index));
+      if (next) apply(next);
+    });
+  }
 
   row.appendChild(el('div', 'thing-icon'));
 
@@ -1928,10 +1915,10 @@ function renderLibrary(s: AppState, view: HTMLElement): void {
     ...(unused.length > 0
       ? ([['unused', `In no setup · ${unused.length}`]] as Array<[string, string]>)
       : []),
-    ['plays', 'How it plays'],
+    ['plays', 'Installed'],
     ['looks', 'How it looks'],
     ['files', 'Game files'],
-    ['core', 'Needed to run mods'],
+    ['core', 'Required'],
   ];
   for (const [id, label] of filters) {
     if (id !== 'all' && id !== 'unused' && libraryMods(s, id, '').length === 0) continue;
@@ -2045,7 +2032,16 @@ function libraryDetail(s: AppState, mod: Mod): HTMLElement {
   const panel = el('div', 'lib-detail');
 
   const head = el('div');
-  head.appendChild(el('div', 'lib-detail-name', mod.name));
+  const nameRow = el('div', 'lib-detail-head');
+  nameRow.appendChild(el('div', 'lib-detail-name', mod.name));
+  // Deleting lives here, not in a standing warning card: the same "⋯" menu
+  // that removes a setup or a mod from a setup, so there is one place in the
+  // app that means "more actions on this thing" rather than two.
+  const more = el('button', 'more-btn', '⋯');
+  more.title = `More actions for ${mod.name}`;
+  more.addEventListener('click', () => modMenu(mod));
+  nameRow.appendChild(more);
+  head.appendChild(nameRow);
   const sub = el('div', 'lib-detail-sub');
   sub.appendChild(el('span', 'tag', plainKind(mod.kind)));
   sub.appendChild(el('span', 'lib-detail-ver', mod.version));
@@ -2129,54 +2125,6 @@ function libraryDetail(s: AppState, mod: Mod): HTMLElement {
   }
 
   panel.appendChild(el('div', 'lib-grow'));
-
-  // --- the one irreversible action ------------------------------------------
-  const danger = el('div', 'lib-danger');
-  danger.appendChild(el('div', 'lib-danger-h', 'Delete from the library for good?'));
-  const body = el('div', 'lib-danger-body');
-  if (needers.length > 0) {
-    body.appendChild(
-      document.createTextNode(
-        needers.length === 1
-          ? 'Another mod needs this to run: '
-          : `${needers.length} of your mods need this to run, including `,
-      ),
-    );
-    body.appendChild(el('b', undefined, needers[0]!.name));
-    body.appendChild(
-      document.createTextNode(
-        needers.length === 1
-          ? '. It would stop working, and the files leave your disk. Swapmeet cannot undo this one.'
-          : '. They would stop working, and the files leave your disk. Swapmeet cannot undo this one.',
-      ),
-    );
-  } else {
-    body.appendChild(
-      document.createTextNode(
-        used.length > 0
-          ? `It would come out of ${used.length} setup${used.length === 1 ? '' : 's'}, and the files leave your disk. Swapmeet cannot undo this one.`
-          : 'No setup uses it. The files leave your disk — Swapmeet cannot undo this one.',
-      ),
-    );
-  }
-  danger.appendChild(body);
-
-  const acts = el('div', 'lib-danger-acts');
-  const del = el('button', 'lib-delete', 'Delete for good');
-  del.addEventListener('click', async () => {
-    const next = await guard('Deleting…', () => api.removeMod(mod.id));
-    if (next) {
-      librarySelection = null;
-      apply(next);
-      toast(`${mod.name} deleted from the library.`, 'ok');
-    }
-  });
-  acts.appendChild(del);
-  const keep = el('button', 'btn', 'Keep it');
-  keep.addEventListener('click', () => toast('Nothing was deleted.', 'ok'));
-  acts.appendChild(keep);
-  danger.appendChild(acts);
-  panel.appendChild(danger);
 
   return panel;
 }
@@ -3304,9 +3252,6 @@ function render(): void {
       break;
     case 'profile':
       renderProfile(s, view);
-      break;
-    case 'order':
-      renderOrder(s, view);
       break;
     case 'speedrun':
       renderSpeedrun(s, view);
