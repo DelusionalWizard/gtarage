@@ -14,11 +14,11 @@ MIT licensed.
 
 ---
 
-> ### ⚠️ Beta — read this first
+> ### ⚠️ Read this first
 >
-> **This is early software that writes to your real game folders.** It is
-> tested, but it has not been through many hands yet, and you are the person
-> who finds out if something is wrong.
+> **This writes to your real game folders.** 1.0.0 is the first release that
+> is not labelled beta, but it has still not been through many hands, and you
+> may be the person who finds out something is wrong.
 >
 > - **Back up your game folder and saves before first use.** GTArage takes
 >   save snapshots automatically and never deletes a displaced file, but a
@@ -28,7 +28,8 @@ MIT licensed.
 >   modding safe. Apply the vanilla profile before you go online.
 > - **The Windows builds are unsigned.** SmartScreen will warn you, and you
 >   should be sceptical of unsigned binaries from anyone. Building from source
->   is three commands and is the option I would take.
+>   is three commands and is the option I would take. Dropping "beta" from the
+>   version number did not change this.
 > - Windows is the only tested platform today. Linux support is planned — see
 >   the roadmap.
 > - **The Definitive Edition trilogy is untested with actual mods** — see the
@@ -65,40 +66,48 @@ load out of a `~mods` folder.
 
 ---
 
-## Finding mods
+## Getting mods in
 
-GTArage has a **Browse** tab with two halves, because mods come from two very
-different kinds of place.
+The **Tools** tab is where mods arrive. There is no catalogue and no search
+box, because there is nothing to search: GTArage does not scrape mod sites and
+never will. Mods reach your library one of three ways, and the screen makes
+them look as different as they behave.
 
-**Sources with a real API** are listed in-app:
+**Drop a file you already have.** A `.zip`, `.rar`, `.oiv`, a folder, or a
+loose `.asi` — dragged anywhere onto the window. This works offline, with no
+account, and it is how most mods actually get installed.
 
-- **Essentials** — a curated catalogue of the load-bearing tools everything
-  else depends on (ASI loaders, ScriptHookV .NET, CLEO Redux, modloader,
-  SilentPatch, Widescreen Fixes, UE4SS), resolved live from their official
-  GitHub releases. No account, no configuration, one click to install. GTArage
-  picks the right build for the game: the 32-bit ASI loader for San Andreas,
-  the 64-bit one for GTA V, `SilentPatchSA` rather than `SilentPatchVC`.
-- **Nexus Mods** — via the official API and your own personal key, stored
-  encrypted with the Windows credential store. Two honest limits, both stated
-  in the UI: the v1 API has no full-text search (so the box filters the feed),
-  and direct API downloads are a Premium feature — for everyone else GTArage
-  registers the `nxm://` handler so the site's own "Mod Manager Download"
-  button works.
+**Essentials** — a short, curated list of the load-bearing tools everything
+else depends on (ASI loaders, ScriptHookV .NET, RageOpenV, CLEO Redux,
+modloader, SilentPatch, Widescreen Fixes, UE4SS), resolved live from their
+official GitHub release pages. No account, no key, one press to install.
+GTArage picks the right build for the game: the 32-bit ASI loader for San
+Andreas, the 64-bit one for GTA V, `SilentPatchSA` rather than `SilentPatchVC`.
 
-**Sources without an API** — GTA5-Mods, GTAinside, LibertyCity, ModDB — open
-in a real browser window inside the app. You log in yourself, on the real site,
-and browse normally. GTArage's only involvement is catching the download at the
-end and importing it into the library. No scraping, no automated clicking, no
-ToS problem, and your password is never seen by GTArage. The embedded window
-gets no preload and none of GTArage's API, so a compromised mod site cannot
-reach your filesystem.
+Each entry shows where you stand with it: installed and current, installed and
+behind (with the version it would move to), not installed, or — for the few
+tools whose authors publish no downloadable release — a link to the page
+instead of a download URL GTArage would have to invent. When a lookup fails,
+it says it could not check and offers to try again, rather than claiming the
+tool must be fetched by hand.
 
-A few tools (ScriptHookV, OpenIV) are distributed only from their authors' own
-sites. GTArage lists them, explains why, and opens the page — it never invents
-a download URL.
+**Community sites** — GTA5-Mods, GTAinside, LibertyCity, ModDB, Nexus — open
+in a real browser window inside the app. You log in yourself, on the real
+site, and download normally. GTArage's only involvement is catching the file
+at the end and importing it. No scraping, no automated clicking, no ToS
+problem, and your password is never seen by GTArage. That window gets no
+preload and none of GTArage's API, so a compromised mod site cannot reach your
+filesystem. Executables are saved but never run or imported.
 
-The catalogue is scoped per game rather than offering everything everywhere.
-ASI loaders are the clearest case:
+There is no Nexus API integration. It was removed: the v1 API has no full-text
+search and direct downloads are Premium-only, so it promised more than it
+could deliver. Nexus is a site you open and download from like any other.
+
+`gtamods.com` is listed separately as documentation — it is a wiki and hosts
+no mod files, so it never appears among places you can download from.
+
+The Essentials list is scoped per game rather than offering everything
+everywhere. ASI loaders are the clearest case:
 
 | Game | Where the ASI loader comes from |
 |---|---|
@@ -110,9 +119,16 @@ Offering Ultimate ASI Loader on GTA V would be worse than redundant — both it
 and ScriptHookV claim `dinput8.dll`, so it would manufacture a file conflict
 the user then has to resolve for no benefit.
 
-`gtamods.com` appears too, but only as documentation: it is a wiki and hosts no
-mod files. GTArage deep-links it to explain what a `handling.meta` or an `.img`
-archive actually is.
+### First launch
+
+The one time GTArage interrupts you unasked. Nearly every "my mods do nothing"
+report comes down to two causes, and both are cheap to fix before you start
+and miserable to diagnose afterwards: a missing or mismatched Script Hook V,
+and a game folder still carrying leftovers from a previous modding attempt.
+
+So the first-launch prompt says exactly that — start from a clean game folder,
+and here are the load-bearing tools for the game you have, ticked and ready to
+install. It appears once, whichever way you answer.
 
 ## Dependency detection
 
@@ -162,15 +178,92 @@ ones left behind by manual installs. The online *warning* is off by default,
 since GTA V asks story-or-online on every launch and warning on every swap is
 noise; turn it on in Settings if you play online.
 
+**Switching and playing are two presses.** "Switch to *setup*" installs that
+setup's mods and stops. The button then becomes Play now. Choosing a setup no
+longer starts the game as a side effect, so there is a moment to look at what
+changed before anything launches.
+
+**Your saves are snapshotted before every switch**, automatically, and kept
+per game with the time each was taken. Restoring one is a couple of presses in
+Backups.
+
+**Files inside a mod can be switched off individually.** A mod that ships a
+config you have already tuned by hand does not have to be all-or-nothing —
+open its ⋯ menu and exclude that one file. Exclusions are per setup, and they
+propagate everywhere: the conflict list, the swap preview and the deploy all
+see the same reduced file list.
+
+## Looking after a modded install
+
+**It notices when the game updates.** Rockstar patches, Script Hook V stops
+matching the new build, and every ASI plugin silently fails to load with no
+error anywhere — this is the single most common way a working setup breaks.
+GTArage records the build it last told you about, compares the executable on
+each launch, and names the mods that are likely affected rather than leaving
+you to guess which of forty things to blame. It also reads the build numbers
+out of your Script Hook V copy and says whether they match.
+
+**Add-on DLC packs are checked against `dlclist.xml`.** An add-on car or map
+installs into `dlcpacks/` and does absolutely nothing unless it is also listed
+in a file that lives *inside* `update.rpf`. GTArage cannot write into that
+archive — see the OpenIV note below — but it detects the gap and hands you the
+exact line to add. Past roughly eight add-on packs it also suggests a
+replacement `gameconfig.xml`, because the stock memory pools run out and the
+game crashes on load with nothing on screen to say why.
+
+**OpenIV packages are read, not guessed at.** An `.oiv` is a *script*, not a
+folder of files: `assembly.xml` lists operations, and most real packages write
+inside RPF archives. GTArage cannot open those — RPF is a proprietary
+encrypted container, and shipping the means to decrypt it is a legal question
+rather than an engineering one. So it reads the assembly and tells you which
+half it can apply: a package that only copies files installs like any other
+mod, one that only edits archives says so and sends you to OpenIV, and the
+awkward middle case warns that it will be only partly installed rather than
+leaving you to work out which half worked.
+
+**BattlEye can be switched off for GTA V Enhanced**, from Settings, by writing
+`-nobattleye` into that game's Steam launch options — which is what lets
+script mods load at all. GTArage refuses while Steam is running, because Steam
+rewrites its own settings on exit and would silently undo the change, and it
+backs up the file it edits. Story mode only: going online with mods loaded is
+what gets accounts banned, with or without the anti-cheat.
+
+**Mods already in your game folder can be adopted.** Almost nobody arrives at
+a mod manager with a clean install, so GTArage scans the places mods actually
+land, ignores everything the base game ships and everything it deployed
+itself, and offers what is left as recognisable tools. Adopting copies them
+into the library, so the game folder is untouched if it goes wrong.
+
+**Starting over is possible without hunting through folders.** Settings has a
+per-game "Remove all mods", which puts the game folder back as it was without
+deleting anything from your library, and a purge that removes everything
+GTArage has ever written to the machine — gated behind typing REMOVE, because
+it is the one genuinely irreversible action in the app.
+
+**Light and dark.** The interface ships both and asks once which you want.
+
+**Speedrun mode**, off by default, adds a practice setup and pointers to the
+tools that the community actually uses, kept separate so it does not clutter the
+app for everyone else.
+
 ---
 
 ## Install
 
-Grab a build from `release/`:
+Grab a build from the
+[latest release](https://github.com/DelusionalWizard/gtarage/releases/latest):
 
 - `GTArage-Setup-1.0.0.exe` — normal installer (per-user, no admin required,
   choose your own install directory).
 - `GTArage-1.0.0-portable.exe` — single-file portable build, no installation.
+
+GTArage checks for its own updates and can install them for you; the check can
+be turned off in Settings.
+
+**Updating from Swapmeet 0.5.0-beta.1?** The app was renamed, which moves the
+folder your library lives in, so your library, setups and shelf are moved
+across on first launch and the stored paths repointed. Nothing is deleted —
+the old folder is left where it was.
 
 ### Build from source
 
@@ -231,9 +324,9 @@ refuses rather than half-extracting — are handled by shelling out to 7-Zip or
 WinRAR if either is installed. If neither is, the error says so instead of
 failing vaguely.
 
-You can drag files or folders anywhere onto the window, or use **Add files** /
-**Add folder**. Those are two buttons rather than one because Windows cannot
-show a dialog that accepts files *and* folders at once.
+You can drag files or folders anywhere onto the window, or use **Add mod
+files** / **Add a folder**. Those are two separate buttons because Windows
+cannot show one dialog that accepts files *and* folders at once.
 
 ---
 
@@ -245,7 +338,7 @@ src/
               and the pure planner logic
   main/       Electron main: detection, library, deployment, saves,
               archive extraction, dependency scanning, the mod-site browser
-  main/providers/  GitHub Releases and Nexus Mods
+  main/providers/  GitHub Releases (the Essentials catalogue)
   preload/    the contextBridge, the only path from UI to filesystem
   renderer/   the UI (no framework, no bundler)
   test/       node:test coverage of the rules that matter
@@ -304,9 +397,9 @@ that have seen real use.
 - Windows is the only tested platform today. **Linux support is planned** —
   see [Roadmap](#roadmap) for what already works and what is genuinely in the
   way.
-- The Nexus provider is written against the documented API but has not been
-  exercised against a live key — that needs your own account. It is the
-  largest untested surface after the DE trilogy.
+- **Epic copies have never been launched from GTArage on real hardware.**
+  Detection is verified; the launch path uses the app id out of Epic's own
+  manifest, but there is no Epic install on the development machine.
 - Modding GTA Online is a ban. GTArage warns and gives you a locked vanilla
   profile, but it cannot make online modding safe — nothing can.
 - Definitive Edition Steam app ids in the registry are best-effort; detection
@@ -355,7 +448,6 @@ Rockstar catalogue targets it.
 
 - An end-to-end test against a real Definitive Edition install, which is the
   largest untested surface (see [Caveats](#caveats)).
-- The Nexus provider exercised against a live API key.
 - Mod dependency editing in the UI — `requires` is enforced by the planner and
   `dependencies` is detected automatically, but neither is user-editable yet.
 - `.rar`/`.7z` without needing 7-Zip or WinRAR installed.
