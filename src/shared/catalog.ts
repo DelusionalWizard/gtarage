@@ -8,8 +8,6 @@
  *    modding scene depends on (script hooks, ASI loaders, CLEO, UE4SS),
  *    resolved live through the public GitHub Releases API. Works with no
  *    account and no configuration.
- *  - **Nexus Mods** - the official, documented Nexus API, using the user's
- *    own personal API key.
  *
  * A few essential tools are not distributed through either (ScriptHookV and
  * OpenIV are hosted on their authors' own sites). Those appear in the catalog
@@ -19,11 +17,10 @@
 
 import type { GameId } from './types';
 
-export type ProviderId = 'essentials' | 'nexus';
+export type ProviderId = 'essentials';
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   essentials: 'Essentials',
-  nexus: 'Nexus Mods',
 };
 
 /** One downloadable file belonging to a catalog mod. */
@@ -86,7 +83,7 @@ export interface BrowseResult {
   mods: CatalogMod[];
   /** Set when the provider is unavailable, so the UI can explain why. */
   error?: string;
-  /** True when the provider needs setup (e.g. a missing Nexus API key). */
+  /** True when the provider needs setup before it can return anything. */
   needsSetup?: boolean;
 }
 
@@ -367,21 +364,3 @@ export function essentialsFor(gameId: GameId): EssentialDef[] {
   return ESSENTIALS.filter((e) => e.games.includes(gameId));
 }
 
-// --- Nexus game domains -----------------------------------------------------
-
-/**
- * Nexus addresses each game by a URL domain rather than a numeric id.
- *
- * The Definitive Editions are deliberately absent: Nexus groups them in ways
- * that have moved around, and guessing a domain would produce confident-
- * looking empty results. A missing entry disables the Nexus provider for that
- * game and says so, which is the honest failure.
- */
-export const NEXUS_DOMAINS: Partial<Record<GameId, string>> = {
-  gta5: 'grandtheftautov',
-  gta5e: 'grandtheftautov',
-  gta4: 'grandtheftauto4',
-  gtasa: 'grandtheftautosanandreas',
-  gtavc: 'grandtheftautovicecity',
-  gta3: 'grandtheftauto3',
-};

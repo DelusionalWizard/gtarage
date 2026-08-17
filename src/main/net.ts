@@ -31,8 +31,8 @@ const ALLOWED_HOSTS = new Set([
   'objects.githubusercontent.com',
   'release-assets.githubusercontent.com',
   'raw.githubusercontent.com',
-  // Nexus Mods API and its CDN
-  'api.nexusmods.com',
+  // Nexus Mods: the site and its download CDNs, for the embedded-browser
+  // handoff. The API host is gone with the API integration.
   'www.nexusmods.com',
   'nexusmods.com',
   'file-cdn.nexusmods.com',

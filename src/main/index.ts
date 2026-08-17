@@ -8,7 +8,7 @@ import path from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import { CALL_CHANNEL, type ApiMethod } from '../shared/api';
-import { handlers, initApi, modSiteHooks, primeNexus } from './api';
+import { handlers, initApi, modSiteHooks } from './api';
 import {
   initConfig,
   libraryFor,
@@ -24,35 +24,8 @@ import { ensureVanillaProfile } from './config';
 import { ensureDir } from './fsutil';
 import { repairLibrary, sweepOrphanedModFolders } from './library';
 import { initModSites } from './modsites';
-import { gameIdForDomain, parseNxmUrl } from './providers/nexus';
 
 const isDev = process.argv.includes('--dev');
-
-/**
- * Nexus's "Mod Manager Download" button hands over an `nxm://` URL. Claiming
- * the protocol is what lets a browser download become a Swapmeet import.
- *
- * On Windows the URL arrives as an argv entry on a *second* instance, so a
- * single-instance lock is required for this to work at all.
- */
-function handleNxmUrl(url: string): void {
-  const parsed = parseNxmUrl(url);
-  if (!parsed) return;
-  const gameId = gameIdForDomain(parsed.domain);
-  if (!gameId) return;
-  // Surfaced to the renderer; the user confirms before anything downloads.
-  BrowserWindow.getAllWindows()[0]?.webContents.send('swapmeet:nxm', {
-    gameId,
-    modId: parsed.modId,
-    fileId: parsed.fileId,
-    key: parsed.key,
-    expires: parsed.expires,
-  });
-}
-
-function nxmUrlFromArgv(argv: string[]): string | undefined {
-  return argv.find((arg) => arg.startsWith('nxm://'));
-}
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -87,26 +60,18 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-// A second launch (including one triggered by an nxm:// link) must hand its
-// URL to the running instance rather than starting a rival copy that would
-// fight over the same config file.
+// A second launch must not start a rival copy that would fight over the same
+// config file; it focuses the running one instead.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv) => {
-    const url = nxmUrlFromArgv(argv);
-    if (url) handleNxmUrl(url);
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
       if (win.isMinimized()) win.restore();
       win.focus();
     }
-  });
-  // macOS delivers protocol URLs through an event instead of argv.
-  app.on('open-url', (event, url) => {
-    event.preventDefault();
-    handleNxmUrl(url);
   });
 }
 
@@ -124,7 +89,6 @@ app.whenReady().then(async () => {
 
   initConfig(userDataDir);
 
-  app.setAsDefaultProtocolClient('nxm');
 
   const config = await loadConfig(userDataDir);
 
@@ -202,11 +166,7 @@ app.whenReady().then(async () => {
   const win = createWindow();
   initApi(userDataDir, win);
   initModSites(modSiteHooks());
-  void primeNexus();
 
-  // A protocol URL can also be present on the very first launch.
-  const initialNxm = nxmUrlFromArgv(process.argv);
-  if (initialNxm) win.webContents.once('did-finish-load', () => handleNxmUrl(initialNxm));
 
   // One channel, dispatched by method name. Anything not in `handlers` is
   // rejected rather than reflected onto some other object.

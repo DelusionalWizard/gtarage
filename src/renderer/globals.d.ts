@@ -17,7 +17,6 @@ type ProgressEvent_ = import('../shared/api').ProgressEvent;
 type SwapmeetApi = import('../shared/api').SwapmeetApi;
 type SaveSnapshotView = import('../shared/api').SaveSnapshotView;
 type ImportReport = import('../shared/api').ImportReport;
-type NexusAccount = import('../shared/api').NexusAccount;
 type GraphicsView = import('../shared/api').GraphicsView;
 type AdoptGroupView = import('../shared/api').AdoptGroupView;
 type HookStatus = import('../shared/api').HookStatus;

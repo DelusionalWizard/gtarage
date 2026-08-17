@@ -34,13 +34,6 @@ export const PROGRESS_CHANNEL = 'swapmeet:progress';
 /** Main -> renderer notifications from the embedded mod-site browser. */
 export const SITE_CHANNEL = 'swapmeet:site';
 
-/** Nexus account state, so the UI can say what the key can actually do. */
-export interface NexusAccount {
-  name: string;
-  premium: boolean;
-  supporter: boolean;
-}
-
 /** A library mod together with the prerequisites it is still missing. */
 export interface MissingDeps {
   modId: string;
@@ -159,10 +152,6 @@ export interface AppState {
    */
   dlc: DlcReport | null;
 
-  /** Nexus account, when a working API key is configured. */
-  nexus: NexusAccount | null;
-  /** Whether a Nexus key is stored at all (it is never sent to the UI). */
-  hasNexusKey: boolean;
   /**
    * Set when the settings file on disk could not be read and the app fell back
    * to defaults. The damaged file is preserved rather than overwritten, and the
@@ -457,7 +446,7 @@ export interface SwapmeetApi {
 
   /** List mods from a provider. */
   browse(query: BrowseQuery): Promise<BrowseResult>;
-  /** Fetch a mod's downloadable files (Nexus needs a second call). */
+  /** Fetch a mod's downloadable files. */
   catalogFiles(mod: CatalogMod, gameId: GameId): Promise<CatalogFile[]>;
   /**
    * Download a catalog file and import it into the library. Executables are
@@ -488,10 +477,6 @@ export interface SwapmeetApi {
   /** Open a URL in the user's real browser. http/https only. */
   openExternal(url: string): Promise<void>;
 
-  /** Store and validate a Nexus personal API key. */
-  setNexusKey(apiKey: string): Promise<{ state: AppState; account: NexusAccount | null; error?: string }>;
-  /** Forget the stored Nexus key. */
-  clearNexusKey(): Promise<AppState>;
 
   /** Window chrome, since the app draws its own title bar. */
   windowMinimize(): Promise<void>;

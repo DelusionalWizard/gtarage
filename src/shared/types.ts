@@ -310,11 +310,6 @@ export interface AppConfig {
   seenBuilds?: SeenBuilds;
   /** Last game the user had selected. */
   lastGameId?: GameId;
-  /**
-   * Nexus Mods personal API key, encrypted with the OS keychain where one is
-   * available. Never store or log the decrypted value.
-   */
-  nexusApiKey?: string;
   settings: {
     /** Snapshot saves before every swap. */
     backupSavesOnSwap: boolean;

@@ -40,7 +40,6 @@ import type {
   DlcReport,
   GameView,
   ImportReport,
-  NexusAccount,
   SwapmeetApi,
   HookCandidateView,
   SaveSnapshotView,
@@ -80,12 +79,6 @@ import {
 } from './graphics';
 import { listSites, openModSite } from './modsites';
 import { browseEssentials } from './providers/github';
-import {
-  NexusAuthError,
-  decryptKey,
-  encryptKey,
-  validateKey,
-} from './providers/nexus';
 import type { AppConfig, GameId, Mod, Profile, SwapPlan } from '../shared/types';
 import {
   activeProfileFor,
@@ -130,15 +123,6 @@ import {
 
 let userDataDir = '';
 let mainWindow: BrowserWindow | null = null;
-
-/**
- * The validated Nexus account, cached in memory.
- *
- * Revalidating on every state rebuild would mean a network round trip each
- * time the user flips a toggle, so the key is checked when it is set and at
- * startup, and the answer is remembered for the session.
- */
-let nexusAccount: NexusAccount | null = null;
 
 export function initApi(dir: string, win: BrowserWindow): void {
   userDataDir = dir;
@@ -339,8 +323,6 @@ async function buildState(config: AppConfig): Promise<AppState> {
       : {}),
     dlc: gameId ? await dlcReport(config, gameId, ordered) : null,
     appVersion: app.getVersion(),
-    nexus: nexusAccount,
-    hasNexusKey: Boolean(config.nexusApiKey),
     // Surfaced so the UI can warn rather than silently looking freshly
     // installed to someone who had a library a minute ago.
     ...(getConfigError() ? { configError: getConfigError()! } : {}),
@@ -349,21 +331,6 @@ async function buildState(config: AppConfig): Promise<AppState> {
 
 function emitSite(event: SiteEvent): void {
   mainWindow?.webContents.send(SITE_CHANNEL, event);
-}
-
-/**
- * Validate a stored key once at startup, so the browser tab can show the
- * account straight away instead of after the first query.
- */
-export async function primeNexus(): Promise<void> {
-  const config = await loadConfig(userDataDir);
-  const key = decryptKey(config.nexusApiKey);
-  if (!key) return;
-  try {
-    nexusAccount = await validateKey(key);
-  } catch {
-    nexusAccount = null;
-  }
 }
 
 /**
@@ -1365,12 +1332,6 @@ export const handlers: SwapmeetApi = {
         emitProgress(received, total || file.size, `Downloading ${file.name}`);
       });
     } catch (err) {
-      if (err instanceof NexusAuthError) {
-        // Not a failure so much as a different route: send them to the page,
-        // where the site's own download button hands back over nxm://.
-        await shell.openExternal(mod.url);
-        throw new Error(err.message);
-      }
       throw err;
     }
 
@@ -1458,30 +1419,6 @@ export const handlers: SwapmeetApi = {
       throw new Error(`Refusing to open a ${parsed.protocol} link.`);
     }
     await shell.openExternal(parsed.toString());
-  },
-
-  async setNexusKey(apiKey) {
-    const trimmed = apiKey.trim();
-    if (!trimmed) throw new Error('Paste your Nexus personal API key first.');
-
-    try {
-      const account = await validateKey(trimmed);
-      nexusAccount = account;
-      const next = await mutate((config) => {
-        config.nexusApiKey = encryptKey(trimmed);
-      });
-      return { state: next, account };
-    } catch (err) {
-      nexusAccount = null;
-      return { state: await state(), account: null, error: (err as Error).message };
-    }
-  },
-
-  async clearNexusKey() {
-    nexusAccount = null;
-    return mutate((config) => {
-      delete config.nexusApiKey;
-    });
   },
 
   async windowMinimize() {

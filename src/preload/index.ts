@@ -74,8 +74,6 @@ const METHODS: ApiMethod[] = [
   'listSites',
   'openSite',
   'openExternal',
-  'setNexusKey',
-  'clearNexusKey',
   'windowMinimize',
   'windowMaximize',
   'windowClose',
