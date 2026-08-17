@@ -2180,11 +2180,10 @@ button:disabled {
 /* ===========================================================================
  * Tools, from the "Settings & Browse" mockup.
  *
- * Three routes, three visual languages, and the difference is the point: a
- * dashed band you can drop onto, a solid list with real install buttons, and
- * a column of doorways with no listing behind them. Giving all three the same
- * card is what made the previous version read as a catalogue that returns
- * nothing.
+ * Two routes, two visual languages, and the difference is the point: a solid
+ * list with real install buttons, and a column of doorways with no listing
+ * behind them. Giving both the same card is what made the previous version
+ * read as a catalogue that returns nothing.
  * ======================================================================== */
 
 .tools {
@@ -2208,41 +2207,6 @@ button:disabled {
 
 .tools-sub {
   font: 400 13px var(--sans);
-  color: var(--dim);
-  margin-top: 3px;
-}
-
-/* Route one. Dashed because it is a target, not a button. */
-.drop-band {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  min-height: 104px;
-  padding: 0 28px;
-  border: 1.5px dashed color-mix(in oklch, var(--blue) 40%, transparent);
-  border-radius: 12px;
-  background: var(--panel);
-}
-
-.drop-band-icon {
-  flex: none;
-  font: 400 34px var(--sans);
-  color: var(--blue);
-}
-
-.drop-band-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.drop-band-title {
-  font: 600 17px var(--sans);
-  color: var(--text);
-}
-
-.drop-band-sub {
-  font: 400 12.5px var(--sans);
   color: var(--dim);
   margin-top: 3px;
 }
@@ -2501,23 +2465,9 @@ button:disabled {
   padding: 40px;
 }
 
-.tools-empty-zone {
-  width: 640px;
-  max-width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  padding: 56px 40px;
-  border: 1.5px dashed color-mix(in oklch, var(--blue) 40%, transparent);
-  border-radius: 16px;
-  background: var(--panel);
+.tools-empty-lead {
   text-align: center;
-}
-
-.tools-empty-icon {
-  font: 400 44px var(--sans);
-  color: var(--blue);
+  max-width: 560px;
 }
 
 .tools-empty-title {

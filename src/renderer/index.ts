@@ -2172,13 +2172,14 @@ function renderSettings(s: AppState, view: HTMLElement): void {
 // --- Tools --------------------------------------------------------------------
 
 /**
- * Tools: the three ways a mod gets into GTArage.
+ * Tools: where a mod comes from.
  *
- * Built from the "Settings & Browse" mockup, which argues that the three
- * routes should look as different as they behave. They are not variations on
- * a listing: dropping a file is a target, Essentials is a short fixed list
- * with real install buttons, and a community site is a doorway where all the
- * app can do is catch what you download.
+ * Built from the "Settings & Browse" mockup, which argues that the routes in
+ * should look as different as they behave. They are not variations on a
+ * listing: Essentials is a short fixed list with real install buttons, and a
+ * community site is a doorway where all the app can do is catch what you
+ * download. The mockup's drop band was removed by request -- dropping a file
+ * still works anywhere in the window, it just is not advertised here.
  *
  * There is deliberately no search. The previous version had one, over a
  * catalogue that does not exist, and people reasonably concluded the app was
@@ -2246,26 +2247,6 @@ async function installEssential(entry: EssentialView, gameId: GameId): Promise<v
     toolInstalling = null;
     render();
   }
-}
-
-/** The drop band: route one, and the only one that works with no network. */
-function dropBand(): HTMLElement {
-  const band = el('div', 'drop-band');
-  band.appendChild(el('div', 'drop-band-icon', '⬇'));
-  const main = el('div', 'drop-band-main');
-  main.appendChild(el('div', 'drop-band-title', 'Drop a file you already have'));
-  main.appendChild(
-    el(
-      'div',
-      'drop-band-sub',
-      '.zip, .rar, .oiv, a folder, or a loose .asi — anywhere in this window. Works offline, no account.',
-    ),
-  );
-  band.appendChild(main);
-  const pick = el('button', 'btn', 'Choose a file instead');
-  pick.addEventListener('click', () => void installMod('files'));
-  band.appendChild(pick);
-  return band;
 }
 
 /** One Essentials row, in whichever of its six states applies. */
@@ -2463,20 +2444,16 @@ function sitesPanel(gameId: GameId): HTMLElement {
 function toolsFirstRun(s: AppState, gameId: GameId): HTMLElement {
   const wrap = el('div', 'tools-empty');
 
-  const zone = el('div', 'tools-empty-zone');
-  zone.appendChild(el('div', 'tools-empty-icon', '⬇'));
-  zone.appendChild(el('div', 'tools-empty-title', 'Drop a mod file to get started'));
-  zone.appendChild(
+  const lead = el('div', 'tools-empty-lead');
+  lead.appendChild(el('div', 'tools-empty-title', 'Nothing here yet'));
+  lead.appendChild(
     el(
       'div',
       'tools-empty-sub',
-      '.zip, .rar, .oiv, a folder, or a loose .asi. This works right now, offline, with nothing else set up.',
+      'Install one of the essential tools, or open a community site and download as you normally would.',
     ),
   );
-  const pick = el('button', 'btn', 'Choose a file instead');
-  pick.addEventListener('click', () => void installMod('files'));
-  zone.appendChild(pick);
-  wrap.appendChild(zone);
+  wrap.appendChild(lead);
 
   const cards = el('div', 'tools-empty-cards');
 
@@ -2546,7 +2523,7 @@ function renderTools(s: AppState, view: HTMLElement): void {
   const head = el('div', 'tools-head');
   head.appendChild(el('div', 'tools-title', 'Get mods into GTArage'));
   head.appendChild(
-    el('div', 'tools-sub', 'There’s no catalogue here — mods arrive one of three ways.'),
+    el('div', 'tools-sub', 'There’s no catalogue here — mods come from the essentials list or a community site.'),
   );
   page.appendChild(head);
 
@@ -2556,8 +2533,6 @@ function renderTools(s: AppState, view: HTMLElement): void {
     view.appendChild(page);
     return;
   }
-
-  page.appendChild(dropBand());
 
   const cols = el('div', 'tools-cols');
   cols.appendChild(essentialsPanel(s, gameId));
