@@ -69,6 +69,19 @@ export interface EssentialView {
   outdated?: boolean;
 }
 
+/**
+ * Whether GTA V Enhanced is set to start without BattlEye.
+ *
+ * `known` is false when there is no Steam account file to read, which is the
+ * normal case for a copy bought elsewhere — the UI must then say it cannot
+ * tell rather than showing the flag as off.
+ */
+export interface BattlEyeView {
+  enabled: boolean;
+  known: boolean;
+  steamRunning: boolean;
+}
+
 export interface EssentialsView {
   entries: EssentialView[];
   /**
@@ -496,6 +509,13 @@ export interface GTArageApi {
     id: string,
     gameId: GameId,
   ): Promise<{ state: AppState; imported: boolean; message: string }>;
+  /** Whether Enhanced is set to launch without BattlEye. */
+  battlEyeState(): Promise<BattlEyeView>;
+  /**
+   * Add or remove `-nobattleye` from Enhanced's Steam launch options.
+   * Rejects while Steam is running, because Steam would undo it.
+   */
+  setBattlEye(disabled: boolean): Promise<{ state: AppState; message: string }>;
   /** Mod sites available for a game. */
   listSites(gameId: GameId): Promise<ModSite[]>;
   /** Open the embedded browser at a site. Downloads there are captured. */

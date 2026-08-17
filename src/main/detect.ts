@@ -35,7 +35,7 @@ interface Candidate {
 // --- storefront probes ------------------------------------------------------
 
 /** Read Steam's install path out of the registry, with fallbacks. */
-async function steamRoot(): Promise<string | null> {
+export async function steamRoot(): Promise<string | null> {
   if (process.platform === 'win32') {
     const fromReg = await regQuery(
       'HKCU\\Software\\Valve\\Steam',

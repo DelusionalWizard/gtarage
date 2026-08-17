@@ -1854,6 +1854,74 @@ async function switchAndPlay(profile: Profile): Promise<void> {
  * recommended, and explained in terms of what goes wrong without them. The
  * cosmetic ones come after and look like preferences, because they are.
  */
+/**
+ * The BattlEye toggle for GTA V Enhanced.
+ *
+ * Reads its own state rather than taking it from AppState: it lives in
+ * Steam's config, not ours, and the user can change it in Steam behind our
+ * back. Rendered disabled until that read comes back, so it can never show
+ * "Disable" for something already disabled.
+ */
+function battlEyeButton(): HTMLElement {
+  const btn = el('button', 'btn', 'Checking BattlEye…');
+  btn.disabled = true;
+
+  const paint = (view: BattlEyeView): void => {
+    if (!view.known) {
+      btn.textContent = 'BattlEye: unknown';
+      btn.title =
+        'GTArage could not find a Steam account file to read, so it cannot tell whether BattlEye is off. Set -nobattleye in your launcher yourself.';
+      btn.disabled = true;
+      return;
+    }
+    btn.disabled = false;
+    btn.textContent = view.enabled ? 'Turn BattlEye back on' : 'Disable BattlEye';
+    btn.title = view.enabled
+      ? 'Remove -nobattleye from this game’s Steam launch options.'
+      : 'Add -nobattleye to this game’s Steam launch options so script mods can load. Story mode only — never go online with mods.';
+    btn.classList.toggle('is-on', view.enabled);
+  };
+
+  const load = (): void => {
+    void api
+      .battlEyeState()
+      .then(paint)
+      .catch(() => {
+        btn.textContent = 'BattlEye: unknown';
+        btn.disabled = true;
+      });
+  };
+
+  btn.addEventListener('click', async () => {
+    const view = await api.battlEyeState().catch(() => null);
+    if (!view) return;
+    const turningOff = !view.enabled;
+
+    if (turningOff) {
+      const ok = await confirmModal(
+        'Disable BattlEye for GTA V Enhanced?',
+        'This adds -nobattleye to the game’s Steam launch options, which is what lets script mods load at all. It is for story mode. Going online with mods loaded — with or without BattlEye — is what gets accounts banned, so keep using the vanilla setup before you go online. Steam has to be closed: it rewrites its own settings when it exits, and would undo this.',
+        'Disable it',
+      );
+      if (!ok) return;
+    }
+
+    btn.disabled = true;
+    try {
+      const result = await api.setBattlEye(turningOff);
+      apply(result.state);
+      toast(result.message, turningOff ? 'warn' : 'ok');
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    } finally {
+      load();
+    }
+  });
+
+  load();
+  return btn;
+}
+
 function renderSettings(s: AppState, view: HTMLElement): void {
   const sheet = el('div', 'sheet');
 
@@ -2001,6 +2069,12 @@ function renderSettings(s: AppState, view: HTMLElement): void {
         if (next) apply(next);
       });
       row.appendChild(forget);
+
+      // Enhanced ships BattlEye, which stops script mods loading at all. The
+      // flag is Steam's, not ours, so this only appears for a Steam copy.
+      if (game.id === 'gta5e' && game.source === 'steam') {
+        row.appendChild(battlEyeButton());
+      }
     }
     gameRows.appendChild(row);
   }
@@ -2609,7 +2683,7 @@ function renderLibrary(s: AppState, view: HTMLElement): void {
   const bar = el('div', 'lib-bar');
   const search = el('input', 'lib-search') as HTMLInputElement;
   search.type = 'search';
-  search.placeholder = `Search ${mods.length} mods`;
+  search.placeholder = `Search ${mods.length} mod${mods.length === 1 ? '' : 's'}`;
   search.value = librarySearch;
   search.addEventListener('input', () => {
     librarySearch = search.value;
@@ -2692,7 +2766,6 @@ function renderLibraryRows(s: AppState, host: HTMLElement): void {
     const main = el('div', 'lib-col-mod');
     const title = el('div', 'lib-row-title');
     title.appendChild(el('span', 'lib-name', mod.name));
-    title.appendChild(el('span', 'tag', plainKind(mod.kind)));
     const needers = s.mods.filter((m) => m.requires.includes(mod.id));
     if (needers.length > 0) {
       title.appendChild(
@@ -2713,7 +2786,7 @@ function renderLibraryRows(s: AppState, host: HTMLElement): void {
       'div',
       'lib-col-used',
       used.length === 0
-        ? 'In no setup'
+        ? ''
         : used.length <= 2
           ? used.map((p) => p.name).join(', ')
           : `${used.length} setups`,
@@ -2806,16 +2879,25 @@ function libraryDetail(s: AppState, mod: Mod): HTMLElement {
   panel.appendChild(section);
 
   // --- add to another setup -------------------------------------------------
+  // Shown for every mod, not only the ones with somewhere left to go.
+  // Hiding it when a mod is already in every setup meant the control came and
+  // went between selections, which reads as the button being broken rather
+  // than as there being nothing to add it to.
   const free = usable.filter((p) => !p.order.includes(mod.id));
-  if (free.length > 0) {
+  {
     const add = el('select', 'lib-add') as HTMLSelectElement;
-    const placeholder = el('option', undefined, 'Add to another setup');
+    const placeholder = el('option', undefined, 'Add to a setup');
     placeholder.value = '';
     add.appendChild(placeholder);
     for (const profile of free) {
       const option = el('option', undefined, profile.name);
       option.value = profile.id;
       add.appendChild(option);
+    }
+    if (free.length === 0) {
+      add.disabled = true;
+      placeholder.textContent =
+        usable.length === 0 ? 'No setups to add it to yet' : 'Already in every setup';
     }
     add.addEventListener('change', async () => {
       if (!add.value) return;

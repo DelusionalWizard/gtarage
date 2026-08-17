@@ -25,6 +25,7 @@ type HookCandidateView = import('../shared/api').HookCandidateView;
 type SiteEvent = import('../shared/api').SiteEvent;
 type EssentialView = import('../shared/api').EssentialView;
 type EssentialsView = import('../shared/api').EssentialsView;
+type BattlEyeView = import('../shared/api').BattlEyeView;
 type ModSite = import('../shared/sites').ModSite;
 
 type Conflict = import('../shared/types').Conflict;

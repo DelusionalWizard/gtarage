@@ -35,6 +35,7 @@ import {
 } from '../shared/planner';
 import type {
   AppState,
+  BattlEyeView,
   EssentialsView,
   EssentialView,
   SiteEvent,
@@ -80,6 +81,7 @@ import {
 } from './graphics';
 import { browseEssentials } from './providers/github';
 import { listSites, openModSite } from './modsites';
+import { NO_BATTLEYE, isSteamRunning, launchFlagState, setLaunchFlag } from './steam';
 import type { AppConfig, GameId, Mod, Profile, SwapPlan } from '../shared/types';
 import {
   activeProfileFor,
@@ -1453,6 +1455,29 @@ export const handlers: GTArageApi = {
     const file = mod.files.find((f) => f.primary) ?? mod.files[0];
     if (!file) throw new Error(`${mod.name} has no downloadable file right now.`);
     return installCatalogFile(mod, file, gameId);
+  },
+
+  async battlEyeState() {
+    const state_ = await launchFlagState(getGame('gta5e').steamAppIds[0]!, NO_BATTLEYE);
+    return { ...state_, steamRunning: await isSteamRunning() };
+  },
+
+  async setBattlEye(disabled) {
+    const result = await setLaunchFlag(
+      getGame('gta5e').steamAppIds[0]!,
+      NO_BATTLEYE,
+      disabled,
+    );
+    const where =
+      result.written.length > 0
+        ? ` Wrote to ${result.written.length} Steam account file${result.written.length === 1 ? '' : 's'}, with a backup of each alongside.`
+        : ' It was already set that way, so nothing was changed.';
+    return {
+      state: await state(),
+      message: disabled
+        ? `GTA V Enhanced will now start with ${NO_BATTLEYE}.${where} Do not take it online with mods loaded.`
+        : `BattlEye is back on for GTA V Enhanced.${where}`,
+    };
   },
 
   async listSites(gameId) {
