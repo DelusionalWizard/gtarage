@@ -421,3 +421,85 @@ test('a mid-deploy failure still records the displaced original', async (t) => {
     assert.equal(await read(recorded!.backup!), 'VANILLA-ORIGINAL');
   }
 });
+
+// --- companion folders -----------------------------------------------------
+//
+// The layout that keeps breaking in real use. ChaosMod, Menyoo and the various
+// trainers all ship a loose `.asi` plus a folder of data beside it, and the
+// folder is not optional - without it the plugin loads and immediately fails.
+// Reported repeatedly as "the folder does not come back" and "the asi does not
+// get put back", so the whole round trip is asserted here, not just the deploy.
+
+const CHAOS = {
+  'ChaosMod.asi': 'plugin binary',
+  'chaosmod/config.ini': 'settings',
+  'chaosmod/effects/nested.dat': 'deeply nested data',
+  'chaosmod/twitch/auth.txt': 'more data',
+};
+
+test('a mod with a companion folder deploys every file, not just the asi', async (t) => {
+  const h = await makeHarness();
+  t.after(() => cleanup(h));
+
+  const mod = await makeMod(h, 'chaos', CHAOS, { kind: 'asi' });
+  h.config.mods = [mod];
+  const p = profile({ order: ['chaos'], enabled: ['chaos'] });
+  h.config.profiles = [p];
+
+  await deployProfile(h.config, 'gta5', h.gamePath, p, [mod]);
+
+  for (const rel of Object.keys(CHAOS)) {
+    assert.ok(
+      await present(path.join(h.gamePath, rel)),
+      `${rel} should have been deployed`,
+    );
+  }
+});
+
+test('undeploying a mod with a companion folder leaves nothing behind', async (t) => {
+  const h = await makeHarness();
+  t.after(() => cleanup(h));
+
+  const before = await snapshot(h.gamePath);
+
+  const mod = await makeMod(h, 'chaos', CHAOS, { kind: 'asi' });
+  h.config.mods = [mod];
+  const p = profile({ order: ['chaos'], enabled: ['chaos'] });
+  const vanilla = profile({ id: 'v', name: 'Vanilla', vanillaLock: true });
+  h.config.profiles = [p, vanilla];
+
+  await deployProfile(h.config, 'gta5', h.gamePath, p, [mod]);
+  await deployProfile(h.config, 'gta5', h.gamePath, vanilla, [mod]);
+
+  // The folder itself must go too, not just the files inside it: an empty
+  // `chaosmod/` left in the game folder is exactly the litter people report.
+  assert.ok(
+    !(await present(path.join(h.gamePath, 'chaosmod'))),
+    'the companion folder should be gone entirely',
+  );
+  assert.deepEqual(
+    await snapshot(h.gamePath),
+    before,
+    'the game folder should be exactly as it was found',
+  );
+});
+
+test('a companion folder comes back when the profile is applied again', async (t) => {
+  const h = await makeHarness();
+  t.after(() => cleanup(h));
+
+  const mod = await makeMod(h, 'chaos', CHAOS, { kind: 'asi' });
+  h.config.mods = [mod];
+  const p = profile({ order: ['chaos'], enabled: ['chaos'] });
+  const vanilla = profile({ id: 'v', name: 'Vanilla', vanillaLock: true });
+  h.config.profiles = [p, vanilla];
+
+  await deployProfile(h.config, 'gta5', h.gamePath, p, [mod]);
+  await deployProfile(h.config, 'gta5', h.gamePath, vanilla, [mod]);
+  await deployProfile(h.config, 'gta5', h.gamePath, p, [mod]);
+
+  for (const [rel, content] of Object.entries(CHAOS)) {
+    assert.ok(await present(path.join(h.gamePath, rel)), `${rel} should be back`);
+    assert.equal(await read(path.join(h.gamePath, rel)), content, `${rel} intact`);
+  }
+});

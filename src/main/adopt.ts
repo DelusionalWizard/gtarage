@@ -114,6 +114,31 @@ const MOD_ONLY_DIR = /(^|\/)(scripts|cleo|modloader|~mods|ue4ss)(\/|$)/i;
  * breaks the game. Every name here was observed in a real GTA V, GTA V
  * Enhanced or Definitive Edition install.
  */
+/**
+ * Does `folder` look like the data folder belonging to `asiBase`?
+ *
+ * An exact name match is what this used to require, and it is wrong for most
+ * of the mods that actually have a data folder:
+ *
+ *   ChaosModV.asi     ->  chaosmod/      (the plugin carries a version suffix)
+ *   Menyoo.asi        ->  menyooStuff/   (the folder carries a suffix)
+ *   NativeTrainer.asi ->  NativeTrainer/ (the only shape exact matching caught)
+ *
+ * So either side may be a prefix of the other. That catches the real naming
+ * conventions while still being tight enough that nothing claims `update/` or
+ * `x64/` - which share no prefix with any plugin name, and which the caller
+ * screens out through protectedPaths regardless.
+ *
+ * The length floor matters: a two or three character stem would prefix-match
+ * half the directories in a game folder.
+ */
+export function isCompanionFolder(asiBase: string, folder: string): boolean {
+  const a = asiBase.toLowerCase();
+  const f = folder.toLowerCase();
+  if (a.length < 4 || f.length < 4) return a === f;
+  return a === f || a.startsWith(f) || f.startsWith(a);
+}
+
 const ENGINE_DLL =
   /^(bink2w64|binkawin64|d3dcompiler_\d+|d3dcsx_\d+|dstorage|dstoragecore|fvad|libcurl|libtox|opus|opusenc|steam_api64|steam_api|xcurl|zlib1|turbojpeg|mtlx|oo2core[\w.]*|amd_ags_x64|amd_fidelityfx[\w]*|nvngx[\w]*|gfsdk_[\w.]+|gpuperfapi[\w-]*|nvpmapi[\w.]*|sl\.[\w]+|api-ms-win[\w-]*|msvc[pr]\d+|vcruntime\d+|concrt\d+|ucrtbase|openvr_api|openal32|physx[\w]*|apex_[\w]*|cudart[\w]*|icu[\w]*)\.dll$/i;
 
@@ -241,13 +266,27 @@ export async function findAdoptable(
    * So a loose .asi claims a sibling directory matching its base name.
    */
   const claimSiblingFolder = async (rel: string): Promise<string[]> => {
-    const base = path.basename(rel, path.extname(rel)).toLowerCase();
+    const base = path.basename(rel, path.extname(rel));
     const dir = path.dirname(rel) === '.' ? '' : `${path.dirname(rel)}/`;
-    const folder = path.join(gamePath, dir, base);
+    const parent = path.join(gamePath, dir);
 
-    if (!(await isDirectory(folder))) return [];
-    const walked = await walk(folder, 4);
-    return walked.map((f) => toPosix(`${dir}${base}/${f.rel}`));
+    let entries;
+    try {
+      entries = await fs.readdir(parent, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const out: string[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      // Never claim part of the base game, however the name lines up.
+      if (isProtectedish(def.protectedPaths, `${dir}${entry.name}`)) continue;
+      if (!isCompanionFolder(base, entry.name)) continue;
+      const walked = await walk(path.join(parent, entry.name), 4);
+      out.push(...walked.map((f) => toPosix(`${dir}${entry.name}/${f.rel}`)));
+    }
+    return out;
   };
 
   // Anything left that is unmistakably a mod becomes its own entry. Only
