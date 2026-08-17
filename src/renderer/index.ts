@@ -1436,7 +1436,6 @@ function thingRow(
   const row = el('div', 'thing');
 
   if (drag) {
-    row.draggable = true;
     row.classList.add('is-draggable');
 
     const grip = el('div', 'thing-grip');
@@ -1446,21 +1445,35 @@ function thingRow(
     grip.title = `Drag to move ${mod.name}`;
     row.appendChild(grip);
 
-    // A native drag can start from anywhere the `draggable` attribute
-    // applies, which is the whole row - the switch and the "⋯" button are
-    // inside it. Only honour a drag that actually began on the grip, or
-    // clicking the switch would occasionally yank the row instead of
-    // toggling it.
+    /*
+     * Only a drag that starts on the grip counts, so pressing the switch or
+     * the "⋯" button never yanks the row instead of activating it.
+     *
+     * Gating that on `dragstart`'s target does not work, and looked like it
+     * did: on `dragstart` the target is the element carrying `draggable`,
+     * which is the row, never the grip - so the check failed every time and
+     * cancelled every drag. Arming `draggable` on mousedown over the grip is
+     * what actually distinguishes them, because mousedown does report the
+     * element under the cursor.
+     */
+    row.draggable = false;
+    grip.addEventListener('mousedown', () => {
+      row.draggable = true;
+    });
+    row.addEventListener('mouseup', () => {
+      row.draggable = false;
+    });
+
     row.addEventListener('dragstart', (event) => {
-      if (!(event.target instanceof HTMLElement) || !event.target.closest('.thing-grip')) {
-        event.preventDefault();
-        return;
-      }
       drag.dragState.id = mod.id;
       row.classList.add('is-dragging');
+      // Firefox refuses to start a drag unless the payload is set.
+      event.dataTransfer?.setData('text/plain', mod.id);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
     });
     row.addEventListener('dragend', () => {
       drag.dragState.id = null;
+      row.draggable = false;
       row.classList.remove('is-dragging');
     });
     row.addEventListener('dragover', (event) => {
