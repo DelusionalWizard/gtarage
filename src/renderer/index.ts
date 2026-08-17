@@ -1233,12 +1233,18 @@ function setupCard(s: AppState, profile: Profile): HTMLElement {
     again.addEventListener('click', () => void startGame(profile.gameId));
     card.appendChild(again);
   } else {
+    // Switching and playing are two presses, not one. The old combined
+    // button started the game as a side effect of choosing a setup, which
+    // gave no moment to look at what had changed before the game opened.
     const play = el(
       'button',
-      `btn btn-wide ${live ? 'is-blue' : ''}`,
-      live ? 'Play now' : 'Switch and play',
+      `btn btn-wide ${live ? 'is-blue' : 'is-switch'}`,
+      live ? 'Play now' : `Switch to ${profile.name}`,
     );
-    play.addEventListener('click', () => void switchAndPlay(profile));
+    if (!live) play.title = `Install this setup's mods. The game does not start yet.`;
+    play.addEventListener('click', () =>
+      void (live ? switchAndPlay(profile) : switchTo(profile)),
+    );
     card.appendChild(play);
   }
 
@@ -1833,6 +1839,24 @@ async function openProfile(profile: Profile): Promise<void> {
  * all still have to happen. This is a faster route to the same decision, not
  * a way around it.
  */
+/**
+ * Make a setup the installed one, and stop there.
+ *
+ * The button then becomes Play now, because `live` is true once this
+ * finishes -- which is the point: you get to see what was swapped before
+ * anything launches.
+ */
+async function switchTo(profile: Profile): Promise<void> {
+  if (state?.activeProfileId !== profile.id) {
+    const next = await guard('Switching setup…', () =>
+      api.setActiveProfile(profile.gameId, profile.id),
+    );
+    if (!next) return;
+    apply(next);
+  }
+  await applyProfile(false);
+}
+
 async function switchAndPlay(profile: Profile): Promise<void> {
   if (state?.activeProfileId !== profile.id) {
     const next = await guard('Switching setup…', () =>

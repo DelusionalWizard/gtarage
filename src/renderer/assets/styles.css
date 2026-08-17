@@ -3143,6 +3143,13 @@ button:disabled {
   color: var(--orange);
 }
 
+/* A setup name goes in this one, and names can be long. */
+.btn.is-switch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .btn.is-danger {
   border-color: var(--red);
   color: var(--red);
