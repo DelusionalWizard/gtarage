@@ -4,9 +4,9 @@ Notable changes per release. Dates are release dates; versions link to their
 tag.
 
 The project was called **Swapmeet** up to and including 0.5.0-beta.1, and
-**GTArage** from 1.0.0. Only 1.0.0 has a published download — the earlier
-releases were withdrawn once it landed, though their tags are kept so any
-point in the history can still be checked out.
+**GTArage** from 1.0.0. Only 1.0.0 is downloadable: the earlier builds and
+their tags were withdrawn once it landed, so the entries below are a record
+of how the app got here rather than something you can still install.
 
 ---
 
