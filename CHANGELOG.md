@@ -142,7 +142,17 @@ along the way still ends up with its library.
 
 ### Fixed
 
-- A bug that could account for 125 GB of disk.
+- **Setting up Script Hook V from a copy already in the game folder imported
+  the entire game.** It looked like a freeze on "Setting up ScriptHookV…"; it
+  was not hung, it was copying a 120 GB GTA V install into the mod library,
+  because the detector named the game *folder* as the source rather than the
+  files. It now names Script Hook V's own five files — 2.35 MB instead of
+  120.2 GB. The orphan sweep added in the previous release cleaned up the
+  125 GB that had already landed, on the next launch, unprompted.
+- Project 127 support was reconsidered and added. An earlier decision had
+  declined it on the assumption it was DRM circumvention; that was wrong — it
+  is an MIT-licensed launcher for running GTA V at 1.27, the version the
+  Classic speedrun category uses, and it ships no game files.
 
 ---
 
