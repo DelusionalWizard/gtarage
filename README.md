@@ -12,6 +12,8 @@ MIT licensed.
 
 **[Download the latest release →](https://github.com/DelusionalWizard/gtarage/releases/latest)**
 
+[What changed, per release →](CHANGELOG.md)
+
 ---
 
 > ### ⚠️ Read this first
