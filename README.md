@@ -262,10 +262,6 @@ Grab a build from the
 GTArage checks for its own updates and can install them for you; the check can
 be turned off in Settings.
 
-**Updating from Swapmeet 0.5.0-beta.1?** The app was renamed, which moves the
-folder your library lives in, so your library, setups and shelf are moved
-across on first launch and the stored paths repointed. Nothing is deleted —
-the old folder is left where it was.
 
 ### Build from source
 
